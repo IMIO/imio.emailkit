@@ -30,7 +30,7 @@ to justify its cleverness, it is the wrong solution.
 
 ## Frozen API (§6) — do not change signatures
 
-```python
+```text
 html, text = render(name, context={...}, language=None)
 
 Email(name).to(...).cc(...).bcc(...).reply_to(...).sender(...).subject(...) \

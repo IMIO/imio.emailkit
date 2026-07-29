@@ -8,6 +8,278 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — Uninstall DOES remove the theme records
+
+**Context.** Plone's instinct is never to destroy settings on uninstall, and the first
+implementation left `imio.emailkit.theme.*` in place on that basis.
+
+**Finding that overrides it.** These records are defined by an interface shipped in this egg,
+and `plone.app.registry` resolves that interface when reading them. Once the egg is gone,
+`IEmailkitTheme` is not importable and **the registry control panel raises** on the orphaned
+records.
+
+**Choice.** `profiles/uninstall/registry.xml` removes them with `remove="true"`.
+
+**Why.** A broken control panel is a hard, site-wide failure. The three values lost are branding
+for mails that no longer exist, and reinstalling re-creates the records from the interface
+defaults — the real cost is re-entering a logo URL and a colour. Preserving settings is a good
+default; it is not worth a broken control panel.
+
+---
+
+## 2026-07-29 — §8.2 level 2 reaches the two shipped mails by a different mechanism
+
+**Context.** §8.2 level 2 offers theme tokens as the branding-only override path, and it works
+for both consumer templates and the two Plone-default mails — but **not by the same route**, and
+the difference is worth knowing before someone debugs it.
+
+**How it differs.** For consumer templates, `render()` injects `theme` into the namespace. For the
+two jbot-hosted mails there is no `render()` call, so the override template reaches the registry
+directly (via `@@emailkit_theme`). Verified working in both paths.
+
+**Consequence.** The stock view's namespace also has **no locale helpers** — a jbot-hosted override
+cannot call `format_datetime` (`NameError`) — and no `theme` variable of its own. Anything a
+default-mail template needs must come from the registry, the view, or `options`.
+
+**Why not unified.** Unifying would mean owning the view that renders those mails, which §8
+deliberately avoids ("no new mechanism", jbot only). Two routes to the same three tokens is the
+cheaper trade.
+
+---
+
+## 2026-07-29 — `zpretty` must never touch the compiled `.pt` files
+
+**Context.** The house lint runs `zpretty` over `src`. The compiled templates live under `src`.
+
+**Finding.** `zpretty`'s formatting is not Maizzle's, so letting it rewrite the generated `.pt`
+files puts two gates in direct conflict: `make check` would reformat them and `make check-emails`
+would then report them stale **forever**.
+
+**Choice.** `zpretty` is pointed at hand-written markup and configuration only (`*.zcml`, `*.xml`),
+never at `templates/` or `browser/overrides/`. Recorded in the Makefile at the point of use.
+
+**Why this way round.** When a formatting gate and a correctness gate disagree, the correctness gate
+wins: `check-emails` is what stands between a stale template and production.
+
+**Related.** `ruff` excludes `spike/` (throwaway Phase 0 evidence, slated for deletion) and
+`.claude/` (agent definitions whose fenced examples are illustrative, not runnable).
+
+---
+
+## 2026-07-29 — `is_product_installed()` is False on a `:base`-only site
+
+**Context.** §8.2 level 3 makes `:base` a first-class install, not a half-installed state.
+
+**Finding.** Plone's quick-installer answers "was the `default` profile applied?", so on a
+`:base`-only site `is_product_installed("imio.emailkit")` returns `False` even though the runtime is
+fully present and working.
+
+**Choice.** Accept the quirk; do not add a shim. Tests check `portal_setup` profile versions
+instead, and the README documents it.
+
+**Why.** It is Plone's definition of "installed", not ours to redefine, and §8.2's opt-out is about
+which *profile* you applied. A shim would misreport the opposite way for anyone reading the
+add-ons panel.
+
+---
+
+## 2026-07-29 — RESOLVED (§4.2): plaintext twins are hand-authored, not generated
+
+**Context.** §4 requires a `<name>.txt.pt` twin "placeholders intact"; §6.1 returns `(html, text)`.
+Phase 1 was to settle generation with evidence.
+
+**Finding.** Maizzle's plaintext output is unusable as a `.txt.pt`. Measured: `${}` survives, but
+every `tal:`/`i18n:` construct is destroyed — conditionals vanish, header lines come out empty,
+`i18n:translate` freezes at the English default, and `structure body_html` disappears entirely.
+
+**Choice.** Twins are **hand-authored** where plaintext quality matters. Where absent, `render()`
+uses §4's documented naive-extraction fallback with a startup warning and a once-per-template
+logged deprecation. Maizzle's `plaintext` option is not used.
+
+**Why.** A generated twin that silently loses conditionals and translations is worse than no twin:
+it would ship a plausible-looking plaintext body with the wrong content in the wrong language. §4
+already anticipated the fallback, so nothing downstream changes.
+
+**Phase 1 scope.** The two default mails need no twin — the stock view sends a single body whose
+`Content-Type` the template declares. `notification` exercises the fallback path.
+
+---
+
+## 2026-07-29 — Four more silent-failure modes in the Maizzle→Chameleon seam
+
+**Context.** Phase 1's kit work surfaced four defects that, like every Phase 0 caveat, produce a
+**successful build**. Recorded because each needs a permanent guard, and two of them mean Phase 0's
+committed output was subtly wrong.
+
+1. **`@import "@maizzle/tailwindcss"` cannot live in `kit/tailwind.css`.** Tailwind resolves bare
+   specifiers by walking up from the *importing* file, and a kit directory inside an egg has no
+   `node_modules` ancestor. **Maizzle catches CSS errors and ships the uncompiled stylesheet with
+   exit 0** — so this fails completely silently. Fix: `Main.vue` emits the import itself (where
+   Maizzle's PostCSS plugin rewrites it to an absolute path) and `@import`s the kit CSS by absolute
+   path. This is a documented deviation from §3's implied `tailwind.css` role: the file holds the
+   `@theme` tokens, not the framework import.
+2. **`<Outlook :open="…" />` with an empty slot emits `<!--[endif]---->`** — a `--` inside a
+   comment, i.e. caveat A2, making the `.pt` unparseable by Chameleon. Use real slot content, or
+   `v-html`.
+3. **The formatter breaks conditional comments across lines, and Chameleon then re-serialises them
+   as `<!--[if mso ]>…<! [endif]-->`.** Outlook silently ignores **every** MSO fallback.
+   **Phase 0 shipped this latent** — its single-line comments happened to mask it. Fix: a
+   `flattenConditionalComments` pass in `afterTransform`.
+4. **`htmlWhitespaceSensitivity: 'ignore'` breaks the line between an inline element and following
+   punctuation**, rendering "account x ." — and because that text is also the `i18n:translate`
+   default, the stray space is baked into the `.pot`. `'css'` or a larger `printWidth` fixes the
+   prose but breaks the conditional comments or the line-granular diffs, so the fix is a narrow
+   `unbreakPunctuation` pass instead.
+
+Also: **`Subject: <span i18n:translate=…>` needs `tal:omit-tag=""`.** Without it the header ships as
+`Subject: <span>Reset your password</span>` — a corrupt mail header. The Phase 0 spike had this bug.
+
+**Why this matters more than the individual fixes.** Every one of these is invisible to the build
+and to a browser preview. It is now the settled position of this project that **the Maizzle exit
+code carries almost no information about correctness**, and that the only trustworthy gates are the
+committed-output diff (§5) and rendering assertions on substituted values (§7).
+
+---
+
+## 2026-07-29 — Theme tokens colour cells via `bgcolor`, not `style`
+
+**Context.** The amended theme-token decision settled on `tal:attributes="style string:…"`.
+
+**Refinement.** For background colours the kit uses `bgcolor="${…}"` rather than a `style`
+attribute. `bgcolor` is never parsed as CSS, so caveat A1 cannot apply to it, and it remains the
+most bulletproof way to colour a table cell across mail clients. `tal:attributes="style string:…"`
+stays the rule for anything that genuinely needs CSS.
+
+---
+
+## 2026-07-29 — `lang` chain includes `request/LANGUAGE`
+
+**Context.** Plan §4.1 gave `Main.vue` the chain `lang | options/lang | string:en`.
+
+**Finding.** Under the two jbot-rendered stock mails neither `lang` nor `options/lang` is present,
+so every mail rendered `lang="en"` — defeating §3's `lang` a11y default and the FR/NL/DE
+requirement outright.
+
+**Choice.** `lang | options/lang | request/LANGUAGE | string:en`. Verified to yield
+`<html lang="fr">`.
+
+---
+
+## 2026-07-29 — OPEN: dark mode in `Main.vue`
+
+**Context.** §3 lists "dark mode" among `Main.vue`'s responsibilities.
+
+**Status.** Phase 1 ships only `color-scheme` / `supported-color-schemes` meta tags, not real
+`prefers-color-scheme` CSS. Flagged rather than silently skipped.
+
+**Why deferred.** A working dark-mode block needs element-level (class-free) selectors to survive
+`css.purge`, plus per-client testing that browser previews cannot give. Scheduled with the
+send-test button (§6.3, Phase 2), which is the first point at which it can actually be verified in
+Outlook and Gmail.
+
+---
+
+## 2026-07-29 — `@@emailkit_theme` view: how theme tokens reach a stock-view-rendered mail
+
+**Context.** §8.2 level 2 says branding adjustments happen through the three theme tokens in
+`plone.app.registry`. §6.1 has `render()` inject `theme/*` into the namespace. But the two
+Plone-default mails are rendered by a **stock view**, so `render()` never runs and nothing puts
+`theme` in the namespace.
+
+**Finding.** Without a route, `Main.vue`'s `theme | options/theme | nothing` fallback resolved to
+`nothing` and the layout fell back to its hard-coded default colour — the registry was **silently
+ignored for exactly the two mails Phase 1 ships**. §8.2 level 2 was broken where it mattered most.
+
+**Choice.** A small browser view, `@@emailkit_theme`, returning the token mapping from the
+registry. `Main.vue`'s chain becomes
+`theme | options/theme | context/@@emailkit_theme | nothing`.
+
+**Why.** A view is the boring Plone mechanism for "expose some data to a template that a view I do
+not control is rendering", and it costs one file. Verified: a registry value of `#123456` reaches
+the rendered stock mail and the kit default disappears.
+
+**Scope note.** Not in §6's API surface, and not a builder method, so §6.2's freeze is untouched.
+Recorded because it was added outside the original workstream brief.
+
+---
+
+## 2026-07-29 — Locale helpers use `zope.i18n` CLDR, not `plone.api.portal.get_localized_time`
+
+**Context.** §6.1 requires `format_date`, `format_datetime`, `format_number` "bound to the render
+language", and describes `render()` as a "pure function of (template, context, registry state)".
+
+**Options.** (A) `plone.api.portal.get_localized_time` / Plone's `translation_service`;
+(B) `zope.i18n`'s CLDR locale data.
+
+**Choice.** **B.**
+
+**Why.** (A) formats in the *request's* negotiated language and needs a request, a portal and the
+translation service. It cannot be pointed at an arbitrary language, which §6.2's per-language
+sending requires, and the request dependency contradicts §6.1's "pure function… used directly by
+previews and tests".
+
+**Trade-off, accepted knowingly.** Plone's control-panel date-format overrides do **not** reach
+mails. Given that emails are a separate visual channel with their own shell, that is defensible;
+if a client ever needs it, the helper is one function to change.
+
+**Sub-decisions.** Date length `long`, time length `short`, because zope.i18n's bundled CLDR data
+is stale: `medium` fr/nl dates emit two-digit years and `long` times append a broken `+000`.
+Also noted: `fr` groups thousands with NBSP while `fr-BE` uses `.` — Belgian French differs from
+French French, which matters for this audience.
+
+---
+
+## 2026-07-29 — Locale helpers must be called as `${python: format_date(x)}`
+
+**Context.** §6.1 injects the helpers into the render namespace.
+
+**Finding.** TAL **path** expressions cannot call functions: `${format_date(when)}` raises
+`Invalid variable name`. The working form is `${python: format_date(when)}`.
+
+**Choice.** Document it as a §3 authoring rule and add it to §5's lint checks in Phase 4.
+
+**Why recorded.** It is exactly the class of mistake this project keeps finding: it is a *parse*
+error rather than a silent one, so it fails loudly — but authors will hit it constantly, and the
+lint is nearly free.
+
+---
+
+## 2026-07-29 — Default-mail templates are built once and copied to the jbot overrides dir
+
+**Context.** §8 states the restyled Plone mails are "authored, compiled, discovered, tested and
+shipped exactly like consumer templates". §4's discovery resolves `<directory>/<name>.pt`, while
+z3c.jbot demands a **dotted** filename such as
+`Products.CMFPlone.browser.login.templates.mail_password_template.pt`.
+
+**Finding.** Phase 1's first pass emitted the compiled output only into `browser/overrides/` under
+the dotted names, so discovery skipped both templates and `available_templates()` came back empty
+— §8's "discovered … exactly like consumer templates" was false.
+
+**Options.** (A) build to `templates/<name>.pt` as canonical, then copy to
+`browser/overrides/<dotted>.pt`; (B) register discovery against the dotted names; (C) accept that
+the two default mails are jbot-only and amend §8.
+
+**Choice — revised to (C).** Option A was chosen first and is **withdrawn**: it does not work.
+
+**Why A fails.** Copying the file makes it *discoverable* but not *renderable*. These two templates
+are rendered by a stock Plone view, so per Phase 0 caveat D2 they must speak the hosting view's
+dialect (`options/…`, `python:member.getProperty('…')`) — `MemberData` cannot be path-traversed at
+all. `render()` supplies a flat context and would fail on them wherever the file sits. The blocker
+is the **dialect**, not the path, so relocating the file only produces a registration that raises
+`TemplateNotFound`'s cousin at render time. Measured by the kit workstream.
+
+**What we do instead.** The two default mails are jbot-only and are not registered as discoverable
+templates. `templates/notification.pt` — an ordinary template in the flat dialect — is what
+demonstrates and tests the normal consumer flow end to end.
+
+**Consequence for §8.** Its claim that the default mails are "authored, compiled, discovered,
+tested and shipped exactly like consumer templates" is true for *authored, compiled, tested and
+shipped* but **not for discovered**, and cannot be while a stock view renders them. §8's dogfooding
+intent still holds: they go through the same kit, the same build, the same staleness gate and the
+same golden tests. Recorded as a spec correction rather than engineered around.
+
+---
+
 ## 2026-07-29 — jbot wiring: include the whole `z3c.jbot` package, never just `meta.zcml`
 
 **Context.** §8.1 registers the jbot directory on `IEmailkitLayer`. How jbot itself is loaded is
@@ -213,10 +485,13 @@ second registration to keep in sync, per §8's "no new mechanism" preference.
 
 **Findings.**
 
-- **A partial `css:` key does not deep-merge with the defaults.** Supplying only `css.purge`
-  silently drops `inline`, `shorthand`, `safe` and `preferUnitless` — the build succeeds and
-  nothing is inlined. Every key must be restated. This initially masqueraded as "inlining is
-  broken in Maizzle 6".
+- **Restate every `css` key in the kit's base config.** ⚠️ **The original reason given here was
+  wrong and is corrected:** Maizzle merges config with `defu`, which *does* deep-merge — a config
+  supplying only `css.purge` still resolves `inline: true`. That claim was an untested hypothesis
+  formed while chasing the dead-inlining symptom, whose real and only cause was caveat A1. The
+  advice survives on different grounds: §3 has consumers **extend** the base config, and a consumer
+  that spreads it (`{...base, css: {…}}`) shadows whole keys, because object spread is shallow.
+  Restating the keys makes that shadowing harmless.
 - **A top-level SFC `<style>` block never reaches the email** (standard Vue semantics — the
   bundler extracts it). Purge then strips the now-orphaned class from the `class` attribute too.
   Custom CSS must be a real `<style>` **element** inside `<template>`, or live in the kit's CSS

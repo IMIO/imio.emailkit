@@ -321,9 +321,16 @@ blocked. Carried into Phase 1 as an open item in `docs/DECISIONS.md`.
    theme-token bug even produced a page that renders in a browser. This is the strongest
    argument for §5's `check-emails` lint and §7's golden files: the build exit code carries
    almost no information about correctness.
-2. **A partial `css:` config key does not deep-merge** with Maizzle's defaults. Supplying only
-   `css.purge` drops `inline`, `shorthand`, `safe` and `preferUnitless`. This cost real time and
-   initially masqueraded as "inlining is broken". Every key must be restated.
+2. ~~A partial `css:` config key does not deep-merge with Maizzle's defaults.~~
+   **CORRECTED 2026-07-29 — this claim was wrong.** Maizzle merges config with `defu`, which deep-
+   merges: `resolveConfig` on a config supplying only `css.purge` returns
+   `{"inline":true,"purge":{…},"shorthand":true,"safe":true,"preferUnitless":true}`. The original
+   claim was a hypothesis formed while chasing the dead-inlining symptom and was never tested
+   directly; the sole cause of that symptom was caveat A1's placeholder-in-`style`. Recorded here
+   rather than deleted, because the wrong diagnosis was committed and acted on.
+   The *practical advice* — restate every `css` key in the kit's base config — still stands, but for
+   a different reason: a consumer that **spreads** the base object (`{...base, css: {…}}`) shadows
+   whole keys, since object spread is shallow. Every key must be restated.
 3. **A top-level SFC `<style>` block never reaches the email** — standard Vue semantics: the
    bundler extracts it. Purge then strips the now-orphaned class from the `class` attribute too.
    Custom CSS must be a real `<style>` *element* inside `<template>`.

@@ -91,7 +91,7 @@ def main(argv):
         print(f"\n=== {path} ===")
         try:
             out = render(path)
-        except Exception as exc:  # noqa: BLE001 - we want the class name shown
+        except Exception as exc:
             print(f"  [FAIL] Chameleon could not render: "
                   f"{type(exc).__name__}: {exc}")
             failures += 1

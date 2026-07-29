@@ -129,6 +129,11 @@ showcontent = true
 target-version = "py310"
 line-length = 88
 fix = true
+# `spike/` is committed Phase 0 evidence, deliberately throwaway and deleted once
+# the kit supersedes it. Holding it to the package's lint standard would only
+# generate noise about code nobody will maintain. `.claude/` holds agent
+# definitions whose fenced examples are illustrative, not runnable.
+exclude = ["spike", ".claude"]
 lint.select = [
     "YTT", "S", "B", "A", "C4", "T10", "SIM", "C90",
     "E", "W", "F", "PGH", "UP", "RUF",
