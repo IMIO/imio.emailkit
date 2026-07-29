@@ -35,9 +35,10 @@ commune are the ones nobody ever gets round to designing.
   restyles Plone's password-reset and user-registration mails, with no extra
   package and no opt-in step.
 - **A two-stage pipeline with a build-time seam.** Maizzle compiles `.vue` into
-  email-safe HTML (inlined CSS, Outlook fallbacks, dark mode); the output is
-  committed as `.pt` and rendered by Chameleon at runtime. Node is a
-  developer/CI tool only.
+  email-safe HTML (inlined CSS, Outlook fallbacks); the output is committed as
+  `.pt` and rendered by Chameleon at runtime. Node is a developer/CI tool only.
+  Dark mode currently ships as `color-scheme` hints only, not
+  `prefers-color-scheme` rules — see `docs/DECISIONS.md`.
 - **A built-in design system** — one canonical layout plus components — shipped
   *inside the egg*, so the buildout pin that governs the runtime governs the
   design system too. No npm registry, no version skew.
@@ -97,15 +98,22 @@ GenericSetup profile.
 from imio.emailkit import render
 
 html, text = render(
-    "imio.emailkit:mail_password_template",
-    context={"member": member, "reset_url": url},
+    "imio.emailkit:notification",
+    context={"title": title, "intro": intro, "cta_url": url},
     language="fr",
 )
 ```
 
 `render()` injects the theme tokens, the render language as `lang`, and the
-locale helpers. It returns both parts of a `multipart/alternative` body; what you
-do with them is yours until the `Email` builder lands.
+locale helpers. It returns an HTML part and a plaintext part; assembling them
+into a message is yours until the `Email` builder lands.
+
+> [!NOTE]
+> The two restyled Plone default mails are **not** available through `render()`.
+> A stock Plone view renders them, so they speak that view's namespace, and
+> asking for them by name raises `TemplateNotFound`. They are shipped, tested and
+> overridable — just not discoverable. Use `imio.emailkit:notification` as the
+> worked example of an ordinary template.
 
 ## Shipping templates from your own add-on
 
@@ -139,8 +147,12 @@ language — there is no metadata sidecar and no front-matter round-trip. An
 unknown name raises `TemplateNotFound` carrying the list of names that *are*
 registered.
 
-Each template ships two compiled files, `<name>.pt` and `<name>.txt.pt`, plus a
-fixture and a golden snapshot under `tests/`.
+Each template compiles to `<name>.pt`, and ships a fixture plus a golden snapshot
+under `tests/`. A plaintext twin, `<name>.txt.pt`, is **hand-authored** where
+plaintext quality matters: Maizzle's plaintext output destroys `tal:` and `i18n:`
+constructs, so generating it would ship a plausible-looking body with the wrong
+content in the wrong language. Without a twin, `render()` falls back to a naive
+text extraction and logs a deprecation.
 
 ## Extending
 

@@ -8,6 +8,103 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — `render()` injects `target_language`, and injected names beat the caller's context
+
+**Context.** §6.1 enumerates what `render()` injects: the context, `theme/*`, `portal_url`,
+`translate`, the three locale helpers, and `lang`. Two things go beyond that list.
+
+**1. `target_language`.** Zope's page-template i18n machinery reads the render language from this
+name. Without it, `i18n:translate` negotiates from the *request* — so passing `language="nl"`
+renders French to a Dutch recipient, **silently**, which is precisely the failure §6.2's
+per-language sending exists to prevent. Injected deliberately.
+
+**2. Precedence.** Low to high: the registration's `preheader`, then the caller's `context`, then
+the names this package injects. §6.1 is silent on collisions.
+
+**Why injected names win.** The kit layout uses `theme`, `lang` and `target_language`
+unconditionally. A caller who shadowed one would break the shell for everyone, not just their own
+template — a much worse failure than losing a name they chose badly. The caller still owns every
+name the kit does not.
+
+---
+
+## 2026-07-29 — `Main.vue` has a named `preheader` slot as well as the msgid path
+
+**Context.** §3/§4 define the preheader as coming from the registration's optional `preheader`
+msgid, rendered into the hidden div ("omitted → the div collapses to nothing").
+
+**Finding.** The two Plone-default mails have no registration — a stock view renders them — so the
+msgid path cannot reach them, and they would ship with an empty preheader: the highest-visibility
+line in the inbox, blank, on the two mails Phase 1 exists to improve.
+
+**Choice.** `Main.vue` also exposes a named `preheader` slot, which the two default mails fill with
+build-time markup. The runtime msgid still wins whenever it is present.
+
+**Why recorded.** It is a second mechanism for one spec concept, which is exactly the shape of thing
+that should not be invented quietly. It is narrow (build-time fallback only, runtime always wins)
+and it exists because §8's stock-view constraint leaves no alternative.
+
+---
+
+## 2026-07-29 — Plaintext hygiene: hidden elements and zero-width characters are stripped
+
+**Context.** §4's fallback is "naive text extraction", and §6.1 returns a plaintext part.
+
+**Finding.** The naive extraction kept the hidden preheader `<div>`, so every plaintext mail opened
+with the inbox-preview line followed by ~20 invisible filler characters (U+2007, U+FEFF, U+034F)
+that the kit adds to fill the preview budget, plus a stray zero-width joiner. That had been
+committed as the expected golden output.
+
+**Choice.** `naive_text()` drops elements hidden with `display:none` and strips zero-width
+characters. Separately, `notification` now ships a **hand-authored `notification.txt.pt`**.
+
+**Why the twin too.** §4 makes the twin the primary path and the fallback the deprecated one, yet no
+twin existed anywhere in the repo — the specified path was unexecuted code while only the deprecated
+path was covered. The twin also produces genuinely better output: it includes the CTA **URL**, which
+naive extraction drops with the `<a>` tag.
+
+**Two consequences.**
+
+- The staleness gate ignores `*.txt.pt`: twins are hand-authored **source**, not build output, and
+  the gate would otherwise report every twin as an `ORPHAN`.
+- `render()` re-checks that the twin still exists before rendering it. `text_path` comes from the
+  cached startup scan, so a rebuild or a branch switch can leave it naming a deleted file; that
+  raised `FileNotFoundError` instead of §4's warn-and-fall-back. Found only once a twin existed to
+  lose.
+
+---
+
+## 2026-07-29 — No formatter may touch `SPEC.md` or `docs/`
+
+**Context.** `make format` invoked `ruff format` with no path argument, so it walked the whole repo.
+
+**Finding.** Ruff's preview formatter rewrites fenced Python blocks inside markdown. It reformatted
+`SPEC.md` — collapsing §6.2's fluent `Email(...)` builder chain onto a single line. Semantically
+harmless, but it is an edit to the **approved source of truth**, made by a tool, unnoticed, and it
+destroyed the readability of the one illustration of the frozen API.
+
+**Choice.** `SPEC.md` and `docs/` are in ruff's `exclude`; `make lint`/`format` pass explicit
+`RUFF_TARGETS=src tests scripts`. The reformatted `SPEC.md` was reverted to the committed original.
+
+**Why.** The spec is an input to this project, not a source file in it. Nothing automated is
+entitled to edit it, and belt-and-braces is warranted because the damage was silent.
+
+---
+
+## 2026-07-29 — `@@emailkit_theme` is registered for the default layer, not `IEmailkitLayer`
+
+**Context.** The view exists so a stock-view-rendered mail can reach the theme tokens.
+
+**Choice.** Registered `for="*"` on the default browser layer with `permission="zope2.View"`, so it
+is traversable on a `:base`-only site too.
+
+**Why not `IEmailkitLayer`.** That layer only exists under `:default`. A site that installed `:base`
+to keep Plone's stock mails still wants the tokens available to its own templates, and narrowing the
+registration would take that escape hatch away for no gain: the view exposes three branding values
+a visitor can already see in any mail they receive.
+
+---
+
 ## 2026-07-29 — Uninstall DOES remove the theme records
 
 **Context.** Plone's instinct is never to destroy settings on uninstall, and the first

@@ -141,7 +141,7 @@ src/imio/pm/notifications/
 Consumers declare one entry point in `setup.py`:
 
 ```python
-entry_points = {
+entry_points={
     "imio.emailkit.templates": [
         "imio.pm.notifications = imio.pm.notifications:emailkit",
     ],
@@ -153,11 +153,11 @@ pointing at a module-level dict:
 ```python
 # imio/pm/notifications/__init__.py
 emailkit = {
-    "directory": "templates",  # relative to package
+    "directory": "templates",          # relative to package
     "templates": {
         "item_published": {
-            "subject": _("email_subject_item_published"),  # i18n msgid
-            "preheader": _("email_preheader_item_published"),  # optional
+            "subject": _("email_subject_item_published"),        # i18n msgid
+            "preheader": _("email_preheader_item_published"),    # optional
         },
         "meeting_convocation": {
             "subject": _("email_subject_meeting_convocation"),
@@ -226,7 +226,7 @@ from imio.emailkit import render
 html, text = render(
     "imio.pm.notifications:item_published",
     context={"item": item, "meeting": meeting},
-    language="fr",  # optional; defaults to negotiated language
+    language="fr",              # optional; defaults to negotiated language
 )
 ```
 
@@ -238,11 +238,14 @@ html, text = render(
 ```python
 from imio.emailkit import Email
 
-Email("imio.pm.notifications:item_published").to(member).to("greffe@commune.be").cc(
-    meeting_managers
-).reply_to("noreply@imio.be").with_context(item=item, meeting=meeting).attach(
-    convocation_pdf, filename="convocation.pdf"
-).send()
+Email("imio.pm.notifications:item_published") \
+    .to(member) \
+    .to("greffe@commune.be") \
+    .cc(meeting_managers) \
+    .reply_to("noreply@imio.be") \
+    .with_context(item=item, meeting=meeting) \
+    .attach(convocation_pdf, filename="convocation.pdf") \
+    .send()
 ```
 
 **Semantics:**
