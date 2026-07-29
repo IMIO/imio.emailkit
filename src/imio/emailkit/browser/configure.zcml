@@ -78,20 +78,21 @@
       package="Products.CMFCore"
       file="permissions.zcml"
       />
+
   <browser:page
       name="emailkit-preview"
       for="*"
-      layer="imio.emailkit.interfaces.IEmailkitLayer"
       class=".preview.EmailkitPreview"
       permission="cmf.ManagePortal"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
   <browser:page
       name="emailkit-preview-body"
       for="*"
-      layer="imio.emailkit.interfaces.IEmailkitLayer"
       class=".preview.EmailkitPreviewBody"
       permission="cmf.ManagePortal"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
 </configure>
