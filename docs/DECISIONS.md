@@ -8,6 +8,47 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — The MailHost test double replaces `_makeMailer`, not `_send`
+
+**Context.** §7 names one test explicitly: "Transaction abort test: `.send()` + abort → MailHost queue
+empty."
+
+**Finding.** The obvious double, `Products.CMFPlone.tests.utils.MockMailHost`, overrides **`_send`** —
+which is precisely the method that forks between the transaction-joined path and the immediate one. On
+that double the message lands in the mock's list at `.send()` and **survives an abort**. §7's test
+would therefore be *untestable while looking tested*: green, and proving nothing.
+
+**Choice.** The double replaces **`_makeMailer`**, one level below the fork, so real
+`Products.MailHost` and real `zope.sendmail` code runs. A queued delivery then has three observable
+states — pending, delivered, cancelled — and the abort test asserts `sent == []` **and**
+`aborted == 1`: positive proof that a delivery was joined and then cancelled, not merely that nothing
+appeared. A real `transaction.commit()` counterpart proves the same message does arrive.
+
+**Why it matters beyond this test.** It is the same category as every other finding in this project: a
+green result that carries no information. Recorded so nobody "simplifies" the harness back to the
+stock mock.
+
+---
+
+## 2026-07-29 — `attach(bytes, filename="x.dat")` raises rather than defaulting to octet-stream
+
+**Context.** §6.2: "`filename` and `mimetype` are inferred where the source carries them … and
+required for `bytes`; missing/unguessable metadata raises `AttachmentError` at `.send()` time,
+consistent with `RecipientError` (fail loud, not silent drop)."
+
+**Reading taken.** The literal one. An extension `mimetypes.guess_type` cannot resolve raises
+`AttachmentError`; it does **not** fall back to `application/octet-stream`.
+
+**Why.** The spec names "unguessable" as an error condition in the same breath as fail-loud, and
+`application/octet-stream` is the kind of plausible default that gets a document delivered as an
+unopenable blob to a commune with no explanation. The caller knows what they are attaching and can say
+so in one keyword argument.
+
+**Revisit if** a real consumer hits it often with legitimately opaque payloads; the change is one line
+and a decision entry.
+
+---
+
 ## 2026-07-29 — §6.3 and §6.2 contradict each other on the send-test language; §6.2 wins
 
 **Context.** This is not spec silence — it is the spec disagreeing with itself.
