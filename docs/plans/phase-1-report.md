@@ -128,6 +128,31 @@ and a correctness gate disagree, the correctness gate wins.
 | Golden base class exported for consumers | it lives in `tests/`, not the egg | Phase 4 |
 | Authoring lint (gate 2 of `check-emails`) | Phase 4 per §5 | Phase 4 |
 
+## Spec review outcome
+
+`spec-guardian` reviewed the whole phase: **PASS WITH CONCERNS**. All hard boundaries intact, §6.1's
+signature exactly as frozen, no scope creep against §9, and the two riskiest checks clean — zero
+Chameleon placeholders in any literal `style`/`class` (caveat A1) and a genuine `:base` opt-out with
+both positive and negative assertions on rendered output.
+
+Everything it raised was fixed rather than argued:
+
+| Finding | Resolution |
+|---|---|
+| **VIOLATION** — the README's only `render()` example named an unregistered template and would raise `TemplateNotFound` | rewritten to `imio.emailkit:notification`, with a note explaining why the default mails are not discoverable |
+| **VIOLATION** — README promised a `.txt.pt` twin per template | corrected to describe hand-authored twins and the fallback |
+| **CONCERN** — README sold dark mode and `multipart/alternative` as delivered | both now scoped to what actually ships |
+| **CONCERN** — `naive_text()` kept the hidden preheader, freezing invisible filler into the plaintext golden | hidden elements and zero-width characters stripped |
+| **GAP** — no `.txt.pt` anywhere, so §4's *primary* path was unexecuted code | `notification.txt.pt` hand-authored; it also exposed a `FileNotFoundError` in `render()` |
+| **GAP** — `target_language` injection and namespace precedence undocumented | recorded in `DECISIONS.md` |
+| **GAP** — `Main.vue`'s named `preheader` slot is a second mechanism | recorded, scoped to a build-time fallback |
+| **CONCERN** — `@@emailkit_theme` registered `for="*"` | rationale recorded |
+| **CONCERN** — a formatter had edited `SPEC.md` | reverted; spec and docs fenced off from every formatter |
+
+The `SPEC.md` one is the most uncomfortable finding of the phase: `make format` ran `ruff` with no
+path argument, ruff's preview formatter rewrites fenced Python inside markdown, and it silently
+collapsed §6.2's builder chain — an unnoticed tool edit to the approved source of truth.
+
 ## Known quirks documented rather than papered over
 
 - **`is_product_installed()` is `False` on a `:base`-only site.** Plone's quick-installer asks "was
