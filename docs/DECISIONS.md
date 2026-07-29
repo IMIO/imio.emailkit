@@ -8,6 +8,88 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — Plaintext: table cells get a ` | ` separator (approved fix)
+
+**Context.** `naive_text()` broke lines on `</tr>` but not on `</td>`/`</th>`, so adjacent cells
+concatenated: a header row rendered as `PointDécision` and a data row as `Budget 2026approuvé`.
+
+**Why it matters more than it looks.** Legacy notification bodies (§9 phase 3) are table-heavy, and
+`render_shell` has **no plaintext twin to fall back on** — naive extraction *is* its plaintext part,
+by design. So this was the plaintext quality of every migrated PloneMeeting mail.
+
+**Choice.** `</td>`/`</th>` become ` | `, and the separator the last cell leaves at end of line is
+stripped. A row therefore stays on one line and stays readable:
+`Point | Decision` / `Budget 2026 | approuve`.
+
+**Why a separator and not a line break.** One cell per line loses the row structure entirely, which is
+worse for a table than a slightly noisy separator.
+
+**Process note.** The workstream that found this deliberately did **not** fix it, because it changes
+`render()`'s fallback output and therefore committed golden files — a decision plus approval, not a
+quiet edit. That was the right call and the fix was then made deliberately.
+
+---
+
+## 2026-07-29 — `render_shell` injects no preheader, and has no plaintext twin
+
+**Context.** Plan §4 gate 2 listed the preheader among the shell's defaults; §4 of the spec makes the
+`.txt.pt` twin the primary plaintext path.
+
+**Choice 1 — no preheader.** The shell's first visible text is already the subject, so filling the
+hidden line with it would spend the entire inbox snippet repeating what the client already displays.
+Left empty, the div collapses and clients continue the snippet into the legacy body, which carries
+information. This contradicts the plan's gate wording; the template that owns the slot won the
+argument. The layout's runtime `preheader` path is untouched, so a future `preheader=` argument
+forecloses nothing.
+
+**Choice 2 — no `shell.txt.pt`.** A twin could not exist even in principle: its only content would be
+`body_html`, which is HTML, so the twin would put tags in the plaintext part. Naive extraction is
+therefore the **designed** path here, not §4's missing-twin fallback, and it emits no deprecation
+warning.
+
+---
+
+## 2026-07-29 — Pathological bodies all render; a pasted `<html>` document yields invalid HTML
+
+**Context.** Plan §2 item 3 asked what happens to unclosed tags, a `<style>` block, and a whole
+`<html>` document dropped into the shell.
+
+**Measured answer: all three render, none fails loudly.** Also verbatim and without exception: a bare
+`&`, `--` inside a comment, a stray closing tag, an unquoted attribute, uppercase `<FONT>`, an MSO
+conditional, and a naked `<`. The reason is the same one that makes the slot safe: Chameleon parses the
+*template* at compile time, and the body is inserted as a string afterwards, never parsed.
+
+**The one case worth knowing.** A pasted full `<html>` document produces output with `<html>`, `<body>`
+and `<!DOCTYPE>` **twice** — technically invalid HTML that mail clients tolerate in practice.
+
+**Choice.** Left as is. Plan §5 forbids cleaning, and the alternative is the shell silently rewriting a
+consumer's markup. Recorded as the documented answer rather than papered over; a `check-emails`-style
+warning for a consumer that does this is a reasonable Phase 4 lint addition.
+
+---
+
+## 2026-07-29 — Two documented routes for sending a legacy body, and neither adds a builder method
+
+**Context.** Plan gate 8 said "`Email(...)` can send a shell-rendered body with no builder change".
+That is true of the **message assembly**, verified end to end — but `Email` always renders internally
+from a template *name*, so there is no way to hand it a `render_shell()` pair.
+
+**Consequence, and it is a happy one.** Consumers have two routes, both with no new API, and they
+should be documented as distinct:
+
+1. **Already own their sending code** (PloneMeeting calls MailHost directly today) →
+   `render_shell(subject, body_html)` + `build_message(...)`.
+2. **Want the builder** → `Email("imio.emailkit:notification").with_context(body_html=<legacy>, …)`,
+   because the kit layout defines the `body_html` slot for **every** template, not just the shell.
+   Verified: the legacy body is injected on that path too. This route additionally keeps the
+   registration's subject and preheader and the hand-authored `.txt.pt` twin, which `render_shell` has
+   neither of.
+
+**Why recorded.** Route 2 was not designed; it falls out of the layout owning the slot, and it is
+strictly better than route 1 for a consumer willing to register a template. Worth telling people.
+
+---
+
 ## 2026-07-29 — Additions around §6.2 that the spec does not describe
 
 Recorded after a spec review found them undocumented. None changes §6.2's nine-method surface; all are
