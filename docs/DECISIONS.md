@@ -8,6 +8,108 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — Both `kit-mode`s materialise `emails/.kit/`, so a consumer's config never changes
+
+**Context.** §5 offers `kit-mode = path | copy` and §4 mentions `emails/.kit/` as "gitignored,
+materialized by the recipe if copy mode is used". Read literally, `path` mode would have no `.kit/`,
+so a consumer's `maizzle.config.js` would have to import the kit from a *different place* depending on
+a buildout setting.
+
+**Choice.** **Both** modes materialise `emails/.kit/`. In `path` mode it holds a two-line re-export of
+the real files inside the installed egg, so Maizzle still resolves components straight out of
+`site-packages` — genuine zero-copy, which §10.1 settled as viable. In `copy` mode it holds the real
+files.
+
+**Why.** The consumer writes one import, once:
+
+```js
+import { kitBaseConfig } from './.kit/maizzle.config.base.js'
+```
+
+and `kit-mode` becomes a pure deployment switch rather than something that changes committed source.
+Under the literal reading, flipping the mode would edit a file the consumer maintains — which is the
+opposite of what a buildout option should do, and would mean a consumer's repo differs by deployment.
+
+**Cost.** `path` mode writes two small generated files where a strict reading would write none. They are
+gitignored, and no Node runs to produce them: wiring is file copying and two text files.
+
+---
+
+## 2026-07-29 — NEW silent failure: a consumer's `i18n:translate` inherits the kit's `i18n:domain`
+
+**Context.** Caveat A3 established that `Main.vue` must emit `i18n:domain="imio.emailkit"` on `<html>`,
+or nothing translates. That fix has a consequence nobody anticipated.
+
+**Finding.** `i18n:domain` **inherits**. A consumer add-on's own `i18n:translate` nested inside the kit
+layout therefore resolves against the **`imio.emailkit` catalog**, not the consumer's own. Their msgid
+is not found, so it renders its default text — in *every* language, identically,
+**indistinguishable from success**. It is caveat A3 again, one level out, and it hits consumers rather
+than us.
+
+**The fix authors must apply.** Declare `i18n:domain="<your.package>"` on your own element inside the
+template. `tests/dummies/dummy.complete`'s `convocation.vue` demonstrates it, and its golden files show
+the contrast deliberately: the kit's footer translates per language while an add-on line without the
+declaration does not.
+
+**Why this is the worst one yet.** Every earlier silent failure was ours to hit while building the
+package. This one is a **consumer's** failure, in *their* language files, discovered by their client
+reading a Dutch mail in English. And there is no visual symptom: the text is real, grammatical and
+plausible.
+
+**Follow-up, recommended not done.** A ninth lint rule — `i18n:translate` in a consumer template with
+no nearer `i18n:domain` — is the natural guard, and it is why the lint exists. Not added yet because
+distinguishing "author forgot" from "author is deliberately reusing a kit msgid" needs care, and a false
+positive on a legitimate case is how a gate gets switched off (the same reasoning that narrowed rule 2).
+`SKILL.md` documents the hazard meanwhile.
+
+---
+
+## 2026-07-29 — `MANIFEST.in`'s `graft` follows symlinks into `node_modules`
+
+**Context.** The dummy consumer add-ons need a `node_modules` symlink at build time, because without a
+`node_modules` **ancestor** Tailwind cannot resolve the `@import "@maizzle/tailwindcss"` the shell
+emits — and Maizzle then **ships the uncompiled stylesheet with exit 0** while printing "Built 1
+template" (measured: 5.3 KB → 3.5 KB, zero inline styles). That is the same class of silent failure as
+everything else here, and it was briefly committed as broken output.
+
+**Finding.** `MANIFEST.in` does `graft tests`, and setuptools' file walk **follows symlinks**. A link
+left in the tree therefore puts roughly **20,000 `node_modules` files into the sdist**, silently — and
+invisibly to `git status`, because the link is gitignored.
+
+**Choice.** The dummies' rebuild helper creates the symlink for the build and removes it afterwards.
+Verified: the built sdist contains **0** `node_modules` entries and all 57 dummy files.
+
+**Why recorded.** Two independent silent failures meeting in one place, and the packaging half would only
+have been noticed by whoever downloaded a 200 MB sdist.
+
+---
+
+## 2026-07-29 — The golden base class ships as `imio.emailkit.golden`, a separate module
+
+**Context.** §7 promises consumers "a provided test base class". It lived in `tests/`, which does not
+ship in the egg, so §7 was unmet in practice.
+
+**Choice.** A new module, `src/imio/emailkit/golden.py` — **not** folded into
+`imio.emailkit.testing`.
+
+**Why separate.** `golden.py` imports `pytest` at module level, and `testing.py` holds the Plone layers
+that consumers on `zope.testrunner` import. Folding them together would make the layers unimportable for
+anyone not using pytest. A test asserts `testing.py` never imports pytest, so the two cannot merge by
+accident.
+
+**Verified shipped.** A built wheel contains `imio/emailkit/golden.py`. No `package-data` entry was
+needed — it is a `.py` module inside a found package — and a test records that, with the reason it would
+have been needed had the harness been data instead of code.
+
+**Dogfooding preserved.** `tests/golden_harness.py` is now a four-attribute subclass of the shipped
+class, with a test asserting it overrides no test method. This package therefore runs exactly what it
+hands consumers, which is the property §7 is really asking for.
+
+**One `S101` exemption** in `pyproject.toml` for that file, with a comment: it *is* test code, and
+`assert actual == expected, <diff>` is what pytest reports usefully.
+
+---
+
 ## 2026-07-29 — `imio.recipe.emailkit` lives in this repository, as a sibling directory
 
 **Context.** §2's artifact table lists two distributions — `imio.emailkit` and
