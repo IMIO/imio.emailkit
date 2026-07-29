@@ -93,6 +93,78 @@ jobs:
           fi
           echo "Email build output is up to date."
 
+  # SPEC §9 phase 4: `imio.recipe.emailkit`, the second distribution in this
+  # repository, and the acceptance criterion it exists to satisfy --
+  # `git clone && buildout && bin/compile-emails` from a clean checkout.
+  #
+  # Two things this job is here to keep true, both of them hard boundaries:
+  #
+  #  1. **buildout invokes no Node.** `make buildout-test` runs the whole buildout
+  #     with node, npm and npx removed from PATH. SPEC §5's "Explicitly rejected"
+  #     section is the reason: compiling at buildout time would make Node a
+  #     production dependency across ~350 applications.
+  #  2. **the generated scripts work**, which no unit test can establish -- a
+  #     buildout-generated script builds its own `sys.path` from lines inside
+  #     itself, so only a real buildout produces the thing under test.
+  #
+  # Node is installed here because `bin/compile-emails` needs it *after* buildout
+  # has finished, which is exactly the separation the whole architecture rests on.
+  recipe:
+    name: "Recipe: Tests and the buildout acceptance test"
+    needs:
+      - config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ needs.config.outputs.python-version }}
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # `recipe/` has its own ruff config and is outside the house `make lint`'s
+      # RUFF_TARGETS (`src tests scripts`), so it is linted here or nowhere.
+      - name: Lint imio.recipe.emailkit
+        run: |
+          set -euo pipefail
+          uvx ruff@latest check --no-fix recipe
+          uvx ruff@latest format --check recipe
+
+      # Runs in two environments on purpose: recipe/.venv has zc.buildout but no
+      # Plone, .venv has Plone but no buildout. Neither run alone covers the suite;
+      # the union does, and the skip counts in the log are the record of which half
+      # covered what.
+      - name: imio.recipe.emailkit's own test suite
+        run: make recipe-test
+        env:
+          PLONE_VERSION: ${{ needs.config.outputs.plone-version }}
+
+      - name: "Acceptance: buildout (no Node on PATH), then the three scripts"
+        run: make buildout-test
+        env:
+          PLONE_VERSION: ${{ needs.config.outputs.plone-version }}
+
+      # The scripts must not have left the working tree holding a build nobody
+      # asked for. `check-emails` restores on a `finally`; this is the independent
+      # check that it really does.
+      - name: The working tree is unchanged
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet; then
+            echo "::error::the acceptance test modified tracked files"
+            git diff --stat
+            exit 1
+          fi
+
   coverage:
     name: "Backend: Test Coverage"
     uses: plone/meta/.github/workflows/backend-pytest-coverage.yml@2.x
@@ -111,6 +183,7 @@ jobs:
       - lint
       - test
       - emails
+      - recipe
       - coverage
     steps:
       - name: Report
@@ -123,4 +196,5 @@ jobs:
           echo '| Lint | ${{ needs.lint.result }} |' >> $GITHUB_STEP_SUMMARY
           echo '| Test | ${{ needs.test.result }} |' >> $GITHUB_STEP_SUMMARY
           echo '| Emails (staleness) | ${{ needs.emails.result }} |' >> $GITHUB_STEP_SUMMARY
+          echo '| Recipe + buildout acceptance | ${{ needs.recipe.result }} |' >> $GITHUB_STEP_SUMMARY
           echo '| Coverage | ${{ needs.coverage.result }} |' >> $GITHUB_STEP_SUMMARY
