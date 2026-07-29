@@ -58,7 +58,7 @@ Precedence: bulk
     <!--
       The stock view cannot hand us a runtime preheader, so the msgid the package
       registers for this template (SPEC §4) is supplied as markup. Same msgid,
-      same domain -- just delivered at build time instead.
+      same domain; just delivered at build time instead.
     -->
     <template #preheader>
       <span i18n:translate="email_preheader_mail_password_template" tal:omit-tag="">Follow the link to choose a new password.</span>

@@ -181,6 +181,27 @@ format: ## Fix code base according to Plone standards
 .PHONY: check
 check: format lint ## Check and fix code base according to Plone standards
 
+# SPEC §5's `bin/check-emails`, gate (2): the authoring lint.
+#
+# The `.vue` sources, not the compiled output -- these are the §3 authoring rules,
+# and every one of them catches a mistake that produced a *successful* Maizzle
+# build. Two of them (`style-placeholder`, `comment-double-dash`) are invisible
+# until a mail client or Chameleon sees the result, which is why this is a gate
+# rather than a style preference. `--list-rules` explains all eight.
+#
+# Deliberately Node-free and dependency-free: it is plain-regex text processing in
+# the egg (`imio.emailkit.lint`), so `bin/check-emails` can call the very same
+# module and the two gates cannot drift. It runs through the venv only because
+# `python -m imio.emailkit.lint` imports the package; the module itself needs
+# nothing but the standard library, so `python src/imio/emailkit/lint.py <paths>`
+# works with a bare interpreter too.
+LINT_EMAILS_TARGETS?=$(EMAILS_FOLDER)/src/templates $(PACKAGE_FOLDER)/kit
+
+.PHONY: lint-emails
+lint-emails: $(VENV_FOLDER) ## Authoring lint (SPEC §5 gate 2) of the .vue sources
+	@echo "$(GREEN)==> Linting email sources against SPEC §3's authoring rules$(RESET)"
+	@$(BIN_FOLDER)/python -m imio.emailkit.lint $(LINT_EMAILS_TARGETS)
+
 # i18n
 .PHONY: i18n
 i18n: $(VENV_FOLDER) ## Update locales
@@ -248,13 +269,18 @@ build-emails: emails-deps ## Compile emails/ into the package (templates/ + brow
 	@echo "$(GREEN)==> Done. Commit the .pt files -- they are what production renders.$(RESET)"
 
 .PHONY: check-emails
-check-emails: emails-deps ## Staleness gate: committed .pt must match a fresh build
-	# SPEC §5's `bin/check-emails`, gate (1). Phase 0 verified the build is
-	# deterministic (two consecutive builds byte-identical) with
-	# `html.format: true`, which is what makes a byte diff meaningful and keeps
-	# the diff line-granular.
+check-emails: emails-deps lint-emails ## SPEC §5's two gates: authoring lint, then staleness
+	# SPEC §5's `bin/check-emails`, both gates in one target.
 	#
-	# Gate (2), the authoring lint, is Phase 4 (docs/plans/phase-1.md §7).
+	# Gate (2), the authoring lint, runs FIRST -- as a prerequisite -- because it
+	# reads the sources and a source-level mistake explains a stale or broken
+	# build, not the other way round. Several of its rules describe failures that
+	# compile cleanly and only surface at runtime, so hearing about them before
+	# the diff is the useful order.
+	#
+	# Gate (1), staleness. Phase 0 verified the build is deterministic (two
+	# consecutive builds byte-identical) with `html.format: true`, which is what
+	# makes a byte diff meaningful and keeps the diff line-granular.
 	#
 	# The build has no configurable alternate destination -- it writes into the
 	# package by design -- so the committed output is snapshotted to a tmpdir,
