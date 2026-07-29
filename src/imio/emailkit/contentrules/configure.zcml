@@ -1,0 +1,88 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:plone="http://namespaces.plone.org/plone"
+    i18n_domain="imio.emailkit"
+    >
+
+  <!-- Two includes, one reason each. Both are idempotent (zope.configuration
+       skips a file it has already processed), so they only ever move a
+       declaration earlier.
+
+       `plone.app.contentrules` declares the
+       `plone.app.contentrules.ManageContentRules` permission in its own
+       `configure.zcml` and ships no `permissions.zcml`, so the whole package is
+       what has to be included. The permission has to be a REGISTERED utility by
+       the time the `browser:page` actions below execute, and ZCML executes
+       actions in the order they were collected; cookiecutter-zope-instance
+       writes a site.zcml that includes this package before Plone's own, so
+       without this the registrations die at start-up with a
+       `ComponentLookupError` naming the permission, which says nothing about
+       include ordering and reads as a misspelled permission name. Same reasoning
+       and the same placement as the `Products.CMFCore` permissions include in
+       `browser/configure.zcml`.
+
+       `plone.contentrules`' `meta.zcml` defines the `plone:ruleAction` directive
+       used at the bottom of this file. It arrives with the include above as well;
+       stating it puts the dependency next to the directive that needs it instead
+       of leaving it to a transitive include. -->
+  <include package="plone.app.contentrules" />
+  <include
+      package="plone.contentrules"
+      file="meta.zcml"
+      />
+
+  <!-- SPEC §8.3: "executor delegates to Email(...)". -->
+  <adapter factory=".mail.StyledMailActionExecutor" />
+
+  <browser:page
+      name="imio.emailkit.actions.StyledMail"
+      for="plone.app.contentrules.browser.interfaces.IRuleActionAdding"
+      class=".mail.StyledMailAddFormView"
+      permission="plone.app.contentrules.ManageContentRules"
+      />
+
+  <browser:page
+      name="edit"
+      for=".mail.IStyledMailAction"
+      class=".mail.StyledMailEditFormView"
+      permission="plone.app.contentrules.ManageContentRules"
+      />
+
+  <!-- SPEC §8.3's action type, registered exactly the way every other
+       `plone.contentrules` action in the Plone ecosystem is. There is no
+       GenericSetup step and none is wanted.
+
+       Why this is NOT conditional on the `:default` profile, since the question
+       will come up: `plone:ruleAction` is unconditionally global, and that is
+       right here. §8.2's opt-out (installing `:base` instead of `:default`) is
+       about not restyling Plone's stock transactional mails; it is not a request
+       to hide an action type. An action type is inert until a Manager creates a
+       rule that uses it, and its template list comes from §4 discovery, so a
+       `:base` site gains nothing it opted out of by having the entry available.
+       Gating it would mean registering a local utility per site, whose stored
+       copy then drifts from this file with no symptom; that is a worse failure
+       than the one it would prevent.
+
+       `event="*"` because a styled mail is worth sending on any trigger, and
+       `for="*"` because the action reads only what any content object has.
+
+       `title` and `description` are plain strings, not msgids: the directive's
+       fields are `schema.TextLine`/`schema.Text` rather than
+       `zope.configuration.fields.MessageID`, so there is no way to hand it a
+       message object. That is what Plone's own "Send email" does too. Everything
+       the action shows inside its own forms (labels, help text, the summary line)
+       does go through `_()` and ships FR/NL/DE. -->
+  <plone:ruleAction
+      name="imio.emailkit.actions.StyledMail"
+      title="Send styled email"
+      description="Send a styled email built from a registered template, through the imio.emailkit builder: one message per recipient language, with the subject translated accordingly."
+      for="*"
+      event="*"
+      schema=".mail.IStyledMailAction"
+      factory=".mail.StyledMailAction"
+      addview="imio.emailkit.actions.StyledMail"
+      editview="edit"
+      />
+
+</configure>

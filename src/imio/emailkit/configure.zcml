@@ -12,6 +12,12 @@
 
   <include package=".browser" />
 
+  <!-- SPEC §8.3's content-rule action, and the discovery-backed vocabulary its
+       edit form offers. The vocabulary is included first because the action's
+       schema names it. -->
+  <include package=".vocabularies" />
+  <include package=".contentrules" />
+
   <!-- SPEC §4: "warning at startup" for a template shipping no plaintext twin.
        Scanning here rather than lazily is what makes that literally true.
        Otherwise the warning lands in the log of whoever sends the first mail,

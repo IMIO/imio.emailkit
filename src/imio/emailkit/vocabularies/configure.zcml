@@ -1,0 +1,23 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    i18n_domain="imio.emailkit"
+    >
+
+  <!-- SPEC §8.3: "the registered template names (vocabulary from discovery)".
+       Registered as a NAMED utility so a schema can name it as a string, which
+       is what keeps `imio.emailkit.contentrules` from importing discovery
+       itself; the vocabulary is the seam.
+
+       Registered globally, unlike the content-rule action element it feeds
+       (that one is a per site registration made by the `:default` profile).
+       A vocabulary is inert until something asks for it, listing nothing but
+       what discovery already knows, so gating it would only mean a `:base` site
+       whose forms raise VocabularyRegistryError instead of showing an empty
+       list. -->
+  <utility
+      provides="zope.schema.interfaces.IVocabularyFactory"
+      name="imio.emailkit.templates"
+      component=".templates"
+      />
+
+</configure>
