@@ -8,6 +8,95 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — Additions around §6.2 that the spec does not describe
+
+Recorded after a spec review found them undocumented. None changes §6.2's nine-method surface; all are
+things the spec is silent about, and the agent contract says silence gets an entry rather than a quiet
+choice.
+
+**1. `.send()` returns the list of built `EmailMessage` objects.** §6.2's example discards the return
+value and the spec says nothing about one. The send-test needs it, and §7's assertions need it.
+Returning data the caller can ignore does not make the builder grow behaviour.
+
+**2. Three fail-loud errors the spec does not enumerate.**
+
+| Condition | Raises | What it replaces |
+|---|---|---|
+| zero recipients at `.send()` | `RecipientError` | a silent no-op that looks like a successful send |
+| no subject anywhere (registration and `.subject()` both absent) | `EmailkitError` | `[No Subject]` on the wire |
+| `plone.email_from_address` unset | `EmailkitError` | MailHost's `"Message missing SMTP Header 'From'"`, which never names the registry record |
+
+§6.2 defines `RecipientError` for *unresolvable* recipients; "none at all" is the same class of mistake
+and gets the same error rather than a new one. No new exception classes were introduced.
+
+**3. `.reply_to()` and `.sender()` accept the full polymorphic recipient set.** §6.2 shows only a
+literal address for `reply_to` and scopes "string / member / userid / iterable" to `.to()/.cc()/.bcc()`.
+Accepting the same values through the same adapter means one resolution path instead of two, and
+`.reply_to(item_author)` works. Signatures are unchanged, so this is a widening of accepted input, not
+a change to the surface.
+
+**4. §6.3 says "renders **each** in an iframe"; the page renders the selected one.** Per-template
+iframes would render every registered template on every page load, and the language switcher and token
+panel are page-global. Functionally complete — every template is reachable — but a departure from the
+wording, noted rather than left implicit.
+
+---
+
+## 2026-07-29 — FIXED: a member with two addresses in `email` was silently dropped
+
+**Context.** §6.2 is emphatic: "fail loud, not silent drop".
+
+**Finding.** The `str` adapter refused a multi-address string, but the **member** adapter did not.
+`parseaddr("a@b.be, c@d.be")` returns `('', '')`, so the header came out as `Full Name <>` and that
+recipient **vanished from the envelope while every other recipient in the same call was delivered** —
+no `RecipientError`, no warning. It is the same defect that was found and fixed for
+`.sender("Greffe <greffe@commune.be>")`, on the one path that had not been fixed.
+
+**Fix.** The member adapter now runs the same `getaddresses` length check and returns `None`, which
+`resolve()` turns into a `RecipientError` naming the member. It also *parses* a
+`"Zoe <z@b.be>"`-shaped property instead of passing it through, so an address can never end up nested
+inside another display name, and falls back to the parsed display name when the member has no
+`fullname`.
+
+**Why it is worth an entry.** Silent recipient loss is the worst failure this package can have — the
+sender believes the mail went out. The lesson generalises: both halves of a polymorphic contract need
+the same guard, and the second half is the one that gets forgotten.
+
+---
+
+## 2026-07-29 — `structure` does NOT evaluate placeholders in an injected body (verified)
+
+**Context.** Phase 3's `render_shell(subject, body_html)` drops arbitrary legacy HTML into the shell
+with `structure` (§3 rule 4's one sanctioned use). Legacy notification bodies are often assembled by
+string concatenation, so one could plausibly contain `${...}`. If Chameleon evaluated that, an
+attacker-influenced or merely careless body could read the render namespace — a security question, not
+a cosmetic one.
+
+**Verified empirically before building anything on it.** A compiled template doing
+`tal:content="structure body_html"` was rendered with
+`body_html = '<p>Bonjour ${member/fullname} and ${python:__import__("os").environ}</p>'` and a real
+`member` in the namespace:
+
+```
+rendered: <div><p>Bonjour ${member/fullname} and ${python:__import__("os").environ}</p></div>
+literal ${member/fullname} preserved : True
+did it evaluate to LEAKED            : False
+python: expression evaluated         : False
+```
+
+**Conclusion.** `structure` inserts the string as markup **data**, not as a template. The page template
+is compiled once and the injected characters are never re-parsed as TAL. **No template injection is
+possible through `body_html`.**
+
+**What `structure` does still mean, by design.** The body is inserted **unescaped**, so it can carry
+arbitrary markup — that is the entire purpose of the slot, and §3 rule 4 reserves `structure` for it
+precisely because it is the one place markup is wanted. The consequence is ordinary HTML injection,
+which in a mail body is bounded by what mail clients render (they strip scripts) and by the fact that
+the body already came from the sending application. The shell therefore **wraps and does not
+sanitise**: silently rewriting a consumer's markup would be a worse failure than rendering it.
+
+---
+
 ## 2026-07-29 — The MailHost test double replaces `_makeMailer`, not `_send`
 
 **Context.** §7 names one test explicitly: "Transaction abort test: `.send()` + abort → MailHost queue
