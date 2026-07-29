@@ -19,6 +19,7 @@ Three things are deliberate and worth reading before changing anything here.
 
 from contextlib import suppress
 from dataclasses import dataclass
+from email.utils import getaddresses
 from imio.emailkit.helpers import FALLBACK_LANGUAGE
 from imio.emailkit.interfaces import IEmailRecipient
 from imio.emailkit.interfaces import RecipientError
@@ -61,12 +62,27 @@ def recipient_from_string(value):
     Consequence, and it is the documented trade-off: a bare address resolves with
     no ``fullname`` and no ``language``, so it lands in §6.2's default-language
     group. Pass the member object (or its userid) when the language matters.
+
+    ``"Greffe <greffe@commune.be>"`` is accepted too, and the display name is
+    kept. This is not decoration: without the parse, the whole string became the
+    address and the header came out as ``"Greffe <greffe"@commune.be`` -- valid
+    syntax, wrong mailbox, no error anywhere. Measured, then fixed.
+
+    A string carrying *several* addresses is refused rather than silently reduced
+    to its first: ``getaddresses`` would hand back only one and the rest would
+    vanish, which is the silent drop §6.2 forbids. Pass a list.
     """
     value = value.strip()
     if not value:
         return None
     if "@" in value:
-        return Recipient(email=value)
+        pairs = getaddresses([value])
+        if len(pairs) != 1:
+            return None
+        fullname, address = pairs[0]
+        if "@" not in address:
+            return None
+        return Recipient(email=address, fullname=fullname)
     member = lookup_member(value)
     if member is None:
         return None
@@ -135,6 +151,14 @@ def resolve(values):
         if not address:
             problems.append(f"{describe(value)} resolved to an empty email address")
             continue
+        # Checked here rather than trusted from the adapter, because this is what
+        # lets `email.py` split every address on '@' without a guard of its own.
+        if "@" not in address:
+            problems.append(
+                f"{describe(value)} resolved to {address!r}, which is not an "
+                f"email address"
+            )
+            continue
         key = address.lower()
         if key in seen:
             continue
@@ -167,9 +191,14 @@ def describe_failure(value):
     finds out which one they have.
     """
     if isinstance(value, str):
+        if "@" not in value:
+            return (
+                f"{value!r} is neither an email address (no '@') nor a known "
+                f"userid in this site"
+            )
         return (
-            f"{value!r} is neither an email address (no '@') nor a known userid "
-            f"in this site"
+            f"{value!r} is not one parsable email address; pass a list rather "
+            f"than a string holding several"
         )
     return (
         f"{describe(value)} has no {IEmailRecipient.__name__} adapter; register "
