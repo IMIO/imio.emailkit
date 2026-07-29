@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<registry xmlns:i18n="http://xml.zope.org/namespaces/i18n"
+          i18n:domain="imio.emailkit"
+>
+
+  <!-- SPEC §3's three theme tokens, as `imio.emailkit.theme.<token>`.
+
+       No <value> elements on purpose. `plone.app.registry` builds each record
+       from the interface and seeds it with the field's own default, so the
+       defaults live in `interfaces.IEmailkitTheme` and nowhere else. Adding
+       them here too would be two places to forget.
+
+       Only `primary_color` has a non-empty default. `logo_url` is
+       site-specific and `footer_html` is user-facing wording, and the house
+       convention keeps wording out of profiles: a value shipped here would
+       freeze one language for every site, including the ones that never open
+       the settings. -->
+  <records interface="imio.emailkit.interfaces.IEmailkitTheme"
+           prefix="imio.emailkit.theme"
+  />
+
+</registry>

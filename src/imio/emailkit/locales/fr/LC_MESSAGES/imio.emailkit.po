@@ -1,0 +1,168 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: imio.emailkit\n"
+"POT-Creation-Date: 2026-07-29 10:47+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Language-Code: fr\n"
+"Language-Name: Français\n"
+"Preferred-Encodings: utf-8 latin1\n"
+"Domain: imio.emailkit\n"
+"Language: fr\n"
+
+#: imio/emailkit/interfaces.py:47
+msgid "Absolute URL of the logo shown in the mail header. Remote URL, not an inline image."
+msgstr "URL absolue du logo affiché dans l’en-tête du courriel. URL distante, pas une image intégrée."
+
+#: imio/emailkit/profiles.zcml:28
+msgid "Email templating runtime plus the restyled Plone default mails."
+msgstr "Moteur de gabarits d’e-mails et courriels Plone par défaut restylés."
+
+#: imio/emailkit/profiles.zcml:20
+msgid "Email templating runtime without the restyled Plone default mails. Install this instead of the default profile to keep Plone's stock mails untouched."
+msgstr "Moteur de gabarits d’e-mails sans les courriels Plone par défaut restylés. Installez ce profil plutôt que le profil par défaut pour laisser les courriels Plone d’origine inchangés."
+
+#: imio/emailkit/interfaces.py:72
+msgid "Footer HTML"
+msgstr "HTML du pied de page"
+
+#: imio/emailkit/interfaces.py:73
+msgid "HTML inserted in the mail footer. Rendered unescaped -- it is one of the two slots allowed to carry markup."
+msgstr "HTML inséré dans le pied de page du courriel. Rendu sans échappement : c’est l’un des deux emplacements autorisés à contenir du balisage."
+
+#: imio/emailkit/interfaces.py:58
+msgid "Hexadecimal color used by buttons and the header rule, for example ``#e6007e``."
+msgstr "Couleur hexadécimale utilisée par les boutons et le filet de l’en-tête, par exemple ``#e6007e``."
+
+#: imio/emailkit/interfaces.py:46
+msgid "Logo URL"
+msgstr "URL du logo"
+
+#: imio/emailkit/interfaces.py:57
+msgid "Primary color"
+msgstr "Couleur principale"
+
+#: imio/emailkit/profiles.zcml:36
+msgid "Uninstall iMio Emailkit setup."
+msgstr "Désinstaller la configuration d’iMio Emailkit."
+
+#. Default: "This message was sent automatically. Please do not reply to it."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:102
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:98
+#: imio/emailkit/templates/notification.pt:58
+msgid "email_footer_default"
+msgstr "Ce message a été envoyé automatiquement. Merci de ne pas y répondre."
+
+#. Default: "iMio"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:43
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:43
+#: imio/emailkit/templates/notification.pt:32
+msgid "email_logo_alt"
+msgstr "iMio"
+
+#. Default: "The site administrator has asked you to reset the password of the account ${userid}. Your previous password no longer works."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:61
+msgid "email_mail_password_admin_request"
+msgstr "L’administrateur du site vous demande de réinitialiser le mot de passe du compte ${userid}. Votre ancien mot de passe n’est plus valable."
+
+#. Default: "Choose a new password"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:70
+msgid "email_mail_password_cta"
+msgstr "Choisir un nouveau mot de passe"
+
+#. Default: "This link is valid for ${hours} hours."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:78
+msgid "email_mail_password_expiry"
+msgstr "Ce lien est valable pendant ${hours} heures."
+
+#. Default: "If the button does not work, copy this address into your browser:"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:74
+msgid "email_mail_password_fallback"
+msgstr "Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :"
+
+#. Default: "Use the button below to choose a new password for ${site_name}."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:65
+msgid "email_mail_password_lead"
+msgstr "Utilisez le bouton ci-dessous pour choisir un nouveau mot de passe pour ${site_name}."
+
+#. Default: "If you did not ask for this, simply ignore this message: your password has not been changed. The request came from the IP address ${ipaddress}."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:87
+msgid "email_mail_password_tracking"
+msgstr "Si vous n’êtes pas à l’origine de cette demande, ignorez simplement ce message : votre mot de passe n’a pas été modifié. La demande provient de l’adresse IP ${ipaddress}."
+
+#. Default: "Follow the link to choose a new password."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:31
+msgid "email_preheader_mail_password_template"
+msgstr "Suivez le lien pour choisir un nouveau mot de passe."
+
+#. Default: "You have a new notification."
+#: imio/emailkit/__init__.py:49
+msgid "email_preheader_notification"
+msgstr "Vous avez une nouvelle notification."
+
+#. Default: "Follow the link to activate your account."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:31
+msgid "email_preheader_registered_notify_template"
+msgstr "Suivez le lien pour activer votre compte."
+
+#. Default: "Kind regards,"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:87
+msgid "email_regards"
+msgstr "Cordialement,"
+
+#. Default: "Your account has been created. Your username is ${username}. Activate it by choosing a password."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:66
+msgid "email_registered_notify_created"
+msgstr "Votre compte a été créé. Votre nom d’utilisateur est ${username}. Activez-le en choisissant un mot de passe."
+
+#. Default: "Activate my account"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:71
+msgid "email_registered_notify_cta"
+msgstr "Activer mon compte"
+
+#. Default: "Activate your account before ${expiration_date}."
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:82
+msgid "email_registered_notify_expiry"
+msgstr "Activez votre compte avant le ${expiration_date}."
+
+#. Default: "If the button does not work, copy this address into your browser:"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:75
+msgid "email_registered_notify_fallback"
+msgstr "Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :"
+
+#. Default: "Hello ${fullname},"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:62
+msgid "email_registered_notify_greeting"
+msgstr "Bonjour ${fullname},"
+
+#. Default: "Password reset request"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:3
+msgid "email_subject_mail_password_template"
+msgstr "Demande de réinitialisation de mot de passe"
+
+#. Default: "Notification"
+#: imio/emailkit/__init__.py:45
+msgid "email_subject_notification"
+msgstr "Notification"
+
+#. Default: "An account has been created for you"
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:3
+msgid "email_subject_registered_notify_template"
+msgstr "Un compte a été créé pour vous"
+
+#: imio/emailkit/profiles.zcml:28
+msgid "iMio Emailkit: Install"
+msgstr "iMio Emailkit : installation"
+
+#: imio/emailkit/profiles.zcml:36
+msgid "iMio Emailkit: Uninstall"
+msgstr "iMio Emailkit : désinstallation"
+
+#: imio/emailkit/profiles.zcml:20
+msgid "iMio Emailkit: runtime only"
+msgstr "iMio Emailkit : moteur uniquement"
