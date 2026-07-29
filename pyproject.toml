@@ -1,0 +1,163 @@
+[project]
+name = "imio.emailkit"
+dynamic = ["version"]
+description = "Transactional email templating and sending for the iMio Plone ecosystem, built on Maizzle 6"
+readme = "README.md"
+license = "GPL-2.0-only"
+# Upper bound on purpose: the classifiers, the CI matrix and Plone itself stop
+# at 3.13, and an open ">=3.10" claims 3.14 support that is neither tested nor
+# real (check-python-versions flags exactly that).
+requires-python = ">=3.10,<3.14"
+authors = [{ name = "Antoine Duchêne", email = "antoine.duchene@imio.be" }]
+keywords = ["CMS", "Plone", "Python", "email", "Maizzle"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Web Environment",
+    "Framework :: Plone",
+    "Framework :: Plone :: 6.0",
+    "Framework :: Plone :: 6.1",
+    "Framework :: Plone :: 6.2",
+    "Framework :: Plone :: Addon",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "Products.CMFPlone",
+    "plone.api",
+    "z3c.jbot",
+]
+
+[project.optional-dependencies]
+test = [
+    "plone.app.testing",
+    "plone.classicui",
+    "pytest",
+    "pytest-cov",
+    "pytest-plone>=1.0.0a2",
+]
+release = ["zest.releaser[recommended]", "zestreleaser.towncrier", "zest.pocompile"]
+
+[project.urls]
+Homepage = "https://github.com/IMIO/imio.emailkit"
+PyPI = "https://pypi.org/project/imio.emailkit"
+Source = "https://github.com/IMIO/imio.emailkit"
+Tracker = "https://github.com/IMIO/imio.emailkit/issues"
+
+[project.entry-points."z3c.autoinclude.plugin"]
+target = "plone"
+
+# imio.emailkit is its own first consumer (SPEC §4): it registers its own
+# templates through exactly the mechanism external addons use.
+[project.entry-points."imio.emailkit.templates"]
+"imio.emailkit" = "imio.emailkit:emailkit"
+
+[tool.uv]
+managed = false
+
+[build-system]
+# setuptools rather than the hatchling the cookieplone template ships:
+# zc.buildout's ``develop`` runs ``setup.py`` directly, so a PEP 517 only
+# package cannot be a develop egg in the iMio buildouts.
+requires = ["setuptools>=68.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "imio.emailkit.__version__" }
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["src"]
+# PEP 420: the ``imio`` namespace has no __init__.py on purpose.
+namespaces = true
+
+[tool.setuptools.package-data]
+# `.pt` covers both the compiled templates and the jbot overrides. The kit's
+# `.vue`/`.js`/`.css` sources ship too: SPEC §3 keeps the design system inside
+# the egg so `bin/compile-emails` can resolve it from the installed
+# distribution, which means they are package data, not dev-only files.
+"*" = [
+    "*.zcml", "*.xml", "*.pt", "*.pot", "*.po", "*.mo", "*.txt",
+    "*.css", "*.js", "*.vue",
+]
+
+[tool.towncrier]
+directory = "news/"
+filename = "CHANGELOG.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## {version} ({project_date})"
+template = "news/.changelog_template.jinja"
+issue_format = "[#{issue}](https://github.com/IMIO/imio.emailkit/issues/{issue})"
+underlines = ["", "", ""]
+
+[[tool.towncrier.type]]
+directory = "breaking"
+name = "Breaking changes:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "feature"
+name = "New features:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "bugfix"
+name = "Bug fixes:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "internal"
+name = "Internal:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "documentation"
+name = "Documentation:"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "tests"
+name = "Tests"
+showcontent = true
+
+[tool.ruff]
+target-version = "py310"
+line-length = 88
+fix = true
+lint.select = [
+    "YTT", "S", "B", "A", "C4", "T10", "SIM", "C90",
+    "E", "W", "F", "PGH", "UP", "RUF",
+]
+lint.ignore = ["E731"]
+
+[tool.ruff.lint.isort]
+case-sensitive = false
+no-sections = true
+force-single-line = true
+from-first = true
+lines-after-imports = 2
+lines-between-types = 1
+order-by-type = false
+
+[tool.ruff.format]
+preview = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501", "RUF001", "S101"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source_pkgs = ["imio.emailkit", "tests"]
+branch = true
+parallel = true
+omit = ["src/imio/emailkit/locales/*.py"]
+
+[tool.zest-releaser]
+python-file-with-version = "src/imio/emailkit/__init__.py"
