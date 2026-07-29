@@ -20,6 +20,7 @@ template name ``imio.emailkit:notification``      [§4] the one ``render()``-abl
 ``imio.emailkit.interfaces.RecipientError``       [§6.2] raised at ``.send()``
 ``imio.emailkit.interfaces.AttachmentError``      [§6.2] raised at ``.send()``
 view name ``emailkit-preview``                    [§6.3] spelled ``@@emailkit-preview``
+``imio.emailkit.render_shell(subject, body_html)`` [§9 phase 3] ``render()``'s sibling
 ===============================================  ==========================
 
 Of those, four are **guesses this file owns** rather than spec quotations, and
@@ -814,3 +815,122 @@ def assert_message_is_clean(message):
     text, html = bodies(message)
     assert_render_is_clean(html, "sent html part")
     assert_render_is_clean(text, "sent text part")
+
+
+# ===========================================================================
+# Phase 3 -- SPEC §9 phase 3 (``render_shell``) and ``docs/plans/phase-3.md``
+# ===========================================================================
+#
+# Written against SPEC §9 phase 3, §6.1, §3 and ``docs/plans/phase-3.md`` §2/§4.
+# ``render_shell`` is the only new name, and the spec and the plan both spell it
+# literally (``from imio.emailkit import render_shell``), so nothing below is a
+# guess about the API -- only about test-local fixture names.
+
+#: §9 phase 3, verbatim: ``render_shell(subject, body_html, language=None)``.
+#: A ``render()`` sibling, **not** a builder method -- ``docs/plans/phase-3.md``
+#: §5 lists "no new builder methods" as a non-goal, which is what
+#: ``tests/test_builder.py::TestTheMethodSet`` already keeps closed.
+SHELL_ARGUMENTS = ("subject", "body_html", "language")
+
+#: Fixtures whose ``CONTEXT`` is a ``render_shell`` call rather than a template
+#: context: ``{"subject": ..., "body_html": ...}``. They live in the same
+#: directory and are loaded by the same :func:`load_fixture`, because §7's
+#: "fixture + snapshot per template" is the same contract -- the shell simply has
+#: its markup handed in instead of authored.
+SHELL_FIXTURES = ("shell_plonemeeting",)
+
+
+def require_shell():
+    """Return ``imio.emailkit.render_shell`` or skip the calling module.
+
+    Coarse like :func:`require_builder`, and for the same reason: the name is
+    quoted verbatim from §9 phase 3 and ``docs/plans/phase-3.md`` §2, so there is
+    nothing to guess -- a missing name means the implementation is not there yet,
+    and every assertion in the Phase 3 modules runs unchanged once it is.
+    """
+    require_runtime()
+    import imio.emailkit
+
+    function = getattr(imio.emailkit, "render_shell", None)
+    if function is None:
+        pytest.skip(
+            "imio.emailkit.render_shell is not available. SPEC §9 phase 3 and "
+            "docs/plans/phase-3.md §2 both spell it "
+            "`from imio.emailkit import render_shell`; these tests encode that "
+            "signature and were not weakened to go green.",
+            allow_module_level=True,
+        )
+    return function
+
+
+def load_shell_fixture(name):
+    """``(subject, body_html)`` of a shell fixture.
+
+    Keyed rather than positional so a fixture that forgets one of the two fails
+    with the key name instead of with a tuple-unpacking error.
+    """
+    data = load_fixture(name)
+    missing = [key for key in ("subject", "body_html") if key not in data]
+    assert missing == [], (
+        f"shell fixture {name!r} is missing {missing}; a shell fixture's CONTEXT "
+        "is the render_shell(subject, body_html) call itself"
+    )
+    return data["subject"], data["body_html"]
+
+
+#: The names ``render()`` puts in the template namespace, per SPEC §6.1 and §3:
+#: the caller's context, the ``theme/*`` tokens, ``portal_url``, ``translate``,
+#: the three locale helpers, ``lang`` -- plus §4's ``preheader`` and the two names
+#: ``render_shell`` itself binds. Used by the injection test: a ``${name}`` for
+#: **each** of them goes into an injected body, and every one has to come back out
+#: verbatim. Enumerated from the spec rather than read off the implementation, so
+#: a name the runtime added silently is simply not covered rather than
+#: rubber-stamped.
+RENDER_NAMESPACE_NAMES = (
+    "theme",
+    "theme/primary_color",
+    "theme/logo_url",
+    "theme/footer_html",
+    "lang",
+    "portal_url",
+    "translate",
+    "format_date",
+    "format_datetime",
+    "format_number",
+    "preheader",
+    "subject",
+    "body_html",
+)
+
+#: Zero-width and invisible characters the kit uses for layout (``&zwj;`` in an
+#: Outlook spacer cell, the preheader's padding). Harmless in HTML, noise or
+#: mojibake in a ``text/plain`` part -- so the plaintext gate asserts on them.
+INVISIBLE_CHARACTERS = re.compile(
+    "["
+    "\u200b"  # zero-width space
+    "\u200c"  # zero-width non-joiner
+    "\u200d"  # zero-width joiner -- the kit's `&zwj;` Outlook spacer cell
+    "\u2007"  # figure space -- the kit's preheader padding
+    "\ufeff"  # zero-width no-break space
+    "\u034f"  # combining grapheme joiner -- also preheader padding
+    "]"
+)
+
+#: Anything that still looks like a tag. ``<`` alone is not enough: a plaintext
+#: part may legitimately contain ``<`` from an unescaped ``&lt;`` in the source.
+HTML_TAG = re.compile(r"</?[a-zA-Z][a-zA-Z0-9-]*(\s[^<>]*)?/?>")
+
+
+def head_of(html):
+    """Everything before ``<body``: the part of the document the layout owns.
+
+    The shell and an authored template are the same kit layout with different
+    content, so their heads -- charset, viewport, colour-scheme meta, the
+    dark-mode ``<style>``, the ``<html>`` attributes -- must be identical for the
+    same language. Comparing the whole head rather than a handful of markers is
+    the only form of "exactly as for an authored template"
+    (``docs/plans/phase-3.md`` §4 gate 2) that a marker cannot fake.
+    """
+    index = html.lower().find("<body")
+    assert index != -1, "no <body> in the rendered document"
+    return html[:index]
