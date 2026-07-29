@@ -33,6 +33,7 @@ default policy: it is the default with CRLF line endings, which is what
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.policy import SMTP as SMTP_POLICY
+from email.utils import parseaddr
 from imio.emailkit import attachments as attachment_sources
 from imio.emailkit import recipients as recipient_sources
 from imio.emailkit.discovery import get_template
@@ -187,36 +188,45 @@ class Email:
         parts = attachment_sources.resolve(self._attachments)
         sender = self._resolve_sender()
 
-        mailhost = getUtility(IMailHost)
-        default_language = recipient_sources.default_language()
-        messages = []
+        # Every group is rendered and assembled before *any* of them is handed
+        # over. With the default delivery an abort would undo a partial run
+        # anyway, but `immediate=True` has no transaction to hide behind: a
+        # template error in the Dutch group would otherwise leave the French mail
+        # already on the wire and no way to tell.
+        groups = []
         for language, fields in recipient_sources.group_by_language(
-            resolved, default_language
+            resolved, recipient_sources.default_language()
         ):
             html, text = render(self.name, context=self._context, language=language)
-            message = build_message(
-                sender=sender,
-                fields=fields,
-                reply_to=reply_to,
-                subject=self._resolve_subject(template, language),
-                html=html,
-                text=text,
-                attachments=parts,
-            )
+            groups.append((
+                language,
+                fields,
+                build_message(
+                    sender=sender,
+                    fields=fields,
+                    reply_to=reply_to,
+                    subject=self._resolve_subject(template, language),
+                    html=html,
+                    text=text,
+                    attachments=parts,
+                ),
+            ))
+
+        mailhost = getUtility(IMailHost)
+        for language, fields, message in groups:
             # No `mto`/`mfrom`: MailHost's own `_mungeHeaders` collects envelope
             # recipients from the To/Cc/Bcc headers and then deletes Bcc. Passing
             # `mto` would *overwrite* the To header with the full list -- Bcc
             # addresses included, in front of everyone.
             mailhost.send(message, immediate=immediate)
             logger.info(
-                "Queued %s to %s recipient(s) in %r%s",
+                "%s %s to %s recipient(s) in %r",
+                "Sent" if immediate else "Queued",
                 self.name,
                 sum(len(v) for v in fields.values()),
                 language,
-                " (immediate)" if immediate else "",
             )
-            messages.append(message)
-        return messages
+        return [message for _, _, message in groups]
 
     # -- internals ----------------------------------------------------------
 
@@ -297,10 +307,21 @@ def format_addresses(recipients):
 
 
 def as_address(recipient):
-    """One resolved recipient as an :class:`email.headerregistry.Address`."""
-    username, _, domain = recipient.email.partition("@")
+    """One resolved recipient as an :class:`email.headerregistry.Address`.
+
+    ``parseaddr`` even though the default ``str`` adapter already normalises: a
+    Plone member's ``email`` property is free text a human typed into a form, and
+    ``"Alice <alice@commune.be>"`` in that field would otherwise become the
+    username half of the address. ``rpartition`` because the domain is what
+    follows the *last* ``@``; ``recipients.resolve()`` has already guaranteed
+    there is one.
+    """
+    display_name, address = parseaddr(recipient.email)
+    username, _, domain = address.rpartition("@")
     return Address(
-        display_name=recipient.fullname or "", username=username, domain=domain
+        display_name=recipient.fullname or display_name,
+        username=username,
+        domain=domain,
     )
 
 
