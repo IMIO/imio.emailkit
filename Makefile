@@ -220,7 +220,10 @@ test-coverage: $(VENV_FOLDER) ## run tests with coverage
 .PHONY: update-golden
 update-golden: $(VENV_FOLDER) ## Regenerate the golden snapshots (deliberate, never automatic)
 	@echo "$(YELLOW)==> Regenerating golden files -- review the diff before committing$(RESET)"
-	@EMAILKIT_UPDATE_GOLDEN=1 $(BIN_FOLDER)/pytest tests/test_golden.py -q -rs
+	# Both harnesses: this package's own templates and the two dummy consumer
+	# add-ons. Leaving the dummies out meant their snapshots silently went stale,
+	# which is precisely the failure golden files exist to catch.
+	@EMAILKIT_UPDATE_GOLDEN=1 $(BIN_FOLDER)/pytest tests/test_golden.py tests/dummies -q -rs
 
 # ---------------------------------------------------------------------------
 # Emails (Node)
@@ -346,6 +349,109 @@ preview-emails: $(VENV_FOLDER) instance/etc/zope.ini ## Render the committed tem
 	@echo "$(GREEN)==> Rendering previews into $(PREVIEW_FOLDER)$(RESET)"
 	@EMAILKIT_PREVIEW_DIR=$(PREVIEW_FOLDER) EMAILKIT_PREVIEW_PORT=$(PREVIEW_PORT) \
 		$(BIN_FOLDER)/zconsole run instance/etc/zope.conf ./scripts/preview_emails.py
+
+# ---------------------------------------------------------------------------
+# imio.recipe.emailkit -- the second distribution in this repository, and the
+# SPEC §9 phase 4 acceptance test that runs it through a real buildout.
+#
+# Nothing below is a prerequisite of install / sync / test / start / create-site,
+# and nothing below may become one. `buildout-test` deliberately runs buildout
+# with node, npm and npx removed from PATH, because SPEC §5's "Explicitly
+# rejected" section is a hard boundary: compiling at buildout time would make
+# Node a production dependency across ~350 applications.
+# ---------------------------------------------------------------------------
+
+RECIPE_FOLDER=$(BACKEND_FOLDER)/recipe
+RECIPE_VENV=$(RECIPE_FOLDER)/.venv
+BUILDOUT_VENV=$(BACKEND_FOLDER)/var/buildout-venv
+BUILDOUT_CFG?=test-buildout.cfg
+
+$(RECIPE_VENV): $(RECIPE_FOLDER)/pyproject.toml ## Environment for the recipe's own suite
+	@echo "$(GREEN)==> Install the recipe test environment$(RESET)"
+	@if [[ ! -d "$(RECIPE_VENV)" ]]; then uv venv $(UV_VENV_ARGS) $(RECIPE_VENV); fi
+	@VIRTUAL_ENV=$(RECIPE_VENV) uv pip install --python $(RECIPE_VENV)/bin/python -q -e "$(RECIPE_FOLDER)[test]"
+
+.PHONY: recipe-test
+recipe-test: $(RECIPE_VENV) $(VENV_FOLDER) ## Run imio.recipe.emailkit's own test suite
+	# Run twice, in two environments, because no single one has everything and a
+	# skipped test proves nothing:
+	#
+	#  1. recipe/.venv has zc.buildout and zc.recipe.egg, so the recipe class is
+	#     exercised against the real pkg_resources types. It has no Plone, so the
+	#     two tests that need the runtime skip there.
+	#  2. .venv has the runtime, so those two run: the entry-point-group drift
+	#     check (the one string this distribution duplicates on purpose) and the
+	#     theme-token check. test_recipe.py skips there for lack of buildout.
+	#
+	# The union covers every test. Neither run alone does, so both run in full and
+	# the skip counts are the record of which half covered what.
+	@echo "$(GREEN)==> imio.recipe.emailkit tests (buildout environment)$(RESET)"
+	@$(RECIPE_VENV)/bin/python -m pytest $(RECIPE_FOLDER)/tests -q -rs
+	@echo "$(GREEN)==> imio.recipe.emailkit tests (Plone runtime environment)$(RESET)"
+	@PYTHONPATH=$(RECIPE_FOLDER)/src $(BIN_FOLDER)/python -m pytest $(RECIPE_FOLDER)/tests \
+		-q -rs -p no:cacheprovider -c $(RECIPE_FOLDER)/pyproject.toml
+
+$(BUILDOUT_VENV): $(VENV_FOLDER) ## Bootstrap zc.buildout for the acceptance test
+	# Built from the SAME interpreter as .venv, deliberately. The harness resolves
+	# eggs out of .venv's site-packages, and buildout's own generated scripts run
+	# under this interpreter -- so a version mismatch puts 3.12 C extensions on a
+	# 3.10 path and the scripts die with `No module named '_cffi_backend'`, which
+	# names nothing recognisable. Measured, not hypothetical.
+	@echo "$(GREEN)==> Bootstrap zc.buildout$(RESET)"
+	@mkdir -p $(BACKEND_FOLDER)/var
+	@if [[ ! -d "$(BUILDOUT_VENV)" ]]; then uv venv --python $(BIN_FOLDER)/python $(BUILDOUT_VENV); fi
+	@VIRTUAL_ENV=$(BUILDOUT_VENV) uv pip install --python $(BUILDOUT_VENV)/bin/python -q \
+		"zc.buildout" "zc.recipe.egg" "setuptools"
+
+.PHONY: buildout-test
+buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## SPEC §9 phase 4 acceptance: buildout, then bin/compile-emails
+	# `git clone && buildout && bin/compile-emails`, which is what §9 asks for.
+	#
+	# Eggs are resolved offline from the development virtualenv's site-packages
+	# rather than downloaded: same recipe, same working set, same generated
+	# scripts, no network. `test-buildout-pypi.cfg` is the from-PyPI variant for
+	# anyone who wants to check the download path too.
+	@set -euo pipefail
+	@site_packages="$$($(BIN_FOLDER)/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
+	@echo "$(GREEN)==> buildout, with node/npm/npx REMOVED from PATH$(RESET)"
+	# The hard boundary of SPEC §5, tested rather than asserted: with
+	# `compile-on-install` at its default the whole run must succeed on a machine
+	# that has no Node at all.
+	@nonode="$$($(BIN_FOLDER)/python -c 'import os; print(os.pathsep.join(p for p in os.environ["PATH"].split(os.pathsep) if p and not any(os.path.exists(os.path.join(p, n)) for n in ("node", "npm", "npx"))))')"
+	@env -u VIRTUAL_ENV PATH="$$nonode" PYTHONWARNINGS=ignore \
+		$(BUILDOUT_VENV)/bin/buildout -c $(BUILDOUT_CFG) \
+		"buildout:eggs-directory=$$site_packages" \
+		buildout:eggs-directory-version= buildout:abi-tag-eggs=false
+	@for script in compile-emails check-emails preview-emails; do
+		test -x "$(BACKEND_FOLDER)/bin/$$script" || { echo "$(RED)bin/$$script was not generated$(RESET)"; exit 1; }
+	done
+	@echo "$(GREEN)==> bin/compile-emails (kit-mode = path, the default)$(RESET)"
+	@$(BACKEND_FOLDER)/bin/compile-emails
+	@echo "$(GREEN)==> bin/compile-emails --kit-mode copy (SPEC §5's other mode)$(RESET)"
+	@$(BACKEND_FOLDER)/bin/compile-emails --kit-mode copy
+	# Both packages, both gates. The external consumer addon is what proves the
+	# wiring end to end; imio.emailkit is its own first consumer (SPEC §4), so it
+	# goes through the identical generated script rather than being trusted
+	# because `make lint-emails` covers it separately.
+	@echo "$(GREEN)==> bin/check-emails --package emailkitdemo (both gates)$(RESET)"
+	@$(BACKEND_FOLDER)/bin/check-emails --package emailkitdemo
+	@echo "$(GREEN)==> bin/check-emails --package imio.emailkit (both gates)$(RESET)"
+	@$(BACKEND_FOLDER)/bin/check-emails --package imio.emailkit
+	@echo "$(GREEN)==> bin/preview-emails (renders through render() with the fixtures)$(RESET)"
+	@$(BACKEND_FOLDER)/bin/preview-emails --no-compile --no-serve
+	@echo "$(GREEN)==> Acceptance test passed$(RESET)"
+
+.PHONY: buildout-clean
+buildout-clean: ## Remove everything the acceptance test writes
+	@echo "$(RED)==> Removing the buildout acceptance-test artifacts$(RESET)"
+	@rm -rf $(BACKEND_FOLDER)/bin $(BACKEND_FOLDER)/develop-eggs $(BACKEND_FOLDER)/parts \
+		$(BACKEND_FOLDER)/eggs $(BACKEND_FOLDER)/.installed.cfg $(BUILDOUT_VENV) $(RECIPE_VENV)
+	@rm -rf $(RECIPE_FOLDER)/tests/consumer/src/emailkitdemo/templates \
+		$(RECIPE_FOLDER)/tests/consumer/src/emailkitdemo/emails/node_modules \
+		$(RECIPE_FOLDER)/tests/consumer/src/emailkitdemo/emails/.kit \
+		$(RECIPE_FOLDER)/tests/consumer/src/emailkitdemo/emails/.maizzle \
+		$(RECIPE_FOLDER)/tests/consumer/src/emailkitdemo/emails/package-lock.json \
+		$(RECIPE_FOLDER)/tests/consumer/*.egg-info $(RECIPE_FOLDER)/src/*.egg-info
 
 ## Add bobtemplates features (check bobtemplates.plone's documentation to get the list of available features)
 add: $(VENV_FOLDER)
