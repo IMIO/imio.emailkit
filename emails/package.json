@@ -1,0 +1,12 @@
+{
+  "name": "imio-emailkit-emails",
+  "private": true,
+  "description": "Maizzle project for imio.emailkit's own templates. Dev-only: pruned from the sdist, never installed in production.",
+  "scripts": {
+    "build": "maizzle build",
+    "postinstall": "maizzle prepare"
+  },
+  "dependencies": {
+    "@maizzle/framework": ">=6.0.5"
+  }
+}

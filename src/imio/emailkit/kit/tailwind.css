@@ -1,0 +1,50 @@
+/*
+ * The iMio email design system: one locked, email-safe Tailwind entry
+ * (SPEC §3, as amended -- Maizzle 6 ships Tailwind 4, which is configured in
+ * CSS, so this file replaces the spec's `tailwind.preset.js`).
+ *
+ * `@maizzle/tailwindcss` already supplies the email-safe base: px font sizes,
+ * a 4px spacing scale, a reset, MSO helpers and client-targeting variants.
+ * All this file adds is the iMio brand: colours and the two type families.
+ * Everything here is baked in at build time.
+ *
+ * The three runtime-variable branding values -- `logo_url`, `primary_color`,
+ * `footer_html` -- are NOT here. They are Chameleon placeholders fed from
+ * `plone.app.registry` at render time; see `layouts/Main.vue`.
+ *
+ * This file deliberately does NOT `@import "@maizzle/tailwindcss"`. Measured:
+ * Tailwind resolves a bare specifier by walking up from the *importing file*,
+ * and a kit directory inside a Python egg has no `node_modules` ancestor, so the
+ * import fails -- and it fails silently, because Maizzle catches CSS errors and
+ * ships the uncompiled stylesheet while the build still exits 0. `Main.vue`
+ * emits that import itself, where Maizzle's own PostCSS plugin rewrites it to an
+ * absolute path first.
+ */
+@theme {
+  /*
+   * Quicksand (display) and Nunito (body) are brand faces, not email faces:
+   * no mail client will have them and remote web fonts are unreliable and
+   * privacy-hostile in mail. They lead the stack so a client that does have
+   * them uses them, and everything falls back to Arial.
+   */
+  --font-display: Quicksand, "Trebuchet MS", Arial, Helvetica, sans-serif;
+  --font-body: Nunito, "Avenir LT Std", Arial, Helvetica, sans-serif;
+
+  /* Brand. Magenta is the accent -- sparing, high-signal use only. */
+  --color-imio-magenta: #e6007e;
+  --color-imio-magenta-dark: #b3004b;
+  --color-imio-pink-soft: #ffadd9;
+
+  /* Neutrals. */
+  --color-imio-black: #1c1c1c;
+  --color-imio-grey-dark: #3c3c3b;
+  --color-imio-grey-light: #d2d2d2;
+  --color-imio-grey-border: #ededed;
+  --color-imio-grey-bg: #f8f8f8;
+  --color-imio-white: #ffffff;
+
+  /* Semantic. */
+  --color-imio-positive: #00e667;
+  --color-imio-warning: #e6da00;
+  --color-imio-negative: #b3004b;
+}
