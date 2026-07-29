@@ -8,6 +8,46 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — `imio.recipe.emailkit` lives in this repository, as a sibling directory
+
+**Context.** §2's artifact table lists two distributions — `imio.emailkit` and
+`imio.recipe.emailkit` — without saying where the second one lives.
+
+**Options.** (A) a sibling directory in this repo (`recipe/`), released as its own distribution;
+(B) its own repository.
+
+**Choice.** **A.**
+
+**Why.** One checkout, one CI run, and — the deciding reason — the recipe's tests can exercise the
+**real kit next door** instead of a pinned release of it. Every Phase 0–3 finding says this pipeline
+fails silently, so a recipe tested against a stale pinned kit is a recipe that passes while the thing
+it wires up has changed. Splitting later is cheap and has an explicit trigger: release cadences
+diverging. That is the same argument §3 makes for keeping the kit in the egg rather than on npm, applied
+one level up.
+
+**Consequence.** Two `pyproject.toml` files in one repo, and CI must build and test both. The
+`imio.emailkit` sdist must not accidentally ship `recipe/`.
+
+---
+
+## 2026-07-29 — A legacy body's own `<style>` block is dropped by most clients
+
+**Context.** `render_shell` injects arbitrary legacy HTML, and some legacy notification bodies carry a
+`<style>` block.
+
+**Finding.** The injected block lands inside the document **`<body>`**, which is invalid placement, and
+Gmail and Outlook.com strip it. The shell does **not** hoist it into `<head>`, because the shell wraps
+and does not rewrite (plan §5). Inline `style="…"` attributes in the body survive untouched.
+
+**Choice.** Documented as a migration caveat in the README rather than fixed by hoisting. Hoisting would
+mean the shell rewriting a consumer's markup, and it would silently change cascade order against the
+shell's own inlined styles.
+
+**Why it needs saying out loud.** It works perfectly in a browser preview, so a consumer cannot discover
+it before real clients do. It is a candidate `check-emails` warning in Phase 4.
+
+---
+
 ## 2026-07-29 — Plaintext: table cells get a ` | ` separator (approved fix)
 
 **Context.** `naive_text()` broke lines on `</tr>` but not on `</td>`/`</th>`, so adjacent cells
