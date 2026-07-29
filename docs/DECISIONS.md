@@ -8,6 +8,76 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — REVERSED (my error): the content-rule action registers via plain ZCML, not GenericSetup
+
+**Context.** §8.3 adds a "Send styled email" content-rule action. §8.2 level 3 makes `:base` the opt-out
+profile.
+
+**What went wrong, and it was mine.** I briefed the implementer to "register in `profiles/default/`, not
+`base`". That instruction was wrong, and it was honoured faithfully. The only GS-native way to satisfy it
+is to register the action element as a **local utility** via `componentregistry.xml` — with a
+`component=` rather than `factory=` subtlety, because GS's factory branch `_setObject`s the result into
+the portal and that needs an OFS item.
+
+**Why it is wrong.**
+
+1. **The mission's own rule:** "if a solution needs a paragraph to justify its cleverness, it's the wrong
+   solution." The justification needed several.
+2. **The pickled-singleton cost is a silent drift.** A GS registration stores a *copy* of the element, so
+   a change to the action's title or description reaches an existing site only when someone re-applies
+   the profile. Drift with no symptom is precisely the defect class this project spent five phases
+   eliminating.
+3. **§8.2's opt-out is about not restyling stock mails, not hiding an action type.** An action type is
+   inert until a rule uses it, and the vocabulary has nothing useful in it without registered templates.
+   A global registration therefore gives a `:base` site nothing it opted out of.
+
+**Choice.** A plain `plone:ruleAction` directive in ZCML, exactly like every other Plone add-on. The GS
+files are deleted and `plone.contentrules` owns the utility object again.
+
+**The gate got stronger, not weaker.** The test now asserts the element is in the *global* registry, that
+the site lookup returns **the same object**, and that the site has **no registration of its own** — so a
+silent slide back to a local utility fails. A `:base`-only site is asserted to *have* the action type,
+with a sibling test that `IEmailkitLayer` is still absent so the two cannot be confused.
+
+**Accepted cost, flagged not hidden.** `IRuleElementDirective.title`/`description` are `TextLine`/`Text`,
+not `MessageID`, so the panel entry is **English** — exactly like Plone's own "Send email" and "Notify
+user". The strings are extracted into the `.pot` and translated, but inert until `plone.contentrules`
+switches those fields. Everything *inside* the action's own forms is translated normally.
+
+**Process lesson.** The implementer surfaced the tradeoff explicitly, priced it ("a two-line change if
+you'd rather"), and said it departed from convention — which is the only reason I could catch that my own
+brief was the problem. It should also have escalated when the justification started needing paragraphs;
+so should I have noticed when writing the brief.
+
+---
+
+## 2026-07-29 — Content-rule decisions the spec leaves open
+
+**1. `cta_label` is passed as a msgid, not a translated string.** `.with_context()` runs **once**, before
+§6.2 groups recipients by language. A string translated at that point would send one language's wording
+to every recipient — a silent per-language bug. Zope's page-template engine translates the message object
+per group instead; verified FR and NL differ and each lands in its own group's HTML.
+
+**Generalises beyond this action:** anything passed through `.with_context()` that is user-facing text
+should be a msgid, for the same reason. Recorded in the README.
+
+**2. The render context is a fixed set of five names** — `item`, `title`, `intro`, `cta_label`, `cta_url`
+— pinned as `RENDER_CONTEXT_NAMES`. §8.3 says nothing about it, and a rule cannot know what a template
+wants. A template needing another name **fails loudly at render** rather than producing a mail with a gap.
+A consumer needing more sends from their own code with `Email(...)`.
+
+**3. The owner resolves as a userid, not an address**, so the member adapter can supply `fullname` *and*
+`language` and per-language sending works from a rule. An unresolvable owner raises `RecipientError`
+rather than mailing everyone else.
+
+**4. Three separate summary msgids rather than one with interpolation**, because `zope.i18n` `str()`s
+mapping values and an interpolated label would render as a bare msgid.
+
+**5. No second cache for the vocabulary.** It reads `discovery.available_templates()` directly; a cache
+here would survive `invalidate_cache()` and go stale in tests and after a restart.
+
+---
+
 ## 2026-07-29 — Both `kit-mode`s materialise `emails/.kit/`, so a consumer's config never changes
 
 **Context.** §5 offers `kit-mode = path | copy` and §4 mentions `emails/.kit/` as "gitignored,

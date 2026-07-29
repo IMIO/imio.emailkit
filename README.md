@@ -115,6 +115,45 @@ into a message is yours until the `Email` builder lands.
 > overridable — just not discoverable. Use `imio.emailkit:notification` as the
 > worked example of an ordinary template.
 
+## Sending styled mail from a content rule
+
+Installing the `default` profile adds a content-rule action, **Send styled email**,
+alongside Plone's own. It offers every registered template — including templates
+from other add-ons, because the vocabulary is built from the same discovery the
+preview view uses — plus a list of recipients and a "send to the owner" box.
+
+The action is a thin caller of the `Email` builder, so everything from
+[Sending a mail](#sending-a-mail) applies unchanged: recipients are resolved
+through `IEmailRecipient`, one message is sent **per recipient language**, and
+delivery is transaction-safe — if the transaction that fired the rule aborts,
+nothing is sent.
+
+### What a rule can put in the template context
+
+A content rule cannot know what any given template wants, so it passes a fixed set
+of names. Authoritative list and reasoning: the *"The render context, for template
+authors"* section of `imio/emailkit/contentrules/mail.py`'s module docstring.
+
+| Name | What it is |
+|---|---|
+| `item` | the content object the rule fired on |
+| `title` | its title |
+| `intro` | a short lead line |
+| `cta_label` | the call-to-action label |
+| `cta_url` | the content's URL |
+
+A template that needs a name outside this set **fails loudly at render** rather
+than quietly producing a mail with a gap in it. If yours needs more, send it from
+your own code with `Email(...)` instead — the builder takes any context you like.
+
+> [!IMPORTANT]
+> `cta_label` reaches the template as an **i18n msgid, not a translated string**.
+> `.with_context()` runs once, *before* `.send()` groups recipients by language, so
+> a string translated at that point would send one language's wording to every
+> recipient. The same trap applies to anything you pass through
+> `.with_context()` yourself: pass msgids and let the render translate them per
+> language group.
+
 ## Migrating a mail you already send
 
 If your add-on already builds an HTML body — a notification assembled by string
