@@ -34,7 +34,9 @@ arbitrary address is a spam relay, and nothing about the feature needs one.
 
 from imio.emailkit.discovery import get_templates
 from imio.emailkit.interfaces import IEmailkitTheme
+from imio.emailkit.interfaces import IEmailRecipient
 from imio.emailkit.interfaces import THEME_REGISTRY_PREFIX
+from imio.emailkit.recipients import default_language
 from imio.emailkit.render import get_theme
 from imio.emailkit.render import negotiated_language
 from imio.emailkit.render import render
@@ -93,6 +95,13 @@ SENT = (
     "Queued a test of {name} ({language}) to your own address, {address}. "
     "Delivery is a queued IMailHost send (SPEC §6.2), so it leaves with this "
     "transaction."
+)
+
+SEND_LANGUAGE_MISMATCH = (
+    "The preview below is {previewed}, but the mail will be sent in {sending}: "
+    "SPEC §6.2 renders per *recipient* language and the builder takes no language "
+    "argument, so the send follows your own preferred language (or the site "
+    "default when you have none). Set yours to {previewed} to send that one."
 )
 
 
@@ -394,6 +403,40 @@ class EmailkitPreview(PreviewBase):
         member = self.member()
         return (member.getProperty("email", "") or "") if member is not None else ""
 
+    def send_language(self):
+        """The language the sent mail will actually be rendered in.
+
+        Not necessarily the one in the switcher, and this is where §6.3 and §6.2
+        pull against each other. §6.3 says the button mails "the currently
+        previewed template + fixture + **language**"; §6.2 gives the builder no
+        language argument at all, and has ``.send()`` group recipients by *their
+        own* resolved language, falling back to the site default. Both cannot be
+        true, and §6.2 is the frozen one.
+
+        So rather than fake it -- an inert ``request['LANGUAGE']`` was tried and
+        does nothing, because ``recipients.default_language()`` deliberately reads
+        the site default and not the request -- the view computes the truth from
+        §6.2's own public contract (the ``IEmailRecipient`` adapter) and says so
+        next to the button. A developer who wants the mail in Dutch sets Dutch as
+        their own preferred language, which is the mechanism §6.2 actually
+        provides. Mutating that property on their behalf was rejected: silently
+        rewriting a user's preferences because they clicked a preview button is
+        not a thing a developer tool gets to do.
+        """
+        member = self.member()
+        if member is None:
+            return default_language()
+        recipient = IEmailRecipient(member, None)
+        preferred = getattr(recipient, "language", None)
+        return preferred or default_language()
+
+    def send_language_note(self):
+        """A warning when the send language will not be the previewed one."""
+        sending = self.send_language()
+        if sending == self.language():
+            return None
+        return SEND_LANGUAGE_MISMATCH.format(previewed=self.language(), sending=sending)
+
     def send_test_blocker(self):
         """Why the send-test button is unavailable, or ``None`` when it is not."""
         if self.error():
@@ -424,19 +467,10 @@ class EmailkitPreview(PreviewBase):
 
         state = self.state()
         template = state["template"]
-        language = self.language()
-        address = self.user_address()
-
-        # SPEC §6.2 groups recipients by their *own* resolved language, and the
-        # builder has no language argument -- correctly, it holds data and does
-        # not grow behaviour. So the switcher is honoured the only way that does
-        # not touch the frozen API: the request's negotiated language, which is
-        # what the builder falls back to for a recipient expressing no
-        # preference. A member who *has* set a language preference gets that
-        # instead, which is §6.2 working as specified rather than a bug here.
-        previous = self.request.get("LANGUAGE")
-        self.request["LANGUAGE"] = language
         try:
+            # SPEC §6.2 verbatim, and nothing else. `.to(member)` rather than
+            # `.to(address)` on purpose: it is the recipient the builder resolves
+            # for itself, so no address this form received can reach the wire.
             email_builder()(template.name).to(self.member()).subject(
                 f"[emailkit test] {template.name}"
             ).with_context(**dict(state["context"])).send()
@@ -445,14 +479,10 @@ class EmailkitPreview(PreviewBase):
             return "error", (
                 f"Email({template.name!r}).send() raised:\n\n{traceback.format_exc()}"
             )
-        finally:
-            if previous is None:
-                self.request.other.pop("LANGUAGE", None)
-            else:
-                self.request["LANGUAGE"] = previous
-
         return "info", SENT.format(
-            name=template.name, language=language, address=address
+            name=template.name,
+            language=self.send_language(),
+            address=self.user_address(),
         )
 
 

@@ -123,9 +123,12 @@
                   type="submit"
                   name="form.button.send_test"
                   value="1"
-          >Send test to ${view/user_address}</button>
+          >Send test to ${view/user_address} in ${view/send_language}</button>
           <p tal:condition="view/send_test_blocker" class="hint warn">
             ${view/send_test_blocker}
+          </p>
+          <p tal:condition="view/send_language_note" class="hint warn">
+            ${view/send_language_note}
           </p>
           <p class="hint">
             Goes through the SPEC §6.2 <code>Email</code> builder, to your own
