@@ -2,6 +2,15 @@
 
 ``html, text = render(name, context={...}, language=None)``
 
+Plus its §9 phase 3 sibling for mails whose body already exists:
+
+``html, text = render_shell(subject, body_html, language=None)``
+
+Both build the same namespace and go through the same compiled-template loader;
+they differ only in where the markup comes from -- a registered template for one,
+the caller's legacy body dropped into the kit shell's ``body_html`` slot for the
+other. Neither is a builder method: §6.2 is frozen.
+
 Pure function of (template, context, registry state): no request faking, no
 site, no database. Previews (§6.3), golden-file tests (§7) and the ``Email``
 builder (§6.2) all go through this one door.
@@ -37,8 +46,10 @@ from imio.emailkit.discovery import get_template
 from imio.emailkit.discovery import TEXT_SUFFIX
 from imio.emailkit.helpers import bind as bind_locale_helpers
 from imio.emailkit.helpers import FALLBACK_LANGUAGE
+from imio.emailkit.interfaces import EmailkitError
 from imio.emailkit.interfaces import IEmailkitTheme
 from imio.emailkit.interfaces import THEME_REGISTRY_PREFIX
+from pathlib import Path
 from plone.registry.interfaces import IRegistry
 from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 from zope.component import queryUtility
@@ -52,6 +63,18 @@ import re
 
 logger = logging.getLogger("imio.emailkit.render")
 
+#: SPEC §9 phase 3's shell -- the kit layout (§3) with no authored content, whose
+#: whole body is the ``body_html`` :func:`render_shell` injects.
+#:
+#: Resolved by **path**, not through §4's entry-point discovery, because
+#: ``render_shell(subject, body_html)`` takes no template name: there is nothing
+#: to look up, and registering it would put a template nobody can call by name in
+#: ``TemplateNotFound.available`` and in the §6.3 preview list. This does not bend
+#: §4 -- §4 governs how *consumers* publish named templates, and z3c.jbot
+#: overridability (§4's last bullet) is unaffected, since the file still loads
+#: through :func:`_page_template` and jbot keys on the filesystem path.
+SHELL_TEMPLATE = Path(__file__).parent / "templates" / "shell.pt"
+
 
 def render(name, context=None, language=None):
     """Render the template registered as ``name`` and return ``(html, text)``.
@@ -64,7 +87,7 @@ def render(name, context=None, language=None):
     """
     template = get_template(name)
     language = language or negotiated_language()
-    namespace = build_namespace(template, context, language)
+    namespace = build_namespace(context, language, preheader=template.preheader)
 
     html = render_file(template.html_path, namespace)
     # `text_path` comes from the cached startup scan, so it can name a file that
@@ -79,8 +102,81 @@ def render(name, context=None, language=None):
     return html, text
 
 
-def build_namespace(template, context, language):
+def render_shell(subject, body_html, language=None):
+    """Wrap an *existing* HTML mail body in the kit shell; return ``(html, text)``.
+
+    SPEC §9 phase 3. The migration path for mails whose body already exists -- a
+    PloneMeeting notification assembled by string concatenation, say -- and which
+    nobody wants to re-author as a kit template. The shell contributes the whole
+    document: the inlined CSS, the a11y defaults, ``lang``, the preheader, the
+    header/footer and the theme tokens. The body contributes its own markup and
+    nothing else changes about it.
+
+    A ``render()`` **sibling**, not a builder method (§6.2 is frozen). It returns
+    the same ``(html, text)`` pair and shares ``render()``'s code path --
+    :func:`negotiated_language`, :func:`build_namespace`, :func:`render_file` --
+    so ``Email`` sends its output with no change at all.
+
+    :param subject: an i18n msgid **or** a literal string, exactly like
+        ``.subject()`` (§6.2). Translated into the render language and handed to
+        the shell as its heading, under the name ``subject``.
+    :param body_html: the existing body, inserted **verbatim** into the shell's
+        ``body_html`` slot with ``structure`` -- §3 rule 4's one sanctioned use of
+        unescaped markup. Not sanitised, not reformatted and **not re-parsed as a
+        template**: ``${...}`` inside it is emitted literally. That is verified,
+        not assumed; see ``docs/DECISIONS.md``.
+    :param language: as ``render()`` -- the negotiated language when omitted.
+    :raises EmailkitError: when the compiled shell is absent from the egg.
+
+    The plaintext part is always :func:`naive_text` of the rendered HTML. A
+    hand-authored ``shell.txt.pt`` twin (§4) could not exist even in principle:
+    its only content would be ``body_html``, which is HTML, so the twin would put
+    tags in the plaintext part. This is therefore the designed path, not §4's
+    logged-deprecation fallback, and it is not warned about.
+
+    **No preheader is injected**, and that is the shell's decision, not an
+    omission: ``emails/src/templates/shell.vue`` documents why (spending the whole
+    inbox snippet repeating the subject line the client already shows is worse
+    than letting the client continue the snippet into the legacy body). The hidden
+    div collapses. The runtime path in the layout still exists, so nothing here
+    forecloses a future ``preheader`` argument.
+    """
+    language = language or negotiated_language()
+    # ``zope.i18n.translate`` returns a plain string unchanged, which is what
+    # makes §6.2's "a msgid or a literal" true here for free -- the same call
+    # ``.subject()`` resolves with, so the heading and the mail header agree.
+    subject = zope_translate(subject, target_language=language)
+    namespace = build_namespace(
+        {"subject": subject, "body_html": body_html},
+        language,
+    )
+    html = render_file(_shell_path(), namespace)
+    return html, naive_text(html)
+
+
+def _shell_path():
+    """:data:`SHELL_TEMPLATE`, checked to exist. Fail loud, never silent.
+
+    Missing means the egg was installed without its build output, and letting
+    ``PageTemplateFile`` discover that produces a bare ``FileNotFoundError`` from
+    inside its mtime check -- which points at Zope rather than at the one thing
+    the reader has to do.
+    """
+    if not SHELL_TEMPLATE.exists():
+        raise EmailkitError(
+            f"The compiled kit shell is missing: {SHELL_TEMPLATE}. "
+            f"render_shell() needs the committed Maizzle build output; run "
+            f"`make compile-emails` (SPEC §5)."
+        )
+    return SHELL_TEMPLATE
+
+
+def build_namespace(context, language, preheader=None):
     """Assemble the namespace ``render()`` hands to both compiled templates.
+
+    Shared verbatim with :func:`render_shell`, which differs from ``render()``
+    only in where its ``context`` comes from and in having no registration to
+    take a ``preheader`` msgid from.
 
     Precedence, low to high: the registration's ``preheader``, then the caller's
     ``context``, then the names this package injects. The injected names win
@@ -88,10 +184,8 @@ def build_namespace(template, context, language):
     ``theme`` or ``lang`` would break the shell, not just their own template.
     """
     namespace = {}
-    if template.preheader is not None:
-        namespace["preheader"] = zope_translate(
-            template.preheader, target_language=language
-        )
+    if preheader is not None:
+        namespace["preheader"] = zope_translate(preheader, target_language=language)
     if context:
         namespace.update(context)
 
