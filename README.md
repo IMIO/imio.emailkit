@@ -115,6 +115,58 @@ into a message is yours until the `Email` builder lands.
 > overridable — just not discoverable. Use `imio.emailkit:notification` as the
 > worked example of an ordinary template.
 
+## Migrating a mail you already send
+
+If your add-on already builds an HTML body — a notification assembled by string
+concatenation, say — you do not have to re-author it as a kit template to get the
+styled shell. There are two routes, and **neither adds any API**.
+
+### Route 1 — you already own your sending code
+
+```python
+from imio.emailkit import render_shell
+
+html, text = render_shell("Point 'Budget 2026' : etat modifie", legacy_body_html)
+```
+
+`render_shell` drops `legacy_body_html` into the kit shell's `body_html` slot and
+returns the same `(html, text)` pair `render()` does. The shell contributes the
+whole document: inlined CSS, accessibility defaults, `lang`, the header and footer,
+the theme tokens and dark mode. Your body goes in **byte-for-byte** — nothing is
+sanitised, reformatted or rewritten.
+
+`${...}` inside the body is emitted **literally**. It is not re-parsed as a
+template, so a body assembled by string concatenation cannot accidentally (or
+deliberately) read the render namespace. That is verified, not assumed — see
+`docs/DECISIONS.md`.
+
+### Route 2 — you want the `Email` builder (usually better)
+
+```python
+from imio.emailkit import Email
+
+Email("imio.emailkit:notification") \
+    .to(member) \
+    .with_context(title=subject, body_html=legacy_body_html) \
+    .send()
+```
+
+The kit layout defines the `body_html` slot for **every** template, not just the
+shell, so the builder can carry a legacy body too. Prefer this when you can: you
+get per-language sending, recipient adapters, attachments and transaction-safe
+delivery, and you keep the registration's subject, its preheader and its
+hand-authored plaintext twin — none of which `render_shell` has.
+
+> [!NOTE]
+> `Email("imio.emailkit:shell")` does **not** work. The shell is resolved by path
+> and deliberately not registered for discovery, so it has no name to look up. Use
+> one of the two routes above.
+
+### What you do not change
+
+Your existing markup, your existing data-gathering code, and your existing
+recipient logic if you take route 1. The shell wraps; it does not redesign.
+
 ## Shipping templates from your own add-on
 
 Declare one entry point:
