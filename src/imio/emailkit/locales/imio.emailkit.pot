@@ -4,7 +4,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2026-07-29 10:47+0000\n"
+"POT-Creation-Date: 2026-07-29 15:41+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,7 +17,7 @@ msgstr ""
 "Preferred-Encodings: utf-8 latin1\n"
 "Domain: imio.emailkit\n"
 
-#: imio/emailkit/interfaces.py:47
+#: imio/emailkit/interfaces.py:48
 msgid "Absolute URL of the logo shown in the mail header. Remote URL, not an inline image."
 msgstr ""
 
@@ -29,76 +29,89 @@ msgstr ""
 msgid "Email templating runtime without the restyled Plone default mails. Install this instead of the default profile to keep Plone's stock mails untouched."
 msgstr ""
 
-#: imio/emailkit/interfaces.py:72
+#: imio/emailkit/interfaces.py:73
 msgid "Footer HTML"
 msgstr ""
 
-#: imio/emailkit/interfaces.py:73
+#: imio/emailkit/interfaces.py:74
 msgid "HTML inserted in the mail footer. Rendered unescaped -- it is one of the two slots allowed to carry markup."
 msgstr ""
 
-#: imio/emailkit/interfaces.py:58
+#: imio/emailkit/interfaces.py:59
 msgid "Hexadecimal color used by buttons and the header rule, for example ``#e6007e``."
 msgstr ""
 
-#: imio/emailkit/interfaces.py:46
+#: imio/emailkit/interfaces.py:47
 msgid "Logo URL"
 msgstr ""
 
-#: imio/emailkit/interfaces.py:57
+#: imio/emailkit/interfaces.py:58
 msgid "Primary color"
+msgstr ""
+
+#: imio/emailkit/contentrules/configure.zcml:86
+msgid "Send a styled email built from a registered template, through the imio.emailkit builder: one message per recipient language, with the subject translated accordingly."
+msgstr ""
+
+#: imio/emailkit/contentrules/configure.zcml:86
+msgid "Send styled email"
 msgstr ""
 
 #: imio/emailkit/profiles.zcml:36
 msgid "Uninstall iMio Emailkit setup."
 msgstr ""
 
+#. Default: "View this item"
+#: imio/emailkit/contentrules/mail.py:122
+msgid "email_cta_view_item"
+msgstr ""
+
 #. Default: "This message was sent automatically. Please do not reply to it."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:102
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:98
-#: imio/emailkit/templates/notification.pt:58
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:142
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:138
+#: imio/emailkit/templates/notification.pt:98
 msgid "email_footer_default"
 msgstr ""
 
 #. Default: "iMio"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:43
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:43
-#: imio/emailkit/templates/notification.pt:32
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:83
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:83
+#: imio/emailkit/templates/notification.pt:72
 msgid "email_logo_alt"
 msgstr ""
 
 #. Default: "The site administrator has asked you to reset the password of the account ${userid}. Your previous password no longer works."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:61
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:101
 msgid "email_mail_password_admin_request"
 msgstr ""
 
 #. Default: "Choose a new password"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:70
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:110
 msgid "email_mail_password_cta"
 msgstr ""
 
 #. Default: "This link is valid for ${hours} hours."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:78
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:118
 msgid "email_mail_password_expiry"
 msgstr ""
 
 #. Default: "If the button does not work, copy this address into your browser:"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:74
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:114
 msgid "email_mail_password_fallback"
 msgstr ""
 
 #. Default: "Use the button below to choose a new password for ${site_name}."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:65
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:105
 msgid "email_mail_password_lead"
 msgstr ""
 
 #. Default: "If you did not ask for this, simply ignore this message: your password has not been changed. The request came from the IP address ${ipaddress}."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:87
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:127
 msgid "email_mail_password_tracking"
 msgstr ""
 
 #. Default: "Follow the link to choose a new password."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:31
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:71
 msgid "email_preheader_mail_password_template"
 msgstr ""
 
@@ -108,37 +121,37 @@ msgid "email_preheader_notification"
 msgstr ""
 
 #. Default: "Follow the link to activate your account."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:31
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:71
 msgid "email_preheader_registered_notify_template"
 msgstr ""
 
 #. Default: "Kind regards,"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:87
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:127
 msgid "email_regards"
 msgstr ""
 
 #. Default: "Your account has been created. Your username is ${username}. Activate it by choosing a password."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:66
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:106
 msgid "email_registered_notify_created"
 msgstr ""
 
 #. Default: "Activate my account"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:71
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:111
 msgid "email_registered_notify_cta"
 msgstr ""
 
 #. Default: "Activate your account before ${expiration_date}."
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:82
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:122
 msgid "email_registered_notify_expiry"
 msgstr ""
 
 #. Default: "If the button does not work, copy this address into your browser:"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:75
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:115
 msgid "email_registered_notify_fallback"
 msgstr ""
 
 #. Default: "Hello ${fullname},"
-#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:62
+#: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:102
 msgid "email_registered_notify_greeting"
 msgstr ""
 
@@ -157,6 +170,26 @@ msgstr ""
 msgid "email_subject_registered_notify_template"
 msgstr ""
 
+#. Default: "Send one of the styled email templates shipped by the installed add-ons. The template owns the markup and the subject; this form chooses which one and who receives it."
+#: imio/emailkit/contentrules/mail.py:412
+msgid "help_add_styledmail_action"
+msgstr ""
+
+#. Default: "One entry per recipient: an email address, or the id of a Plone user. Prefer the user id where you can, because the mail is then rendered and its subject translated in that user's own preferred language."
+#: imio/emailkit/contentrules/mail.py:153
+msgid "help_styledmail_recipients"
+msgstr ""
+
+#. Default: "Send to the owner of the content that triggered the rule, in addition to the recipients above. The rule fails loudly rather than sending to fewer people if the owner cannot be resolved."
+#: imio/emailkit/contentrules/mail.py:172
+msgid "help_styledmail_send_to_owner"
+msgstr ""
+
+#. Default: "The styled template this rule sends. The list holds every template registered by every installed add-on; a template's name is <package>:<template>, because three add-ons may each ship one called 'notification'."
+#: imio/emailkit/contentrules/mail.py:138
+msgid "help_styledmail_template"
+msgstr ""
+
 #: imio/emailkit/profiles.zcml:28
 msgid "iMio Emailkit: Install"
 msgstr ""
@@ -167,4 +200,49 @@ msgstr ""
 
 #: imio/emailkit/profiles.zcml:20
 msgid "iMio Emailkit: runtime only"
+msgstr ""
+
+#. Default: "Add Send styled email action"
+#: imio/emailkit/contentrules/mail.py:411
+msgid "label_add_styledmail_action"
+msgstr ""
+
+#. Default: "Edit Send styled email action"
+#: imio/emailkit/contentrules/mail.py:432
+msgid "label_edit_styledmail_action"
+msgstr ""
+
+#. Default: "Email recipients"
+#: imio/emailkit/contentrules/mail.py:152
+msgid "label_styledmail_recipients"
+msgstr ""
+
+#. Default: "Also send to the owner of the content"
+#: imio/emailkit/contentrules/mail.py:168
+msgid "label_styledmail_send_to_owner"
+msgstr ""
+
+#. Default: "Email template"
+#: imio/emailkit/contentrules/mail.py:137
+msgid "label_styledmail_template"
+msgstr ""
+
+#. Default: "Configure element"
+#: imio/emailkit/contentrules/mail.py:420
+msgid "legend_styledmail_configure"
+msgstr ""
+
+#. Default: "Send the styled email \"${template}\" to ${recipients}"
+#: imio/emailkit/contentrules/mail.py:216
+msgid "summary_styledmail"
+msgstr ""
+
+#. Default: "Send the styled email \"${template}\" to ${recipients} and to the owner of the content"
+#: imio/emailkit/contentrules/mail.py:229
+msgid "summary_styledmail_and_owner"
+msgstr ""
+
+#. Default: "Send the styled email \"${template}\" to the owner of the content"
+#: imio/emailkit/contentrules/mail.py:222
+msgid "summary_styledmail_owner_only"
 msgstr ""
