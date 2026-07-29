@@ -1,0 +1,18 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    i18n_domain="imio.emailkit"
+    >
+
+  <!-- SPEC §6.2: recipient resolution "goes through a single adapter", and these
+       are the two defaults it ships ("for `str` and Plone members"). Adding a
+       third kind of recipient (a group, a PloneMeeting role, a mailing-list
+       object) is one more line here and no change to the `Email` builder, which
+       is the whole point of the interface. -->
+
+  <!-- No `for=` / `provides=` attributes: both come from the @adapter and
+       @implementer decorators on the factories, which keeps the declaration next
+       to the code that has to honour it. -->
+  <adapter factory=".recipients.recipient_from_string" />
+  <adapter factory=".recipients.recipient_from_member" />
+
+</configure>

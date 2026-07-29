@@ -6,10 +6,51 @@ not import anything from ``tests/``. The one layer that needs a test-only packag
 """
 
 from imio.emailkit.testing import FIXTURE
+from imio.emailkit.testing import Layer as EmailkitLayer
+from plone.app.contenttypes.testing import PLONE_APP_CONTENTTYPES_FIXTURE
+from plone.app.testing import FunctionalTesting
 from plone.app.testing import IntegrationTesting
 from plone.app.testing import PloneSandboxLayer
 
 import sitelayer
+
+
+class SendingLayer(EmailkitLayer):
+    """``imio.emailkit:default`` on a site with the Dexterity content types.
+
+    The one layer every SPEC §6.2/§6.3 test in this suite runs on. Two reasons
+    it is not the Phase 1 ``FIXTURE``:
+
+    1. **Content types.** §6.2 lists "a Plone File/Image content object" among
+       the attachment sources, and there is no way to build one without the
+       ``File``/``Image`` FTIs. ``imio.emailkit.testing.Layer`` bases on the bare
+       ``PLONE_FIXTURE`` on purpose -- Phase 1 renders against fixture *data*,
+       never content -- so the content types come in here rather than being
+       charged to every other test's setup. This is exactly the swap
+       ``imio.emailkit.testing``'s own docstring recommends to consumers whose
+       fixtures carry content objects, so it doubles as a worked example.
+    2. **Commits.** ``plone.testing``'s integration lifecycle replaces
+       ``transaction.commit`` with a hard error to protect test isolation, and
+       §6.2's default delivery is *queued*: the message only reaches the MTA in
+       the mail data manager's ``tpc_finish``. Reading a queued message
+       therefore needs a real commit, which only a functional layer allows -- and
+       the alternative, poking at ``transaction.get()._resources`` to run that
+       phase by hand, would replace the thing under test with an imitation of it.
+    """
+
+    defaultBases = (PLONE_APP_CONTENTTYPES_FIXTURE,)
+
+
+SENDING_FIXTURE = SendingLayer()
+
+#: No ``WSGI_SERVER_FIXTURE``: nothing here browses over HTTP, and a server
+#: thread per layer is pure cost. Views are exercised through traversal, which
+#: is also the only way to get a real ``Unauthorized`` out of the security
+#: machinery rather than a 302 to a login form.
+SENDING_FUNCTIONAL_TESTING = FunctionalTesting(
+    bases=(SENDING_FIXTURE,),
+    name="Imio.EmailkitSendingLayer:FunctionalTesting",
+)
 
 
 class SiteOverrideLayer(PloneSandboxLayer):

@@ -48,3 +48,68 @@
   --color-imio-warning: #e6da00;
   --color-imio-negative: #b3004b;
 }
+
+/*
+ * Dark mode (SPEC §3, the last of `Main.vue`'s listed responsibilities).
+ *
+ * Four tokens only: `page`, `surface`, `body`, `muted`. The kit applies them
+ * itself through a `data-dark` attribute on the elements it owns; authors never
+ * write one, exactly as they never write `role="presentation"` or `lang`.
+ *
+ * WHY AN ATTRIBUTE AND NOT A CLASS. `css.purge` understands `class=` and `id=`
+ * and nothing else, and it deletes what it cannot match. A dark block keyed on
+ * classes is precisely the thing it removes while the build still exits 0, which
+ * is why this was deferred rather than guessed at. An attribute selector is
+ * outside purge's model entirely, so there is nothing to match and nothing to
+ * drop. `css.purge.safelist` would also work, but it puts the guard in the build
+ * config, a different file from the rule it protects.
+ *
+ * WHY `!important`. By the time a client reads this block, `css.inline` has
+ * already flattened the light theme into `style` attributes. A normal
+ * declaration in a media query loses to an inline declaration; an important one
+ * wins. Maizzle drops `!important` when it inlines, so nothing on the light side
+ * competes back.
+ *
+ * WHY THE DESCENDANT LISTS. Inlining also puts a literal `color` on individual
+ * paragraphs and headings, and an inline colour is never overridden by
+ * inheritance: only a rule that names the element beats it. Hence
+ * `[data-dark="body"] p` and friends rather than a single colour on the well.
+ *
+ * WHY IT STAYS IN A `<style>` ELEMENT. Juice never inlines a rule inside
+ * `@media`, so this block reaches the client as CSS. Inlined, a media query
+ * could not apply at all.
+ *
+ * Outlook on Windows ignores `prefers-color-scheme` outright, and so does
+ * anything older. This block is therefore purely additive: the light rendering
+ * defined above is the one every client has to get right, and it stands alone.
+ */
+@media (prefers-color-scheme: dark) {
+  /* The canvas behind the content well. On `<body>` and on the article div,
+     because webmail clients routinely discard the former. */
+  [data-dark="page"] {
+    background-color: #14161a !important;
+  }
+
+  /* The white content well, and every panel surface inside it. */
+  [data-dark="surface"] {
+    background-color: #23262b !important;
+  }
+
+  /* Body copy inside the well. */
+  [data-dark="body"],
+  [data-dark="body"] td,
+  [data-dark="body"] div,
+  [data-dark="body"] p,
+  [data-dark="body"] h1,
+  [data-dark="body"] h2,
+  [data-dark="body"] h3,
+  [data-dark="body"] li {
+    color: #e9eaec !important;
+  }
+
+  /* The footer, whether it is the kit default or `footer_html`. */
+  [data-dark="muted"],
+  [data-dark="muted"] p {
+    color: #b7bbc2 !important;
+  }
+}

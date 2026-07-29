@@ -41,4 +41,57 @@
       permission="zope2.View"
       />
 
+  <!-- SPEC §6.3's preview. Two registrations, one feature: the page, and the
+       rendered mail on its own for the page's <iframe>. Splitting them is what
+       keeps the mail's stylesheet (written for mail clients, full of `body {}`
+       rules and !important utilities) out of the Plone UI and vice versa.
+
+       `cmf.ManagePortal`, not `zope2.View`: this renders arbitrary registered
+       templates against arbitrary committed fixture data and has a button that
+       puts mail on the wire. Anonymous and ordinary members get Unauthorized.
+
+       On IEmailkitLayer, so the preview only exists where the jbot overrides do:
+       a preview that showed unoverridden markup would be lying about the very
+       thing it exists to show. Consequence, and it is deliberate: a site that
+       installed `:base` for SPEC §8.2's opt-out has no preview view. That is the
+       opposite call from `emailkit_theme` above, which a `:base` site genuinely
+       needs at render time; nothing renders because of this one.
+
+       (No double hyphen anywhere in this comment: XML forbids it, and ZCML then
+       fails to parse at instance start-up. Same trap docs/DECISIONS.md records
+       for Chameleon and the compiled .pt files, one layer up.) -->
+
+  <!-- `cmf.ManagePortal` has to be a REGISTERED permission utility by the time
+       the two `browser:page` actions below execute, and ZCML executes actions in
+       the order they were collected. cookiecutter-zope-instance writes a
+       site.zcml that includes this package BEFORE `<five:loadProducts />`, so
+       Products.CMFCore's permissions.zcml has not run yet and the registrations
+       below die with
+       `ComponentLookupError: (IPermission, 'cmf.ManagePortal')` at start-up.
+
+       Including it here is idempotent (zope.configuration skips an already
+       processed file), so this only ever moves the declaration earlier. Same
+       reasoning, and the same placement, as the z3c.jbot include above: the
+       include sits next to the directive that needs it, where the mistake would
+       otherwise be made. -->
+  <include
+      package="Products.CMFCore"
+      file="permissions.zcml"
+      />
+  <browser:page
+      name="emailkit-preview"
+      for="*"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
+      class=".preview.EmailkitPreview"
+      permission="cmf.ManagePortal"
+      />
+
+  <browser:page
+      name="emailkit-preview-body"
+      for="*"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
+      class=".preview.EmailkitPreviewBody"
+      permission="cmf.ManagePortal"
+      />
+
 </configure>

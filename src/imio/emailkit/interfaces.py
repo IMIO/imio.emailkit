@@ -2,6 +2,7 @@
 
 from imio.emailkit import _
 from zope import schema
+from zope.interface import Attribute
 from zope.interface import Interface
 from zope.publisher.interfaces.browser import IDefaultBrowserLayer
 
@@ -80,6 +81,26 @@ class IEmailkitTheme(Interface):
     )
 
 
+class IEmailRecipient(Interface):
+    """SPEC §6.2: the one thing ``.to()``/``.cc()``/``.bcc()`` resolve a value to.
+
+    §6.2 lets those methods take "an email string, a Plone member object, a
+    userid, or an iterable of those" and says resolution "goes through a single
+    adapter". So the builder holds whatever it was handed and, at ``.send()``,
+    adapts each value to this interface. Adding a new kind of recipient is one
+    adapter registration and no change to the builder -- which is what keeps
+    §6.2's "it holds data, it does not grow behaviour" true.
+
+    An adapter that cannot resolve its value returns ``None`` (the ordinary
+    zope.component "not adaptable" answer); ``recipients.resolve()`` turns that
+    into :class:`RecipientError`. It must never invent an address.
+    """
+
+    email = Attribute("address")
+    fullname = Attribute("display name, may be empty")
+    language = Attribute("preferred language code, may be None")
+
+
 class EmailkitError(Exception):
     """Base class of every error this package raises deliberately."""
 
@@ -99,3 +120,40 @@ class TemplateNotFound(EmailkitError):
             f"No email template registered as {name!r}. "
             f"Available: {', '.join(self.available) or '(none)'}"
         )
+
+
+class _CollectedError(EmailkitError):
+    """Base of the two ``.send()``-time errors that report *every* problem.
+
+    SPEC §6.2 raises both at ``.send()`` rather than at collection time, and the
+    reason is this class: a caller who mistyped three userids should learn about
+    three, not fix one and run again. So resolution collects problems and raises
+    once.
+    """
+
+    def __init__(self, problems):
+        self.problems = list(problems)
+        super().__init__(
+            f"{self._headline} ({len(self.problems)}):\n  - "
+            + "\n  - ".join(self.problems)
+        )
+
+
+class RecipientError(_CollectedError):
+    """One or more recipients could not be resolved (SPEC §6.2).
+
+    Raised at ``.send()``. Never a silent drop: a mail that quietly reaches four
+    of five people is the failure mode this exception exists to make impossible.
+    """
+
+    _headline = "Unresolvable recipient(s)"
+
+
+class AttachmentError(_CollectedError):
+    """One or more attachments could not be resolved (SPEC §6.2).
+
+    Raised at ``.send()``, for an unreadable source or for missing filename /
+    mimetype that could not be inferred.
+    """
+
+    _headline = "Unusable attachment(s)"

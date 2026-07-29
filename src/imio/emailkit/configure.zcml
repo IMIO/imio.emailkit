@@ -8,6 +8,7 @@
 
   <include file="dependencies.zcml" />
   <include file="profiles.zcml" />
+  <include file="adapters.zcml" />
 
   <include package=".browser" />
 

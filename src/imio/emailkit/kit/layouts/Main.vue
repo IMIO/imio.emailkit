@@ -42,6 +42,21 @@
  * never parses, and the most bulletproof way to colour a cell in mail anyway)
  * and never on `style`. Same rule for `class`, where `css.safe` would rewrite
  * `$` and strip the braces.
+ *
+ * ---------------------------------------------------------------------------
+ * Dark mode: `data-dark` hooks, rules in `kit/tailwind.css`
+ * ---------------------------------------------------------------------------
+ * The `color-scheme` / `supported-color-schemes` meta tags below only tell a
+ * client we are dark-aware. The rules that act on it live in the kit's CSS entry
+ * under one `@media (prefers-color-scheme: dark)` block, and they select on the
+ * `data-dark` attributes this file places on the four surfaces it owns: the
+ * page canvas, the content well, the body copy and the footer.
+ *
+ * The attribute is not decoration. `css.purge` only understands `class=` and
+ * `id=`, so a class-keyed dark block is deleted silently with a successful
+ * build; an attribute selector is outside purge's model and survives untouched.
+ * The full reasoning, including why every declaration is `!important`, is in
+ * `kit/tailwind.css` next to the rules themselves.
  */
 const config = useConfig()
 
@@ -111,7 +126,7 @@ const preheaderFiller = '&#8199;&#65279;&#847; '.repeat(20)
     <style v-html="css"></style>
   </head>
 
-  <body class="m-0 w-full bg-imio-grey-bg p-0 [word-break:break-word]" xml:lang="${lang}" dir="ltr">
+  <body class="m-0 w-full bg-imio-grey-bg p-0 [word-break:break-word]" xml:lang="${lang}" dir="ltr" data-dark="page">
     <!-- SPEC §3 preheader slot, fed by the optional `preheader` msgid (§4).
          The named slot is the build-time fallback for templates a stock Plone
          view renders: they never see `render()`'s preheader, so they supply the
@@ -127,6 +142,7 @@ const preheaderFiller = '&#8199;&#65279;&#847; '.repeat(20)
       lang="${lang}"
       dir="ltr"
       class="bg-imio-grey-bg font-body text-sm text-imio-black"
+      data-dark="page"
     >
       <Container class="px-6 py-8">
         <!-- Header: the logo token, with an alt that is enforced and translatable. -->
@@ -151,9 +167,9 @@ const preheaderFiller = '&#8199;&#65279;&#847; '.repeat(20)
         <!-- Content well. Authored markup goes in the slot; `body_html` is the
              one sanctioned `structure` injection point (§3 rule 4) and the seam
              SPEC §9 phase 3's `render_shell()` will hand its body to. -->
-        <table role="presentation" class="w-full bg-imio-white">
+        <table role="presentation" class="w-full bg-imio-white" data-dark="surface">
           <tr>
-            <td class="p-6 text-sm leading-6 text-imio-black">
+            <td class="p-6 text-sm leading-6 text-imio-black" data-dark="body">
               <slot />
               <div tal:condition="body_html" tal:content="structure body_html" class="text-sm leading-6"></div>
             </td>
@@ -163,7 +179,7 @@ const preheaderFiller = '&#8199;&#65279;&#847; '.repeat(20)
         <!-- Footer: `footer_html` unescaped (§3 rule 4), or a neutral default. -->
         <table role="presentation" class="w-full">
           <tr>
-            <td class="pt-5 text-xs leading-5 text-imio-grey-dark">
+            <td class="pt-5 text-xs leading-5 text-imio-grey-dark" data-dark="muted">
               <div tal:condition="footer_html" tal:content="structure footer_html"></div>
               <p tal:condition="not:footer_html" i18n:translate="email_footer_default" class="m-0 text-xs leading-5 text-imio-grey-dark">
                 This message was sent automatically. Please do not reply to it.
