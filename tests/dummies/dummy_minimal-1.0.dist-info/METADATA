@@ -1,0 +1,4 @@
+Metadata-Version: 2.1
+Name: dummy.minimal
+Version: 1.0
+Summary: Smallest possible imio.emailkit consumer add-on (test fixture, not a real package)

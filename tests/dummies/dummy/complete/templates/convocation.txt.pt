@@ -1,0 +1,10 @@
+<tal:body
+  ><span tal:omit-tag="" tal:content="title" />
+
+<span tal:omit-tag="" tal:content="python: format_date(when)" /> - <span tal:omit-tag="" tal:content="place" />
+
+<tal:rows tal:repeat="row rows">* <span tal:omit-tag="" tal:content="row/title" /> : <span tal:omit-tag="" tal:content="row/decision" />
+</tal:rows>
+<span tal:omit-tag="" tal:content="cta_label" /> :
+<span tal:omit-tag="" tal:content="cta_url" />
+</tal:body>

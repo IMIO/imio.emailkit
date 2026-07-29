@@ -75,9 +75,12 @@ RULE_FIXTURES = {
 # assertion below is "no violation outside this list", so the ledger stops
 # regressions without pretending the file is clean; the xfail after it is what
 # goes green the moment the comment is fixed.
-KNOWN = {
-    ("emails/src/templates/mail_password.vue", 61, "comment-double-dash"),
-}
+# Empty, and it should stay that way. It held one entry -- a `--` in an authoring
+# comment in mail_password.vue -- which was fixed rather than suppressed, at which
+# point `check-emails` gained the lint as a prerequisite. An entry here is a
+# deliberate, visible exception; a growing ledger means the gate is being worked
+# around instead of the sources being fixed.
+KNOWN = set()
 
 
 def own_violations():
@@ -319,17 +322,13 @@ def test_no_unknown_violations_in_the_repos_own_sources():
     )
 
 
-@pytest.mark.xfail(
-    reason=(
-        "emails/src/templates/mail_password.vue has `--` in an authoring comment "
-        "(harmless in the compiled .pt, which has the comment stripped, but "
-        "against docs/DECISIONS.md's 'no -- in any comment, anywhere'). Owned by "
-        "the template author, not by the lint. XPASSes once the comment is fixed, "
-        "at which point KNOWN can be emptied."
-    ),
-    strict=False,
-)
 def test_the_repos_own_sources_are_fully_clean():
+    """No xfail: the one violation this ever found has been fixed.
+
+    `check-emails` now runs the lint as a prerequisite, so this is the assertion
+    that keeps that gate honest -- if it ever fails, the repo's own sources broke
+    a rule the package asks every consumer to follow.
+    """
     assert own_violations() == set()
 
 
