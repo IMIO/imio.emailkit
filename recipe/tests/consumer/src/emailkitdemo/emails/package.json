@@ -1,0 +1,11 @@
+{
+  "name": "emailkitdemo-emails",
+  "private": true,
+  "description": "Maizzle project of the throwaway consumer addon. Dev-only; SPEC §4 prunes emails/ from the sdist.",
+  "scripts": {
+    "build": "maizzle build"
+  },
+  "dependencies": {
+    "@maizzle/framework": ">=6.0.5"
+  }
+}
