@@ -8,6 +8,89 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — §6.3 and §6.2 contradict each other on the send-test language; §6.2 wins
+
+**Context.** This is not spec silence — it is the spec disagreeing with itself.
+
+- §6.3: the Send test button "mails the currently previewed template + fixture + **language** to the
+  logged-in user's own address".
+- §6.2: `Email` has **no language argument**. It "groups recipients by resolved language, renders
+  once per language group". The language comes from the *recipient*, never from the caller.
+
+So §6.3 asks for something §6.2's frozen surface cannot express.
+
+**Options.** (A) add a language argument to `Email` or `.send()`; (B) set `request["LANGUAGE"]` around
+the send; (C) temporarily rewrite the member's `language` property; (D) accept §6.2's rule and make
+the preview *show* the truth.
+
+**Choice.** **D.**
+
+**Why.** (A) changes the frozen §6.2 surface, which needs approval and would also break the one-rule
+model — a per-send language override and per-recipient grouping would then both exist. (B) was
+implemented and **measured inert**: previewing `de` still mailed `fr`, because
+`recipients.default_language()` deliberately reads the *site* default rather than the request. (C) is
+silent mutation of a user's stored preferences to work around a UI mismatch.
+
+**What the view does instead.** It computes the send language from §6.2's own public contract —
+`IEmailRecipient(member).language or default_language()` — labels the button with it ("Send test to
+… **in fr**"), and warns when it differs from the preview switcher, pointing the developer at their
+own preferred-language setting. The preview switcher still does what §6.3 wants for *rendering*; only
+the *mail* follows §6.2.
+
+**Flagged for the maintainer.** §6.3's wording may want correcting, since as written it promises
+something the frozen builder cannot do.
+
+---
+
+## 2026-07-29 — ZCML using a CMF permission must include `Products.CMFCore`'s `permissions.zcml`
+
+**Context.** The preview view is `permission="cmf.ManagePortal"` (§6.3: Manager-only).
+
+**Finding.** The instance **died at startup** with
+`ComponentLookupError: (IPermission, 'cmf.ManagePortal')`. `cookiecutter-zope-instance` writes a
+`site.zcml` that includes `imio.emailkit` *before* `<five:loadProducts />`, so
+`Products.CMFCore/permissions.zcml` has not run when our directives execute — the permission is not
+merely misspelled, it does not exist yet.
+
+**Choice.** An idempotent `<include package="Products.CMFCore" file="permissions.zcml" />` beside the
+directives that need it, same placement rationale as the existing `z3c.jbot` include.
+
+**Why recorded.** Any future ZCML in this repo using a CMF permission hits this, and the error message
+points at the permission name rather than at include ordering — an easy hour lost concluding the name
+is wrong.
+
+---
+
+## 2026-07-29 — The `--`-in-a-comment hazard applies to ZCML and XML, not just `.pt`
+
+**Context.** Recorded earlier for Chameleon templates (caveat A2). It is more general than that entry
+implies, and has now cost time four separate times.
+
+**Finding.** `--` is illegal inside *any* XML comment, so it breaks **ZCML at instance startup** and
+GenericSetup profile XML at import, not only compiled templates at render time. Occurrences so far:
+a `.vue` authoring comment, `profiles.zcml`, `profiles/uninstall/browserlayer.xml`, and
+`adapters.zcml` (which blocked instance startup while it was diagnosed).
+
+**Choice.** No `--` in any comment, anywhere in the repo. The compiled `.pt` output is guarded
+structurally by the comment stripper; ZCML and XML are not, so this is discipline plus a Phase 4 lint
+check. Prefer `;` or a full stop.
+
+---
+
+## 2026-07-29 — `@@emailkit-preview` is registered on `IEmailkitLayer`, unlike `@@emailkit_theme`
+
+**Context.** Two views, two different registration scopes, deliberately.
+
+**Choice.** The preview view is on `IEmailkitLayer`, so a `:base`-only site does not get it. The theme
+view is on the default layer, so a `:base`-only site does.
+
+**Why the asymmetry.** `@@emailkit_theme` is needed at *render* time — a `:base` site still renders
+its own templates and must reach the tokens, so narrowing it would remove §8.2 level 2's escape
+hatch. The preview view renders nothing that anything else depends on; it is a developer tool, and a
+site that opted out of the default profile has not asked for it.
+
+---
+
 ## 2026-07-29 — Plaintext twins live in `emails/twins/` and are copied into the package
 
 **Context.** The previous entry put the hand-authored twin at
