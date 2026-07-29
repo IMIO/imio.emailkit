@@ -102,10 +102,35 @@ def recipient_from_member(member):
     An empty ``language`` property, which is what Plone stores for "no
     preference", becomes ``None``: §6.2's attribute is documented as "may be
     ``None``", and ``""`` would otherwise become its own language group.
+
+    A member whose ``email`` property holds *several* addresses is refused, for
+    the same reason the string adapter refuses one: nothing downstream can send
+    to two mailboxes in one field, and the failure was silent. ``parseaddr`` on
+    ``"a@b.be, c@d.be"`` returns ``('', '')``, so the header came out as
+    ``Full Name <>`` and the recipient simply vanished from the envelope while
+    every other recipient in the same call was delivered -- exactly the silent
+    drop §6.2 forbids. Returning ``None`` here turns it into a ``RecipientError``
+    naming the member.
+
+    A ``"Zoe <z@b.be>"`` shaped property is parsed rather than passed through, so
+    the address never ends up nested inside another display name. That is the same
+    defect that made ``.sender("Greffe <greffe@commune.be>")`` produce
+    ``From: "Greffe <greffe"@commune.be`` -- valid syntax, wrong mailbox, no error
+    -- and this adapter was on the path that had not been fixed.
     """
+    raw = (member.getProperty("email", "") or "").strip()
+    fullname = (member.getProperty("fullname", "") or "").strip()
+    email = raw
+    if raw:
+        pairs = getaddresses([raw])
+        if len(pairs) != 1:
+            return None
+        parsed_name, address = pairs[0]
+        email = address
+        fullname = fullname or parsed_name
     return Recipient(
-        email=(member.getProperty("email", "") or "").strip(),
-        fullname=(member.getProperty("fullname", "") or "").strip(),
+        email=email,
+        fullname=fullname,
         language=(member.getProperty("language", "") or "").strip() or None,
     )
 

@@ -442,3 +442,68 @@ class TestUnresolvable:
 
         with pytest.raises(RecipientError):
             email.send()
+
+
+class TestAMemberWithTwoAddresses:
+    """§6.2: "fail loud, not silent drop" -- on the member path too.
+
+    Regression cover for a real defect. The ``str`` adapter refused a
+    multi-address value from the start; the member adapter did not, so a member
+    whose ``email`` property held ``"a@b.be, c@d.be"`` produced the header
+    ``Full Name <>`` (``parseaddr`` returns ``('', '')`` for it) and **vanished
+    from the envelope while every other recipient in the same call was
+    delivered** -- no error, no warning. The sender believed the mail went out.
+    """
+
+    @pytest.fixture
+    def two_address_member(self, mail_portal, make_member):
+        member = make_member(mail_portal, email="a@commune.be, c@commune.be")
+        return member
+
+    def test_it_raises_rather_than_dropping(self, mail, two_address_member):
+        email = mail().to(two_address_member)
+
+        with pytest.raises(RecipientError):
+            email.send()
+
+    def test_the_error_names_the_member(self, mail, two_address_member):
+        email = mail().to(two_address_member)
+
+        with pytest.raises(RecipientError) as exc_info:
+            email.send()
+
+        assert two_address_member.getId() in str(exc_info.value)
+
+    def test_the_good_recipients_are_not_sent_either(
+        self, mail, two_address_member, deliver, sent
+    ):
+        """Same reasoning as the unresolvable case above: a partial send is worse
+        than none, because the caller retries and half the list is mailed twice."""
+        email = mail().to(support.PLAIN_ADDRESS).to(two_address_member)
+
+        with pytest.raises(RecipientError):
+            email.send()
+
+        deliver()
+
+        assert sent == [], f"{len(sent)} message(s) sent despite RecipientError"
+
+    def test_a_display_name_in_the_property_is_parsed_not_nested(
+        self, mail_portal, make_member
+    ):
+        """``"Zoe <z@b.be>"`` in the property must yield the address, never end up
+        nested inside another display name.
+
+        This is the shape that made ``.sender("Greffe <greffe@commune.be>")``
+        produce ``From: "Greffe <greffe"@commune.be`` -- valid syntax, wrong
+        mailbox, no error. The member adapter was on the path that had not been
+        fixed.
+        """
+        from imio.emailkit.interfaces import IEmailRecipient
+
+        member = make_member(mail_portal, fullname="", email="Zoe <zoe@commune.be>")
+        recipient = IEmailRecipient(member, None)
+
+        assert recipient is not None
+        assert recipient.email == "zoe@commune.be"
+        assert "<" not in recipient.email
