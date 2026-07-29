@@ -157,13 +157,12 @@ INLINE_STYLE = re.compile(r'style="[^"]*[a-z-]+\s*:[^"]+"')
 #: is small.
 MIN_INLINE_STYLES = 10
 
-#: A Chameleon placeholder that survived into the output. Phase 0: without the
-#: ``IPageTemplateEngine`` utility, zope.pagetemplate falls back to zope.tal
-#: where ``${...}`` passes through **verbatim and with no error**.
-UNRESOLVED_PLACEHOLDER = re.compile(r"\$\{[^}]*\}")
-
-#: TAL/i18n attributes that should never survive a render.
-TAL_RESIDUE = re.compile(r"\s(?:tal|i18n|metal):[a-z]+=")
+#: The placeholder and TAL-residue patterns, and the assertion built on them, now
+#: live in the **shipped** ``imio.emailkit.golden`` module: SPEC §7's base class is
+#: exported for consumers as of Phase 4, and the audit is the half of it a consumer
+#: needs most. They are reached through the thin delegations further down rather
+#: than restated here -- two copies of this regex is exactly how one of them ends
+#: up weaker than the other.
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +259,19 @@ def load_fixture(template):
     return dict(module.CONTEXT)
 
 
+def load_fixture_from(directory, template):
+    """:func:`load_fixture` against another add-on's fixture directory.
+
+    Used by the Phase 4 gates, whose fixtures belong to the two dummy consumer
+    add-ons under ``tests/dummies/`` rather than to this package. Same loader --
+    the one shipped in ``imio.emailkit.golden`` for consumers -- so a fixture that
+    works for a dummy works for a real add-on.
+    """
+    from imio.emailkit.golden import load_fixture as shipped
+
+    return shipped(Path(directory) / f"{template}.py")
+
+
 def available_fixtures():
     return sorted(p.stem for p in FIXTURES_DIR.glob("*.py") if p.stem != "__init__")
 
@@ -276,12 +288,9 @@ GOLDEN_LANGUAGES = ("fr", "en")
 
 
 def updating_golden():
-    return os.environ.get(UPDATE_GOLDEN_ENV, "").strip().lower() in {
-        "1",
-        "true",
-        "yes",
-        "on",
-    }
+    from imio.emailkit.golden import updating_golden as shipped
+
+    return shipped()
 
 
 def golden_path(template, language, suffix):
@@ -417,7 +426,9 @@ def count_inline_styles(rendered):
 
 
 def unresolved_placeholders(rendered):
-    return UNRESOLVED_PLACEHOLDER.findall(rendered)
+    from imio.emailkit.golden import unresolved_placeholders as shipped
+
+    return shipped(rendered)
 
 
 def assert_render_is_clean(rendered, what="output"):
@@ -427,14 +438,15 @@ def assert_render_is_clean(rendered, what="output"):
     zope.tal fallback engine, ``${...}`` reaches the inbox verbatim and nothing
     raises -- so a test that only checks "our marker is present" ships raw
     placeholders to production and stays green.
+
+    Delegated to the shipped ``imio.emailkit.golden`` since Phase 4 exported §7's
+    base class: consumers get the same audit this suite runs, and there is one
+    copy of it. Imported inside the function so ``require_runtime()`` still gets
+    to report a missing package rather than this module failing to import.
     """
-    leftovers = unresolved_placeholders(rendered)
-    assert not leftovers, (
-        f"unsubstituted Chameleon placeholder in {what}: {leftovers[:5]}"
-    )
-    assert "${" not in rendered, f"stray '${{' in {what}"
-    residue = sorted(set(TAL_RESIDUE.findall(rendered)))
-    assert not residue, f"leftover TAL/i18n attributes in {what}: {residue}"
+    from imio.emailkit.golden import assert_render_is_clean as shipped
+
+    shipped(rendered, what)
 
 
 # ===========================================================================

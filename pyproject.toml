@@ -159,6 +159,14 @@ preview = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501", "RUF001", "S101"]
+# `src/imio/emailkit/golden.py` is SPEC §7's "provided test base class". It ships in
+# the egg, so it is library code as far as ruff is concerned and S101 fires on it --
+# but it *is* test code: a pytest base class that consumer add-ons subclass, whose
+# `assert actual == expected, <diff>` statements are what pytest reports as a test
+# failure. Raising `AssertionError` by hand would satisfy the rule and read worse,
+# and `python -O` (which is what S101 protects against) does not run test suites.
+# Scoped to the one file and the one rule; the rest of the package has no exemption.
+"src/imio/emailkit/golden.py" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

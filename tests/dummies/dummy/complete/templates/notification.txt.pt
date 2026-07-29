@@ -1,0 +1,7 @@
+<tal:body
+  ><span tal:omit-tag="" tal:content="title" />
+
+<span tal:omit-tag="" tal:content="intro" />
+
+<span tal:omit-tag="" tal:content="reference" />
+</tal:body>

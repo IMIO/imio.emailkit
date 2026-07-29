@@ -96,13 +96,26 @@ class TestFixtureCoverage:
         """
         from imio.emailkit.discovery import get_templates
 
-        registered = {name.split(":", 1)[-1] for name in get_templates()}
+        # Scoped to THIS package's own templates. A consumer add-on's fixtures
+        # live in the consumer's own tests/fixtures/ -- `tests/dummies/` proves
+        # exactly that -- so asserting over every registered name would make this
+        # package fail because somebody else's fixture is somewhere else. It also
+        # made the assertion order-dependent: it passed alone and failed whenever
+        # the dummies happened to be installed in the same session.
+        own = (
+            f"{support.PACKAGE_NAME}:"
+            if hasattr(support, "PACKAGE_NAME")
+            else "imio.emailkit:"
+        )
+        registered = {
+            name.split(":", 1)[-1] for name in get_templates() if name.startswith(own)
+        }
         without = sorted(
             name for name in registered if not support.fixture_path(name).exists()
         )
 
         assert without == [], (
-            f"registered templates with no tests/fixtures/<name>.py: {without}"
+            f"{own}* templates with no tests/fixtures/<name>.py: {without}"
         )
 
     def test_the_default_mails_are_shipped_as_committed_jbot_overrides(self):

@@ -1,0 +1,2 @@
+[imio.emailkit.templates]
+dummy.minimal = dummy.minimal:emailkit
