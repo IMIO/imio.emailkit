@@ -167,6 +167,21 @@ hand-authored plaintext twin — none of which `render_shell` has.
 Your existing markup, your existing data-gathering code, and your existing
 recipient logic if you take route 1. The shell wraps; it does not redesign.
 
+### One thing to check in your legacy body
+
+> [!WARNING]
+> If your body carries its own `<style>` block, **most clients will drop it.** The
+> block ends up inside the document `<body>`, which is invalid placement, and Gmail
+> and Outlook.com strip it. Inline styles in the body are fine and survive
+> untouched; a `<style>` block is not. Move anything load-bearing to inline
+> `style="…"` attributes, or author the template properly and use the kit.
+
+Everything else about a legacy body survives: inline styles, `bgcolor`, nested
+tables, `cellpadding`, entities, unclosed tags, even a whole pasted `<html>`
+document. None of it raises — but a pasted full document does produce a nested
+`<html>`/`<body>`, which is invalid HTML that clients tolerate rather than
+something to rely on.
+
 ## Shipping templates from your own add-on
 
 Declare one entry point:
