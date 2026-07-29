@@ -1,0 +1,18 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    >
+
+  <!-- z3c.jbot is already included by imio.emailkit's own configure.zcml, and
+       ZCML includes are idempotent. Repeating it here is what a real site
+       package would do (it cannot assume load order), and it documents the
+       Phase 0 caveat D1 rule: include the *package*, never just its meta.zcml,
+       or the directive parses and the override silently does nothing. -->
+  <include package="z3c.jbot" />
+
+  <browser:jbot
+      directory="overrides"
+      layer=".interfaces.ISiteLayer"
+      />
+
+</configure>

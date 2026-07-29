@@ -1,0 +1,126 @@
+name: "Main CI"
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+
+  config:
+    name: "Config: Compute values used in workflow"
+    uses: ./.github/workflows/config.yml
+
+  lint:
+    name: "Backend: Lint"
+    needs:
+      - config
+    uses: plone/meta/.github/workflows/backend-lint.yml@2.x
+    with:
+      python-version: ${{ needs.config.outputs.python-version }}
+      plone-version: ${{ needs.config.outputs.plone-version }}
+
+  test:
+    name: "Backend: Test"
+    needs:
+      - config
+    uses: plone/meta/.github/workflows/backend-pytest.yml@2.x
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        plone-version: ['6.2-latest', '6.1-latest', '6.0-latest']
+    with:
+      python-version: ${{ matrix.python-version }}
+      plone-version: ${{ matrix.plone-version }}
+
+  # SPEC §5's staleness gate, in its Phase 1 Makefile form (§9's sequencing note).
+  #
+  # This is the gate the whole two-stage architecture rests on: the compiled `.pt`
+  # is the production artifact, Node never runs in production, and nothing else
+  # notices when someone edits a `.vue` source and forgets to rebuild. Phase 0's
+  # standing lesson applies -- failures in this pipeline are silent, not loud, and
+  # the build's exit code carries almost no information about correctness.
+  #
+  # Node appears in this job and nowhere else. It is not a dependency of `test`,
+  # of `coverage`, or of any runtime path.
+  emails:
+    name: "Emails: Build output is not stale"
+    needs:
+      - config
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install the Maizzle toolchain
+        run: |
+          set -euo pipefail
+          cd emails
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Rebuild the templates
+        run: |
+          set -euo pipefail
+          cd emails
+          npx maizzle build
+
+      - name: Fail if the committed .pt files differ from a fresh build
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- \
+              src/imio/emailkit/templates src/imio/emailkit/browser/overrides; then
+            echo "::error::Committed email templates are stale. Run 'make build-emails' and commit the result."
+            echo '### Stale email build output' >> $GITHUB_STEP_SUMMARY
+            echo '```diff' >> $GITHUB_STEP_SUMMARY
+            git diff -- src/imio/emailkit/templates src/imio/emailkit/browser/overrides \
+              >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          # An untracked .pt is just as stale: a new template that was built but
+          # never added is missing from the sdist and from every deployment.
+          untracked="$(git ls-files --others --exclude-standard -- \
+            src/imio/emailkit/templates src/imio/emailkit/browser/overrides)"
+          if [ -n "$untracked" ]; then
+            echo "::error::Built but never committed:"
+            echo "$untracked"
+            exit 1
+          fi
+          echo "Email build output is up to date."
+
+  coverage:
+    name: "Backend: Test Coverage"
+    uses: plone/meta/.github/workflows/backend-pytest-coverage.yml@2.x
+    needs:
+      - config
+    with:
+      python-version: ${{ needs.config.outputs.python-version }}
+      plone-version: ${{ needs.config.outputs.plone-version }}
+
+  report:
+    name: "Final report"
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    needs:
+      - config
+      - lint
+      - test
+      - emails
+      - coverage
+    steps:
+      - name: Report
+        shell: bash
+        run: |
+          echo '# Workflow Report' >> $GITHUB_STEP_SUMMARY
+          echo '| Job ID | Conclusion |' >> $GITHUB_STEP_SUMMARY
+          echo '| --- | --- |' >> $GITHUB_STEP_SUMMARY
+          echo '| Config | ${{ needs.config.result }} |' >> $GITHUB_STEP_SUMMARY
+          echo '| Lint | ${{ needs.lint.result }} |' >> $GITHUB_STEP_SUMMARY
+          echo '| Test | ${{ needs.test.result }} |' >> $GITHUB_STEP_SUMMARY
+          echo '| Emails (staleness) | ${{ needs.emails.result }} |' >> $GITHUB_STEP_SUMMARY
+          echo '| Coverage | ${{ needs.coverage.result }} |' >> $GITHUB_STEP_SUMMARY

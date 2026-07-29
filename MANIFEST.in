@@ -1,0 +1,22 @@
+graft src/imio
+graft news
+graft tests
+include *.md
+include *.toml
+include LICENSE.GPL
+
+# SPEC §3 keeps the design system inside the egg -- one artifact, one version
+# pin, no npm registry and no version skew between the runtime and the kit that
+# compiled against it. `bin/compile-emails` resolves `src/imio/emailkit/kit/`
+# from the *installed* distribution (`kit-mode = path`, §5), so the `.vue`, `.js`
+# and `.css` sources under `graft src/imio` are shipped files, not dev leftovers.
+# `pyproject.toml`'s `[tool.setuptools.package-data]` lists the same extensions;
+# both are needed -- MANIFEST.in governs the sdist, package-data the wheel.
+
+# The Maizzle project is dev-only (§4: `prune ... emails`). Node must not appear
+# anywhere near an installed distribution.
+prune emails
+
+global-exclude *.pyc
+global-exclude __pycache__
+global-exclude .DS_Store
