@@ -189,7 +189,8 @@ class RecordingMailer:
         self.aborted += 1
 
     def reset(self):
-        self.sent = []
+        # Cleared in place, never rebound: tests hold a reference to this list.
+        self.sent.clear()
         self.aborted = 0
         self.voted = 0
 
@@ -218,7 +219,7 @@ class RecordingMailHost(MailHost):
             mailer = self._v_mailer = RecordingMailer()
         return mailer
 
-    def _makeMailer(self):  # noqa: N802 - Products.MailHost's own spelling
+    def _makeMailer(self):
         return self.mailer
 
     # -- what tests read ---------------------------------------------------

@@ -474,16 +474,26 @@ INTERFACES_MODULE = "imio.emailkit.interfaces"
 #: §6.3, verbatim: "``@@emailkit-preview`` (Manager-only)".
 PREVIEW_VIEW = "emailkit-preview"
 
-#: **GUESS.** §6.3 requires "a language switcher" but names no parameter. This
-#: mirrors §6.1's ``render(..., language=...)``, which is the only language
-#: keyword the spec spells anywhere.
+#: §6.3 requires "a language switcher" but names no parameter. Guessed as
+#: ``language``, mirroring §6.1's ``render(..., language=...)``, and since
+#: **confirmed** against the view.
 PREVIEW_LANGUAGE_PARAM = "language"
 
-#: **GUESS.** §6.3 requires "a **Send test** button" but names no form control.
-#: A single request key is assumed; the *behaviour* asserted around it -- the
-#: mail goes to the logged-in user's own address and nowhere else -- is the part
-#: the spec actually pins.
-SEND_TEST_FORM = {"send_test": "1"}
+#: Likewise for the template selector.
+PREVIEW_TEMPLATE_PARAM = "template"
+
+#: §6.3 requires "a **Send test** button" but names no form control. Guessed as
+#: ``send_test``; the view spells it ``form.button.send_test``, which is the
+#: house convention, so this is the reconciled name rather than the guess.
+SEND_TEST_BUTTON = "form.button.send_test"
+
+SEND_TEST_FORM = {SEND_TEST_BUTTON: "Send test"}
+
+#: The send test only fires on ``POST``. Not a detail the spec mentions, and a
+#: good call the tests have to honour: a URL that sends mail when merely
+#: *fetched* is a URL a prefetcher, a link checker or somebody's browser history
+#: eventually fetches.
+SEND_TEST_METHOD = "POST"
 
 #: §6.3: the preview renders "each in an iframe using committed fixture data".
 IFRAME_SRC = re.compile(r"<iframe[^>]*\bsrc=[\"']([^\"']+)[\"']", re.IGNORECASE)
@@ -752,6 +762,26 @@ def addresses(message, header):
     raw = message.get_all(header) or []
     return sorted(
         address.lower() for _name, address in getaddresses([str(v) for v in raw])
+    )
+
+
+def envelope(record):
+    """The bare addresses the SMTP layer was handed, lowercased.
+
+    ``Products.MailHost`` runs every entry of ``toaddrs`` through
+    ``formataddr``, so a recipient with a display name arrives as
+    ``Frederic Wallon <fr.membre@commune.example.be>``. Parsed with
+    ``getaddresses`` for the same reason :func:`addresses` is: comparing the
+    formatted string would make an assertion about the display name that the
+    test did not mean to make, and substring matching would accept
+    ``...@commune.example.be.evil``.
+    """
+    from email.utils import getaddresses
+
+    return sorted(
+        address.lower()
+        for _name, address in getaddresses([str(v) for v in record.recipients])
+        if address
     )
 
 
