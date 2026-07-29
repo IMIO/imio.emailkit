@@ -1,12 +1,9 @@
-Vous avez une nouvelle notification. ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏
-﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏  ﻿͏
-
-‍
-
 Séance du conseil communal du 12 août
 
 La convocation pour la prochaine séance est disponible. Vous pouvez la consulter dès maintenant.
 
-Consulter la convocation
+Consulter la convocation : https://sambreville.example.be/seances/2026-08-12
 
+--
 Ce message a été envoyé automatiquement. Merci de ne pas y répondre.
+

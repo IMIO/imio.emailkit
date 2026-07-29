@@ -67,7 +67,12 @@ def render(name, context=None, language=None):
     namespace = build_namespace(template, context, language)
 
     html = render_file(template.html_path, namespace)
-    if template.text_path is None:
+    # `text_path` comes from the cached startup scan, so it can name a file that
+    # has since gone -- a rebuild that dropped the twin, or a checkout switch.
+    # SPEC §4 asks for a warning and a fallback when the twin is missing, and it
+    # is the same situation whether it was never there or vanished afterwards.
+    # Without the existence re-check this raised FileNotFoundError instead.
+    if template.text_path is None or not template.text_path.exists():
         text = _fallback_text(template, html)
     else:
         text = render_file(template.text_path, namespace)
@@ -229,6 +234,32 @@ _LINE_BREAK = re.compile(
 _TAG = re.compile(r"<[^>]+>")
 _BLANK_RUN = re.compile(r"\n{3,}")
 
+# Elements hidden from sighted readers must not survive into the plaintext part.
+# The preheader is the one that matters: the kit pads it to fill the inbox
+# preview budget, so keeping it makes every plaintext mail open with the preview
+# line followed by a run of invisible filler (U+2007, U+FEFF, U+034F). Naive
+# single-level match, in keeping with the rest of this function -- the preheader
+# holds text, not nested blocks.
+_HIDDEN_ELEMENT = re.compile(
+    r"<(?P<tag>\w+)[^>]*style=\"[^\"]*display:\s*none[^\"]*\"[^>]*>"
+    r".*?</(?P=tag)\s*>",
+    re.IGNORECASE | re.DOTALL,
+)
+
+# Zero-width characters are layout tricks for HTML mail and are noise -- or worse,
+# mojibake -- in a plaintext part. The kit emits them around the preheader and to
+# keep Outlook from collapsing empty cells.
+_ZERO_WIDTH = re.compile(
+    "["
+    "\u200b"  # zero-width space
+    "\u200c"  # zero-width non-joiner
+    "\u200d"  # zero-width joiner
+    "\u2007"  # figure space -- the kit's preheader filler
+    "\ufeff"  # zero-width no-break space
+    "\u034f"  # combining grapheme joiner -- also preheader filler
+    "]"
+)
+
 _warned_missing_twin = set()
 
 
@@ -254,8 +285,10 @@ def naive_text(html):
     """Strip ``html`` down to something readable. Naive by design, per SPEC §4."""
     text = _SCRIPT_OR_STYLE.sub("", html)
     text = _COMMENT.sub("", text)
+    text = _HIDDEN_ELEMENT.sub("", text)
     text = _LINE_BREAK.sub("\n", text)
     text = _TAG.sub("", text)
     text = unescape(text)
+    text = _ZERO_WIDTH.sub("", text)
     text = "\n".join(line.strip() for line in text.splitlines())
     return _BLANK_RUN.sub("\n\n", text).strip() + "\n"

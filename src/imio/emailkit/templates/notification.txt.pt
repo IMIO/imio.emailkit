@@ -1,0 +1,10 @@
+<tal:body
+  ><span tal:omit-tag="" tal:content="title" />
+
+<span tal:omit-tag="" tal:content="intro" />
+
+<span tal:omit-tag="" tal:content="cta_label" /> : <span tal:omit-tag="" tal:content="cta_url" />
+
+--
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_footer_default">This message was sent automatically. Please do not reply to it.</span>
+</tal:body>

@@ -12,7 +12,6 @@ templates, and ``render()`` works through the ZODB rather than a fixture.
 """
 
 from pathlib import Path
-
 from plone.registry.interfaces import IRegistry
 from Products.CMFCore.utils import getToolByName
 from zope.component import getUtility

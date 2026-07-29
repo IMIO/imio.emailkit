@@ -143,6 +143,10 @@ console: $(VENV_FOLDER) instance/etc/zope.ini ## Start a console into a Plone in
 create-site: $(VENV_FOLDER) instance/etc/zope.ini ## Create a new site from scratch
 	@$(BIN_FOLDER)/zconsole run instance/etc/zope.conf ./scripts/create_site.py
 
+# Explicit paths: ruff invoked with no path walks the whole repo, which is how a
+# formatter got into SPEC.md and reflowed the approved API example.
+RUFF_TARGETS=src tests scripts
+
 # Hand-written markup and configuration only: the compiled .pt files under
 # templates/ and browser/overrides/ are generated artifacts (see lint target).
 ZPRETTY_TARGETS=$(shell find src -name '*.zcml' -o -name '*.xml' | sort)
@@ -151,7 +155,7 @@ ZPRETTY_TARGETS=$(shell find src -name '*.zcml' -o -name '*.xml' | sort)
 .PHONY: lint
 lint: ## Check code base according to Plone standards
 	@echo "$(GREEN)==> Lint codebase$(RESET)"
-	@uvx ruff@latest check --fix --config $(BACKEND_FOLDER)/pyproject.toml
+	@uvx ruff@latest check --fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
 	@uvx pyroma@latest -d .
 	@uvx check-python-versions@latest .
 	# zpretty must never see the compiled .pt files. They are Maizzle build
@@ -164,8 +168,8 @@ lint: ## Check code base according to Plone standards
 .PHONY: format
 format: ## Fix code base according to Plone standards
 	@echo "$(GREEN)==> Format codebase$(RESET)"
-	@uvx ruff@latest check --select I --fix --config $(BACKEND_FOLDER)/pyproject.toml
-	@uvx ruff@latest format --config $(BACKEND_FOLDER)/pyproject.toml
+	@uvx ruff@latest check --select I --fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
+	@uvx ruff@latest format --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
 	@uvx zpretty@latest -i $(ZPRETTY_TARGETS)
 
 .PHONY: check
@@ -257,6 +261,10 @@ check-emails: emails-deps ## Staleness gate: committed .pt must match a fresh bu
 		for built in "$$fresh"/*.pt; do
 			[[ -e "$$built" ]] || continue
 			name="$$(basename "$$built")"
+			# `.txt.pt` twins are HAND-AUTHORED (Maizzle's plaintext output
+			# destroys tal:/i18n:), so they are source, not build output. The
+			# gate would otherwise report every twin as an ORPHAN.
+			[[ "$$name" == *.txt.pt ]] && continue
 			if [[ ! -f "$$committed/$$name" ]]; then
 				echo "$(RED)  MISSING   $$name (built, never committed)$(RESET)"
 				stale=1
@@ -271,6 +279,7 @@ check-emails: emails-deps ## Staleness gate: committed .pt must match a fresh bu
 		for was in "$$committed"/*.pt; do
 			[[ -e "$$was" ]] || continue
 			name="$$(basename "$$was")"
+			[[ "$$name" == *.txt.pt ]] && continue
 			if [[ ! -f "$$fresh/$$name" ]]; then
 				echo "$(RED)  ORPHAN    $$name (committed, no longer built)$(RESET)"
 				stale=1
