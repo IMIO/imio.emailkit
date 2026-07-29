@@ -158,7 +158,10 @@ ZPRETTY_TARGETS=$(shell find src -name '*.zcml' -o -name '*.xml' | sort)
 .PHONY: lint
 lint: ## Check code base according to Plone standards
 	@echo "$(GREEN)==> Lint codebase$(RESET)"
-	@uvx ruff@latest check --fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
+	# No --fix here: a lint target that rewrites files exits non-zero *because*
+	# it fixed something, so a clean tree fails on the first run and passes on
+	# the second. Checking is `lint`, rewriting is `format`.
+	@uvx ruff@latest check --no-fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
 	@uvx pyroma@latest -d .
 	@uvx check-python-versions@latest .
 	# zpretty must never see the compiled .pt files. They are Maizzle build

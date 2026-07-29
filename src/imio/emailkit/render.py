@@ -108,9 +108,9 @@ def render_shell(subject, body_html, language=None):
     SPEC §9 phase 3. The migration path for mails whose body already exists -- a
     PloneMeeting notification assembled by string concatenation, say -- and which
     nobody wants to re-author as a kit template. The shell contributes the whole
-    document: the inlined CSS, the a11y defaults, ``lang``, the preheader, the
-    header/footer and the theme tokens. The body contributes its own markup and
-    nothing else changes about it.
+    document: the inlined CSS, the a11y defaults, ``lang``, the header/footer and
+    the theme tokens. The body contributes its own markup and nothing else about
+    it changes.
 
     A ``render()`` **sibling**, not a builder method (§6.2 is frozen). It returns
     the same ``(html, text)`` pair and shares ``render()``'s code path --
@@ -166,7 +166,7 @@ def _shell_path():
         raise EmailkitError(
             f"The compiled kit shell is missing: {SHELL_TEMPLATE}. "
             f"render_shell() needs the committed Maizzle build output; run "
-            f"`make compile-emails` (SPEC §5)."
+            f"`make build-emails` (SPEC §5)."
         )
     return SHELL_TEMPLATE
 
@@ -321,7 +321,22 @@ def _translate_helper(language):
 _SCRIPT_OR_STYLE = re.compile(
     r"<(script|style)\b.*?</\1\s*>", re.IGNORECASE | re.DOTALL
 )
+# A `<head>` never belongs in a plaintext part. It matters because `render_shell`
+# wraps arbitrary legacy HTML, and a consumer who pastes a whole document into the
+# body contributes a nested `<head>` -- whose `<title>` was landing in text/plain
+# glued to the first line of the body. Mail clients drop the nested head from the
+# HTML part, so this only ever showed up in the plaintext one.
+_HEAD = re.compile(r"<head\b.*?</head\s*>", re.IGNORECASE | re.DOTALL)
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+# Table cells get a visible separator rather than a line break, so a row stays on
+# one line and remains readable. Without this the cells simply concatenated:
+# a header row came out as "PointDécision" and a data row as "Budget 2026approuvé".
+# It matters because legacy notification bodies (§9 phase 3) are table-heavy, and
+# `render_shell` has no plaintext twin to fall back on -- naive extraction IS its
+# plaintext part, by design.
+_CELL_BREAK = re.compile(r"</(?:td|th)\s*>", re.IGNORECASE)
+_TRAILING_CELL = re.compile(r"\s*\|\s*$", re.MULTILINE)
+
 _LINE_BREAK = re.compile(
     r"<br\s*/?>|</(?:p|div|tr|li|h[1-6]|table|blockquote)\s*>", re.IGNORECASE
 )
@@ -377,12 +392,16 @@ def _fallback_text(template, html):
 
 def naive_text(html):
     """Strip ``html`` down to something readable. Naive by design, per SPEC §4."""
-    text = _SCRIPT_OR_STYLE.sub("", html)
+    text = _HEAD.sub("", html)
+    text = _SCRIPT_OR_STYLE.sub("", text)
     text = _COMMENT.sub("", text)
     text = _HIDDEN_ELEMENT.sub("", text)
+    text = _CELL_BREAK.sub(" | ", text)
     text = _LINE_BREAK.sub("\n", text)
     text = _TAG.sub("", text)
     text = unescape(text)
     text = _ZERO_WIDTH.sub("", text)
     text = "\n".join(line.strip() for line in text.splitlines())
+    # The separator the last cell of a row left behind, now at end of line.
+    text = _TRAILING_CELL.sub("", text)
     return _BLANK_RUN.sub("\n\n", text).strip() + "\n"
