@@ -1,7 +1,11 @@
 """Test layers for ``imio.emailkit`` -- shipped in the egg, not in ``tests/``.
 
 Consumer add-ons reuse :data:`FIXTURE` as a base for their own sandbox layer, so
-these live inside the distribution (SPEC §7: "a provided test base class").
+these live inside the distribution (SPEC §7: "a provided test base class"). The
+same reasoning puts :func:`install_recording_mailhost` here: every consumer that
+sends through the ``Email`` builder needs to assert on queued messages, and the
+stock Plone mock cannot tell a queued send from an immediate one (see the long
+comment above it).
 
 Two fixtures, on purpose (SPEC §8.2):
 
@@ -27,6 +31,9 @@ missing include and turn every override test green for the wrong reason. See
 ``tests/test_jbot_wiring.py``, which asserts the patches are in place.
 """
 
+from dataclasses import dataclass
+from email import message_from_bytes
+from email import policy
 from plone.app.robotframework.testing import REMOTE_LIBRARY_BUNDLE_FIXTURE
 from plone.app.testing import applyProfile
 from plone.app.testing import FunctionalTesting
@@ -34,6 +41,9 @@ from plone.app.testing import IntegrationTesting
 from plone.app.testing import PLONE_FIXTURE
 from plone.app.testing import PloneSandboxLayer
 from plone.testing.zope import WSGI_SERVER_FIXTURE
+from Products.MailHost.interfaces import IMailHost
+from Products.MailHost.MailHost import MailHost
+from zope.component import getSiteManager
 
 import imio.emailkit
 
@@ -95,3 +105,152 @@ BASE_FUNCTIONAL_TESTING = FunctionalTesting(
     bases=(BASE_FIXTURE, WSGI_SERVER_FIXTURE),
     name="Imio.EmailkitBaseLayer:FunctionalTesting",
 )
+
+
+# ---------------------------------------------------------------------------
+# A transaction-honest MailHost stand-in (SPEC §6.2, §7)
+# ---------------------------------------------------------------------------
+#
+# SPEC §6.2 makes transaction safety a *guarantee*: "delivery via ``IMailHost``
+# queued send -- an aborted transaction sends nothing", with
+# ``.send(immediate=True)`` the only escape. §7 names the test explicitly.
+#
+# The usual Plone test double, ``Products.CMFPlone.tests.utils.MockMailHost``,
+# **cannot test that**, and would report a pass no matter what. It overrides
+# ``_send`` -- the very method that decides between the transaction-joined path
+# and the immediate one:
+#
+#     if immediate:                       # -> mailer.send() right now
+#         self._makeMailer().send(...)
+#     else:                               # -> MailDataManager joined to the txn,
+#         DirectMailDelivery(...).send()  #    delivered in tpc_finish
+#
+# Replacing ``_send`` throws that fork away, so the message lands in the mock's
+# list immediately and stays there across an abort. A suite built on it cannot
+# tell queued from immediate, and "abort -> queue empty" becomes untestable
+# while looking tested.
+#
+# So this double replaces ``_makeMailer`` instead -- one level *below* the fork.
+# Everything above stays real Products.MailHost and real zope.sendmail code:
+# ``DirectMailDelivery`` joins a ``MailDataManager`` to the current transaction,
+# ``tpc_finish`` calls ``mailer.send()`` and ``abort`` calls ``mailer.abort()``.
+# Which means the double can assert on all three states a queued mail has --
+# pending, delivered, cancelled -- instead of only "something was handed over".
+
+
+@dataclass(frozen=True)
+class SentMail:
+    """One message exactly as the SMTP layer received it.
+
+    ``raw`` is what ``Products.MailHost`` serialised (headers munged, ``Bcc``
+    stripped) and ``recipients`` is the *envelope*, which is where a dropped
+    ``Bcc`` recipient shows up -- it can never appear in the headers.
+    """
+
+    sender: str
+    recipients: tuple
+    raw: bytes
+
+    @property
+    def message(self):
+        """The parsed message as an ``email.message.EmailMessage``.
+
+        Parsed with ``policy.default`` so headers come back decoded and
+        ``iter_attachments`` / ``get_content`` are available: assertions are
+        about structure and substituted values, never about the wire bytes.
+        """
+        return message_from_bytes(self.raw, policy=policy.default)
+
+
+class RecordingMailer:
+    """A ``zope.sendmail`` mailer that records instead of reaching an MTA.
+
+    The three methods are the whole contract ``DirectMailDelivery`` needs --
+    ``send`` for ``tpc_finish``, ``vote`` for ``tpc_vote`` and ``abort`` for
+    ``MailDataManager.abort``. Counting aborts is what makes the §7 abort test
+    a *positive* assertion: an empty inbox proves nothing on its own (a builder
+    that never queued anything also has an empty inbox), while
+    ``sent == [] and aborted == 1`` proves a delivery was really queued and
+    really cancelled.
+    """
+
+    def __init__(self):
+        self.sent = []
+        self.aborted = 0
+        self.voted = 0
+
+    def send(self, fromaddr, toaddrs, message):
+        self.sent.append(SentMail(fromaddr, tuple(toaddrs), bytes(message)))
+
+    def vote(self, fromaddr, toaddrs, message):
+        self.voted += 1
+
+    def abort(self):
+        self.aborted += 1
+
+    def reset(self):
+        self.sent = []
+        self.aborted = 0
+        self.voted = 0
+
+
+class RecordingMailHost(MailHost):
+    """A real ``MailHost`` whose only fake part is the SMTP connection."""
+
+    #: ``MailBase.smtp_queue`` default, restated because it selects the delivery
+    #: strategy: ``False`` means ``DirectMailDelivery``, i.e. joined to the
+    #: transaction. ``True`` would write a maildir to ``smtp_queue_directory``
+    #: and start a processor thread -- a real queue on disk, not what §6.2's
+    #: "queued send" means here.
+    smtp_queue = False
+
+    def __init__(self, identifier="MailHost", mailer=None):
+        MailHost.__init__(self, identifier)
+        # Volatile on purpose: the double is assigned onto the (persistent)
+        # portal, and a test that commits would otherwise pickle the recorded
+        # mail into the layer's storage.
+        self._v_mailer = mailer if mailer is not None else RecordingMailer()
+
+    @property
+    def mailer(self):
+        mailer = getattr(self, "_v_mailer", None)
+        if mailer is None:
+            mailer = self._v_mailer = RecordingMailer()
+        return mailer
+
+    def _makeMailer(self):  # noqa: N802 - Products.MailHost's own spelling
+        return self.mailer
+
+    # -- what tests read ---------------------------------------------------
+
+    @property
+    def sent(self):
+        """Messages actually handed to the MTA, i.e. after a commit."""
+        return self.mailer.sent
+
+    @property
+    def aborted(self):
+        """How many queued deliveries a transaction abort cancelled."""
+        return self.mailer.aborted
+
+    def reset(self):
+        self.mailer.reset()
+
+
+def install_recording_mailhost(portal):
+    """Swap ``portal``'s MailHost for a :class:`RecordingMailHost`.
+
+    Registered *and* set as an attribute, because both lookups are in live use:
+    ``getUtility(IMailHost)`` and ``getToolByName(portal, "MailHost")``. Leaving
+    either one pointing at the real MailHost would either miss the messages or
+    try to open an SMTP connection.
+
+    Nothing is restored: every layer in this package aborts the transaction
+    between tests, and the two writes here are both persistent.
+    """
+    mailhost = RecordingMailHost("MailHost")
+    portal.MailHost = mailhost
+    manager = getSiteManager(portal)
+    manager.unregisterUtility(provided=IMailHost)
+    manager.registerUtility(mailhost, provided=IMailHost)
+    return mailhost

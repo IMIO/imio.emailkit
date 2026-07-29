@@ -8,6 +8,70 @@ Newest entries at the top.
 
 ---
 
+## 2026-07-29 — Plaintext twins live in `emails/twins/` and are copied into the package
+
+**Context.** The previous entry put the hand-authored twin at
+`src/imio/emailkit/templates/notification.txt.pt`, beside the compiled output, because §4 resolves
+twins as `<directory>/<name>.txt.pt`.
+
+**Finding — data loss.** `maizzle build` **empties its output directory**, silently. It deleted the
+committed twin. Reproduced deliberately: unrelated files dropped into `templates/` were also gone
+after a build. Maizzle 6.0.7 exposes no `output.clean` / `emptyOutDir` option. `make check-emails`
+masked it, because its restore trap put the snapshot back — so only `make build-emails` lost the
+file, and only for someone who then committed.
+
+**Choice.** Twins are source and live in **`emails/twins/`**. `make build-emails` copies them into
+`src/imio/emailkit/templates/` after Maizzle has run; `make check-emails` reproduces the copy and
+then diffs, so the twins are covered by the staleness gate again rather than skipped as orphans.
+
+**Why not the alternatives.** Authoring twins as `.vue` templates that Maizzle emits via
+`useOutputPath()` would put them inside the build, but every transformer would then run over
+plaintext and each twin would need its own `useTransformers: false` — clever, and clever is what §3
+warns against. Protecting `templates/` with a stash-and-restore trap in `build-emails` would work
+only for people who go through `make`.
+
+**Cost.** `emails/` is pruned from the sdist, so the twins ship only as the copies under `src/`,
+which is what §4 needs. The source is in git, one directory away.
+
+---
+
+## 2026-07-29 — Dark mode uses attribute selectors, and depends on Maizzle stripping `!important`
+
+**Context.** §3 lists dark mode among `Main.vue`'s responsibilities; it was deferred out of Phase 1
+as OPEN.
+
+**Choice.** One `@media (prefers-color-scheme: dark)` block in `kit/tailwind.css`, keyed on
+`data-dark="page|surface|body|muted"` attributes that `Main.vue`, `Panel.vue` and `DataTable.vue`
+put on the surfaces they own. Every declaration `!important`.
+
+**Why attribute selectors.** `css.purge` only models `class=` and `id=`, so an attribute selector is
+outside what it can match — there is nothing for it to fail to find. Demonstrated: a
+`[data-dark="body"] li` rule survived into all three compiled templates even though no `<li>` exists
+anywhere in the kit. `css.purge.safelist` was rejected because it puts the guard in the build config,
+a different file from the rule it protects.
+
+**The dependency that makes it work, and could silently break it.** `css.inline` has already
+flattened the light theme into `style` attributes, and an inline declaration beats a media query. This
+works *only* because Maizzle **drops `!important` when it inlines** — verified: no inlined `style`
+attribute contains `!important`, so the light side never competes back. That is undocumented
+behaviour. If a future Maizzle preserved `!important` on inlining, dark mode would die with a green
+build. Recorded here so the next person has somewhere to look.
+
+**Scope, honestly.** Verified only structurally: rules survive purge, sit in a real `<style>` in
+`<head>`, and come out of Chameleon byte-intact. **Nothing has been seen in an actual dark-mode
+client** — that needs §6.3's send-test. Outlook Windows ignores `prefers-color-scheme` entirely, so
+the light rendering remains self-sufficient and this is purely additive. The `[data-ogsc]`
+Outlook.com path is not attempted.
+
+**Accepted losses.** Small print inside the content well flattens to the body colour (no structural
+difference to select on — both are `<p>`; font size still carries the hierarchy), and the
+`DataTable` head row loses its tint (told apart by `<th>`'s bold weight). The dark greys
+(`#14161a` / `#23262b` / `#e9eaec` / `#b7bbc2`) are **invented** — the kit has no brand dark
+neutrals. Contrast is 12.8:1 body and 9.5:1 footer, comfortably RGAA, but the exact values are open
+to being overruled.
+
+---
+
 ## 2026-07-29 — `render()` injects `target_language`, and injected names beat the caller's context
 
 **Context.** §6.1 enumerates what `render()` injects: the context, `theme/*`, `portal_url`,

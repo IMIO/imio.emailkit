@@ -63,6 +63,9 @@ NPM?=npm
 NPX?=npx
 
 EMAILS_FOLDER=$(BACKEND_FOLDER)/emails
+# Hand-authored plaintext twins: source, copied into the package by build-emails
+# because `maizzle build` empties its own output directory.
+TWINS_FOLDER=$(BACKEND_FOLDER)/emails/twins
 
 # Where the committed build output lives. Two destinations because the two kinds
 # of artifact are addressed differently at runtime: templates are looked up by
@@ -231,6 +234,14 @@ build-emails: emails-deps ## Compile emails/ into the package (templates/ + brow
 	@echo "$(GREEN)==> Compiling email templates$(RESET)"
 	@mkdir -p $(TEMPLATES_FOLDER) $(OVERRIDES_FOLDER)
 	@cd $(EMAILS_FOLDER) && $(NPX) maizzle build
+	# `maizzle build` EMPTIES its output directory, silently, and 6.0.7 has no
+	# option to stop it -- it deleted a committed hand-authored twin. So the
+	# twins live in emails/twins/ as source and are copied in afterwards. SPEC §4
+	# resolves them as <directory>/<name>.txt.pt, which is what this produces.
+	@if compgen -G "$(TWINS_FOLDER)/*.txt.pt" > /dev/null; then \
+		cp -a $(TWINS_FOLDER)/*.txt.pt $(TEMPLATES_FOLDER)/; \
+		echo "$(GREEN)==> Copied hand-authored plaintext twins$(RESET)"; \
+	fi
 	@echo "$(GREEN)==> Done. Commit the .pt files -- they are what production renders.$(RESET)"
 
 .PHONY: check-emails
@@ -254,6 +265,9 @@ check-emails: emails-deps ## Staleness gate: committed .pt must match a fresh bu
 	@cp -a $(TEMPLATES_FOLDER)/. "$$snapshot/templates/" 2>/dev/null || true
 	@cp -a $(OVERRIDES_FOLDER)/. "$$snapshot/overrides/" 2>/dev/null || true
 	@cd $(EMAILS_FOLDER) && $(NPX) maizzle build >/dev/null
+	@if compgen -G "$(TWINS_FOLDER)/*.txt.pt" > /dev/null; then
+		cp -a $(TWINS_FOLDER)/*.txt.pt $(TEMPLATES_FOLDER)/
+	fi
 	@stale=0
 	@for pair in "$$snapshot/templates:$(TEMPLATES_FOLDER)" "$$snapshot/overrides:$(OVERRIDES_FOLDER)"; do
 		committed="$${pair%%:*}"
@@ -261,10 +275,6 @@ check-emails: emails-deps ## Staleness gate: committed .pt must match a fresh bu
 		for built in "$$fresh"/*.pt; do
 			[[ -e "$$built" ]] || continue
 			name="$$(basename "$$built")"
-			# `.txt.pt` twins are HAND-AUTHORED (Maizzle's plaintext output
-			# destroys tal:/i18n:), so they are source, not build output. The
-			# gate would otherwise report every twin as an ORPHAN.
-			[[ "$$name" == *.txt.pt ]] && continue
 			if [[ ! -f "$$committed/$$name" ]]; then
 				echo "$(RED)  MISSING   $$name (built, never committed)$(RESET)"
 				stale=1
@@ -279,7 +289,6 @@ check-emails: emails-deps ## Staleness gate: committed .pt must match a fresh bu
 		for was in "$$committed"/*.pt; do
 			[[ -e "$$was" ]] || continue
 			name="$$(basename "$$was")"
-			[[ "$$name" == *.txt.pt ]] && continue
 			if [[ ! -f "$$fresh/$$name" ]]; then
 				echo "$(RED)  ORPHAN    $$name (committed, no longer built)$(RESET)"
 				stale=1

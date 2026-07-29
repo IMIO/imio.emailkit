@@ -30,6 +30,7 @@ try:
     from imio.emailkit.testing import BASE_INTEGRATION_TESTING
     from imio.emailkit.testing import FUNCTIONAL_TESTING
     from imio.emailkit.testing import INTEGRATION_TESTING
+    from layers import SENDING_FUNCTIONAL_TESTING
     from layers import SITE_OVERRIDE_INTEGRATION_TESTING
 except ImportError as exc:  # pragma: no cover - only before W2 lands
     RUNTIME_IMPORT_ERROR = exc
@@ -49,6 +50,10 @@ else:
             # ``globals().update`` would silently win -- the resulting error
             # ("Fixture 'site' called directly") points nowhere near the cause.
             (SITE_OVERRIDE_INTEGRATION_TESTING, "site_override"),
+            # SPEC §6.2/§6.3: the one layer the Phase 2 tests run on. Functional
+            # because a queued send only reaches the MTA at commit time, and
+            # content-typed because one attachment source is a Plone File/Image.
+            (SENDING_FUNCTIONAL_TESTING, "sending"),
         ))
     )
 

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>imio.emailkit preview</title>
+    <!-- Deliberately standalone: no main_template, no Plone CSS, no theme.
+         This is a developer tool (SPEC §6.3, "~1 view"), and it has to work on a
+         site whose front end is Volto as readily as on Classic UI. The mail
+         itself is in an iframe, so nothing below can reach it. -->
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; font: 14px/1.5 system-ui, sans-serif; color: #1c1c1c; background: #f8f8f8; }
+      header { padding: 14px 20px; background: #fff; border-bottom: 1px solid #ddd; }
+      h1 { margin: 0; font-size: 17px; }
+      h2 { margin: 20px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: #666; }
+      h2:first-child { margin-top: 0; }
+      .hint { margin: 4px 0 0; font-size: 12px; color: #666; }
+      .layout { display: flex; align-items: flex-start; gap: 20px; padding: 20px; flex-wrap: wrap; }
+      aside { flex: 0 0 320px; background: #fff; border: 1px solid #ddd; padding: 16px; }
+      main { flex: 1 1 520px; min-width: 0; }
+      ul { list-style: none; margin: 0; padding: 0; }
+      li { padding: 6px 8px; border-left: 3px solid transparent; }
+      li.selected { border-left-color: #e6007e; background: #fdf2f8; }
+      li a { font-weight: 600; }
+      .meta { display: block; font-size: 12px; color: #666; word-break: break-all; }
+      .warn { color: #b45309; }
+      .switch a { display: inline-block; padding: 4px 10px; margin: 0 4px 4px 0; border: 1px solid #ccc; background: #fff; text-decoration: none; }
+      .switch a.selected { border-color: #e6007e; background: #e6007e; color: #fff; }
+      table { border-collapse: collapse; width: 100%; font-size: 12px; }
+      th, td { text-align: left; padding: 4px 6px 4px 0; vertical-align: top; word-break: break-all; }
+      th { color: #666; font-weight: 600; }
+      code { background: #f3f3f3; padding: 1px 4px; }
+      form { background: #fff; border: 1px solid #ddd; padding: 12px 16px; margin-bottom: 16px; }
+      button { font: inherit; padding: 8px 14px; border: 0; background: #e6007e; color: #fff; cursor: pointer; }
+      iframe { width: 100%; height: 78vh; border: 1px solid #ddd; background: #fff; }
+      pre { white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid #ddd; padding: 12px; font-size: 12px; }
+      pre.error { border-color: #b91c1c; color: #7f1d1d; }
+      .message { margin: 0 20px 0; padding: 10px 14px; border-left: 3px solid #666; background: #fff; }
+      .message.error { border-left-color: #b91c1c; }
+      .message.info { border-left-color: #0369a1; }
+      details { margin-top: 16px; }
+      summary { cursor: pointer; color: #666; font-size: 12px; }
+      a { color: #005ba1; }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <h1>imio.emailkit preview</h1>
+      <p class="hint">
+        The <em>committed</em> <code>.pt</code> files rendered through
+        <code>render()</code> with the <em>committed</em> fixtures of SPEC §7.
+        Run <code>make build-emails</code> and reload after editing a source.
+      </p>
+    </header>
+
+    <div tal:repeat="message view/messages"
+         class="message ${message/type}"
+         style="margin-top: 20px"
+    >
+      <pre tal:content="message/text"></pre>
+    </div>
+
+    <div class="layout">
+      <aside>
+        <h2>Templates</h2>
+        <p tal:condition="not:view/template_rows" class="hint warn">
+          Nothing is registered in the <code>imio.emailkit.templates</code> entry
+          point group. Note that SPEC §8's two Plone default mails are
+          deliberately not registered -- a stock view renders them.
+        </p>
+        <ul>
+          <li tal:repeat="row view/template_rows" tal:attributes="class row/css">
+            <a href="${row/url}">${row/name}</a>
+            <span class="meta">subject: ${row/subject}</span>
+            <span tal:condition="not:row/fixture" class="meta warn">
+              no fixture under tests/fixtures/
+            </span>
+            <span tal:condition="not:row/twin" class="meta warn">
+              no .txt.pt twin -- plaintext comes from the deprecated fallback
+            </span>
+          </li>
+        </ul>
+
+        <h2>Language</h2>
+        <p class="switch">
+          <a tal:repeat="row view/language_rows"
+             href="${row/url}"
+             tal:attributes="class row/css"
+          >${row/code}</a>
+        </p>
+
+        <h2>Theme tokens</h2>
+        <table>
+          <tr tal:repeat="row view/theme_rows">
+            <th>${row/token}</th>
+            <td>
+              <span tal:condition="row/value">${row/value}</span>
+              <em tal:condition="not:row/value" class="hint">(empty)</em>
+              <span class="meta"><code>${row/record}</code></span>
+            </td>
+          </tr>
+        </table>
+        <p class="hint">
+          <a href="${view/registry_url}">Edit these in the registry control panel</a>
+          -- SPEC §8.2 level 2.
+        </p>
+
+        <h2>Fixture</h2>
+        <p class="hint">
+          <code tal:condition="view/fixture">${view/fixture}</code>
+          <em tal:condition="not:view/fixture">none resolved</em>
+        </p>
+      </aside>
+
+      <main>
+        <form method="post" action="${view/page_url}">
+          <input type="hidden" name="template" value="${view/selected_name}">
+          <input type="hidden" name="language" value="${view/language}">
+          <span tal:replace="structure context/@@authenticator/authenticator"></span>
+          <button tal:condition="not:view/send_test_blocker"
+                  type="submit"
+                  name="form.button.send_test"
+                  value="1"
+          >Send test to ${view/user_address}</button>
+          <p tal:condition="view/send_test_blocker" class="hint warn">
+            ${view/send_test_blocker}
+          </p>
+          <p class="hint">
+            Goes through the SPEC §6.2 <code>Email</code> builder, to your own
+            address only. Browser previews lie; Outlook does not.
+          </p>
+        </form>
+
+        <pre tal:condition="view/error" class="error" tal:content="view/error"></pre>
+
+        <iframe tal:condition="not:view/error"
+                src="${view/body_url}"
+                title="Rendered email"
+        ></iframe>
+
+        <details tal:condition="view/text_part">
+          <summary>plaintext part (SPEC §6.1 returns both)</summary>
+          <pre tal:content="view/text_part"></pre>
+        </details>
+      </main>
+    </div>
+  </body>
+</html>

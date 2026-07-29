@@ -15,7 +15,19 @@ Contract encoded (spec reference in brackets):
 ``imio.emailkit.helpers.format_date`` etc.        [§6.1] locale helpers, ``(value, language)``
 ``imio.emailkit.interfaces.IEmailkitLayer``       [§8.1] browser layer
 template name ``imio.emailkit:notification``      [§4] the one ``render()``-able template
+``imio.emailkit.Email``                           [§6.2] the builder, spelled verbatim in the spec
+``imio.emailkit.interfaces.IEmailRecipient``      [§6.2] ``email`` / ``fullname`` / ``language``
+``imio.emailkit.interfaces.RecipientError``       [§6.2] raised at ``.send()``
+``imio.emailkit.interfaces.AttachmentError``      [§6.2] raised at ``.send()``
+view name ``emailkit-preview``                    [§6.3] spelled ``@@emailkit-preview``
 ===============================================  ==========================
+
+Of those, four are **guesses this file owns** rather than spec quotations, and
+they are listed again next to the code that makes them, so a wrong guess is one
+edit here: which module the two new exceptions and the recipient interface live
+in (:data:`INTERFACES_MODULE`), the preview view's language parameter
+(:data:`PREVIEW_LANGUAGE_PARAM`) and its send-test trigger
+(:data:`SEND_TEST_FORM`).
 """
 
 from pathlib import Path
@@ -422,3 +434,353 @@ def assert_render_is_clean(rendered, what="output"):
     assert "${" not in rendered, f"stray '${{' in {what}"
     residue = sorted(set(TAL_RESIDUE.findall(rendered)))
     assert not residue, f"leftover TAL/i18n attributes in {what}: {residue}"
+
+
+# ===========================================================================
+# Phase 2 -- SPEC §6.2 (``Email`` builder) and §6.3 (preview view)
+# ===========================================================================
+#
+# Everything below was written against SPEC §6.2/§6.3 and
+# ``docs/plans/phase-2.md`` §6 while the builder and the preview view were being
+# written in parallel. Nothing here was derived from that code.
+
+#: §6.2's frozen method set, verbatim, in the order the spec's own example
+#: chains them. ``docs/plans/phase-2.md`` §2: "Methods, and nothing beyond
+#: them", and §7 lists "no new builder methods beyond §6.2" as a non-goal --
+#: which is only enforceable if a test names the closed set.
+BUILDER_METHODS = (
+    "to",
+    "cc",
+    "bcc",
+    "reply_to",
+    "sender",
+    "subject",
+    "with_context",
+    "attach",
+    "send",
+)
+
+#: Every builder method except ``.send()`` returns ``self`` (§6.2: "each method
+#: returns ``self``"), so these are the ones an identity test can chain.
+CHAINING_METHODS = tuple(name for name in BUILDER_METHODS if name != "send")
+
+#: **GUESS.** §6.2 names ``RecipientError``, ``AttachmentError`` and
+#: ``IEmailRecipient`` but not their module. Phase 1 put ``TemplateNotFound``
+#: and ``IEmailkitLayer`` in ``imio.emailkit.interfaces`` ("Module where all
+#: interfaces, events and exceptions live"), so that is where these are looked
+#: for. If the runtime chose otherwise, change this one line.
+INTERFACES_MODULE = "imio.emailkit.interfaces"
+
+#: §6.3, verbatim: "``@@emailkit-preview`` (Manager-only)".
+PREVIEW_VIEW = "emailkit-preview"
+
+#: **GUESS.** §6.3 requires "a language switcher" but names no parameter. This
+#: mirrors §6.1's ``render(..., language=...)``, which is the only language
+#: keyword the spec spells anywhere.
+PREVIEW_LANGUAGE_PARAM = "language"
+
+#: **GUESS.** §6.3 requires "a **Send test** button" but names no form control.
+#: A single request key is assumed; the *behaviour* asserted around it -- the
+#: mail goes to the logged-in user's own address and nowhere else -- is the part
+#: the spec actually pins.
+SEND_TEST_FORM = {"send_test": "1"}
+
+#: §6.3: the preview renders "each in an iframe using committed fixture data".
+IFRAME_SRC = re.compile(r"<iframe[^>]*\bsrc=[\"']([^\"']+)[\"']", re.IGNORECASE)
+
+
+# ---------------------------------------------------------------------------
+# Identities used across the Phase 2 modules
+# ---------------------------------------------------------------------------
+
+#: A recipient that is only ever an address -- no member behind it, so
+#: :data:`IEmailRecipient`'s ``language`` is ``None`` for it and §6.2's grouping
+#: has to fall back to the site default (``docs/plans/phase-2.md`` §4).
+PLAIN_ADDRESS = "greffe@commune.example.be"
+
+#: A second one, for "two addresses land in one message" assertions.
+OTHER_ADDRESS = "secretariat@commune.example.be"
+
+#: Neither an address nor a userid. §6.2: unresolvable recipients "raise
+#: ``RecipientError`` at ``.send()`` time (fail loud, not silent drop)".
+UNRESOLVABLE = "definitely-not-a-user-or-an-address"
+OTHER_UNRESOLVABLE = "also-not-a-user-or-an-address"
+
+#: The two extra members the language-grouping tests need. Userids rather than
+#: addresses so the same fixtures exercise the userid branch of the ``str``
+#: adapter as well.
+FR_MEMBER = {
+    "userid": "fr_member",
+    "email": "fr.membre@commune.example.be",
+    "fullname": "Frederic Wallon",
+    "language": "fr",
+}
+NL_MEMBER = {
+    "userid": "nl_member",
+    "email": "nl.lid@gemeente.example.be",
+    "fullname": "Niels Vlaming",
+    "language": "nl",
+}
+
+#: §6.2: "``From`` defaults to the site's configured sender". In Plone 6 that is
+#: the pair of ``plone.app.registry`` records below, which is what the site
+#: control panel writes.
+SENDER_ADDRESS_RECORD = "plone.email_from_address"
+SENDER_NAME_RECORD = "plone.email_from_name"
+SITE_SENDER_ADDRESS = "noreply@commune.example.be"
+SITE_SENDER_NAME = "Commune de Test"
+
+#: An explicit ``.sender(...)`` override, distinct from the site default.
+OVERRIDE_SENDER = "convocations@commune.example.be"
+
+#: ``.reply_to(...)``, the address §6.2's own example uses.
+REPLY_TO = "noreply@imio.be"
+
+#: The registry record Plone reads the site's default language from. §6.2 groups
+#: by "resolved language"; ``docs/plans/phase-2.md`` §4 makes the site default
+#: the fallback for a recipient that has none.
+DEFAULT_LANGUAGE_RECORD = "plone.default_language"
+
+
+# ---------------------------------------------------------------------------
+# Subjects: expected values are *translated*, never hardcoded
+# ---------------------------------------------------------------------------
+
+#: A second msgid in this package's own domain, used to prove ``.subject(msgid)``
+#: is translated per language group. Chosen because its FR and NL catalog
+#: entries genuinely differ -- ``email_subject_notification`` translates to
+#: "Notification" in both FR and EN, so it cannot distinguish "translated" from
+#: "passed through".
+OVERRIDE_SUBJECT_MSGID = "email_subject_mail_password_template"
+
+#: A literal ``.subject(...)`` override. §6.2: ``.subject()`` "accepts a msgid or
+#: literal string" -- a literal is not a msgid, so it must reach every language
+#: group unchanged.
+LITERAL_SUBJECT = "Convocation - seance du 12 aout"
+
+
+def message_id(msgid, default=None):
+    """A ``zope.i18nmessageid.Message`` in this package's domain."""
+    from zope.i18nmessageid import Message
+
+    return Message(msgid, domain=PACKAGE_NAME, default=default)
+
+
+def translated(msgid, language):
+    """Translate ``msgid`` for ``language`` the way a template would.
+
+    Expected subjects are computed rather than hardcoded on purpose: §6.2 says
+    the subject msgid is "translated per recipient language at send time", so
+    the assertion has to be "equals the translation", not "equals this French
+    string I typed". A hardcoded string would turn every catalog edit into a
+    test failure and -- worse -- would still pass if the builder shipped the
+    *bare msgid*, whenever the catalog happens to have no entry.
+    """
+    from zope.i18n import translate
+
+    return translate(msgid, target_language=language)
+
+
+def registration_subject(template=NOTIFICATION):
+    """The subject msgid the §4 registration declares for ``template``.
+
+    Read out of discovery rather than restated here: §6.2 says the subject
+    "comes from the template registration", so the test's expectation must be
+    whatever the registration holds. Restating it would let the two drift apart
+    and still pass.
+    """
+    from imio.emailkit.discovery import get_template
+
+    return get_template(qualified(template)).subject
+
+
+# ---------------------------------------------------------------------------
+# Guards for the two Phase 2 workstreams
+# ---------------------------------------------------------------------------
+
+_BUILDER_PENDING = (
+    "{target} is not available. SPEC §6.2 freezes the Email builder's API and "
+    "this module encodes it; the builder itself is workstream W1 of "
+    "docs/plans/phase-2.md and is written in parallel with these tests. Every "
+    "assertion here is written and runs unchanged as soon as W1 lands -- "
+    "nothing was weakened to go green. If W1 chose a different name, reconcile "
+    "in tests/support.py ({hint})."
+)
+
+
+def require_builder():
+    """Return ``imio.emailkit.Email`` or skip the calling module.
+
+    ``Email`` is one of the few names SPEC spells literally
+    (§6.2: ``from imio.emailkit import Email``), so there is nothing to guess --
+    only to wait for.
+    """
+    require_runtime()
+    import imio.emailkit
+
+    email_class = getattr(imio.emailkit, "Email", None)
+    if email_class is None:
+        pytest.skip(
+            _BUILDER_PENDING.format(
+                target="imio.emailkit.Email",
+                hint="the name is quoted verbatim from §6.2, so this is W1 pending",
+            ),
+            allow_module_level=True,
+        )
+    return email_class
+
+
+def require_errors(*names):
+    """Return the named Phase 2 exceptions/interfaces or skip the module."""
+    require_runtime()
+    import importlib
+
+    module = importlib.import_module(INTERFACES_MODULE)
+    missing = [name for name in names if not hasattr(module, name)]
+    if missing:
+        pytest.skip(
+            _BUILDER_PENDING.format(
+                target=f"{INTERFACES_MODULE}.{{{','.join(missing)}}}",
+                hint="support.INTERFACES_MODULE picks the module -- a GUESS",
+            ),
+            allow_module_level=True,
+        )
+    return [getattr(module, name) for name in names]
+
+
+def require_preview(portal, request):
+    """Return the ``@@emailkit-preview`` view class or skip the module.
+
+    Looked up unrestricted, so a *missing* view (W2 pending) is a skip while a
+    *protected* view is not -- the Manager-only assertions in
+    ``tests/test_preview.py`` must be able to fail, not vanish into a skip.
+    """
+    require_runtime()
+    from zope.component import queryMultiAdapter
+
+    view = queryMultiAdapter((portal, request), name=PREVIEW_VIEW)
+    if view is None:
+        pytest.skip(
+            f"@@{PREVIEW_VIEW} is not registered. SPEC §6.3's preview view is "
+            "workstream W2 of docs/plans/phase-2.md, written in parallel with "
+            "these tests; they run unchanged once it lands."
+        )
+    return view
+
+
+# ---------------------------------------------------------------------------
+# Reading a sent message
+# ---------------------------------------------------------------------------
+#
+# Every helper here works on the *parsed* message. SPEC §6.2 pins the MIME
+# shape (``set_content(text)`` + ``add_alternative(html, subtype="html")``), and
+# Phase 0's lesson is that marker-string assertions pass while raw ``${}`` ships
+# -- so these return decoded content and structure, never a haystack to grep.
+
+
+def sole(sent, what="message"):
+    """Exactly one item, or a failure that says how many there were."""
+    assert len(sent) == 1, f"expected exactly one {what}, got {len(sent)}"
+    return sent[0]
+
+
+def alternative_part(message):
+    """The ``multipart/alternative`` section of a message.
+
+    Returns the message itself when it *is* the alternative (§6.2's shape with
+    no attachments), or the nested one when ``add_attachment`` has wrapped it in
+    a ``multipart/mixed`` -- which is what ``EmailMessage`` does, and is correct.
+    Written to accept both so the attachment tests can still assert on the body
+    structure without re-deriving it.
+    """
+    if message.get_content_type() == "multipart/alternative":
+        return message
+    for part in message.walk():
+        if part.get_content_type() == "multipart/alternative":
+            return part
+    raise AssertionError(
+        "no multipart/alternative section in the message; SPEC §6.2 requires "
+        f"set_content(text) + add_alternative(html): got {message.get_content_type()} "
+        f"with parts {[p.get_content_type() for p in message.walk()]}"
+    )
+
+
+def body_parts(message):
+    """The ``(text/plain, text/html)`` parts of the alternative, in wire order."""
+    return list(alternative_part(message).iter_parts())
+
+
+def decoded(part):
+    """A text part's content, decoded and with line endings normalised.
+
+    ``\\r\\n`` is the on-the-wire line ending; comparing against ``render()``'s
+    output -- which is what §6.3's preview and §7's golden files also compare --
+    means normalising it. That is a transport detail, not a value.
+    """
+    content = part.get_content()
+    return content.replace("\r\n", "\n").rstrip("\n")
+
+
+def bodies(message):
+    """``(text, html)`` of one message, decoded."""
+    parts = body_parts(message)
+    assert len(parts) == 2, (
+        "SPEC §6.2's message has exactly two alternatives, text then html; got "
+        f"{[p.get_content_type() for p in parts]}"
+    )
+    return decoded(parts[0]), decoded(parts[1])
+
+
+def html_of(message):
+    return bodies(message)[1]
+
+
+def attachments(message):
+    """Every attachment part, in order."""
+    return list(message.iter_attachments())
+
+
+def addresses(message, header):
+    """The bare addresses in one header, lowercased.
+
+    Parsed with ``email.utils.getaddresses`` rather than by substring, because
+    ``"Zoe Testeuse" <zoe@example.be>`` must match ``zoe@example.be`` and
+    ``zoe@example.be.evil`` must not.
+    """
+    from email.utils import getaddresses
+
+    raw = message.get_all(header) or []
+    return sorted(
+        address.lower() for _name, address in getaddresses([str(v) for v in raw])
+    )
+
+
+def display_names(message, header):
+    """The display names in one header (``IEmailRecipient.fullname``, §6.2)."""
+    from email.utils import getaddresses
+
+    raw = message.get_all(header) or []
+    return [name for name, _address in getaddresses([str(v) for v in raw]) if name]
+
+
+def lang_of(message):
+    """The ``lang`` attribute the kit layout emits on ``<html>`` (§3)."""
+    match = LANG_ATTRIBUTE.search(html_of(message))
+    assert match, "no lang attribute on <html> in the sent message (SPEC §3)"
+    return match.group(1).lower()
+
+
+def subject_of(message):
+    return str(message["Subject"])
+
+
+def assert_message_is_clean(message):
+    """Neither MIME part may carry an unsubstituted placeholder.
+
+    The same assertion ``tests/test_render.py`` makes, applied to what actually
+    goes to the MTA. A builder that assembled the message from something other
+    than ``render()`` -- or before the engine was ready -- fails here.
+    """
+    text, html = bodies(message)
+    assert_render_is_clean(html, "sent html part")
+    assert_render_is_clean(text, "sent text part")
