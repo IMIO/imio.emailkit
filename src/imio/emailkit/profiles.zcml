@@ -1,0 +1,46 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:genericsetup="http://namespaces.zope.org/genericsetup"
+    i18n_domain="imio.emailkit"
+    >
+
+  <!-- SPEC §8.2, level 3: `:base` is the documented opt-out. It ships the
+       runtime (render(), discovery, the theme records) and NOT the browser
+       layer, so Plone's stock mails are left exactly as they were. It stays
+       visible in the add-ons control panel on purpose: opting out means
+       installing this instead of `:default`.
+       (No double hyphen anywhere in these comments: XML forbids it inside a
+       comment, which is the same hazard Phase 0 hit in compiled templates.) -->
+  <genericsetup:registerProfile
+      name="base"
+      title="iMio Emailkit: runtime only"
+      description="Email templating runtime without the restyled Plone default mails. Install this instead of the default profile to keep Plone's stock mails untouched."
+      provides="Products.GenericSetup.interfaces.EXTENSION"
+      directory="profiles/base"
+      />
+
+  <genericsetup:registerProfile
+      name="default"
+      title="iMio Emailkit: Install"
+      description="Email templating runtime plus the restyled Plone default mails."
+      provides="Products.GenericSetup.interfaces.EXTENSION"
+      directory="profiles/default"
+      />
+
+  <genericsetup:registerProfile
+      name="uninstall"
+      title="iMio Emailkit: Uninstall"
+      description="Uninstall iMio Emailkit setup."
+      provides="Products.GenericSetup.interfaces.EXTENSION"
+      directory="profiles/uninstall"
+      />
+
+  <!-- Hide Uninstall Profile-->
+  <utility
+      factory=".setuphandlers.HiddenProfiles"
+      name="imio.emailkit"
+      />
+
+  <include package=".upgrades" />
+
+</configure>

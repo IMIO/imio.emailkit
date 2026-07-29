@@ -1,0 +1,44 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    i18n_domain="imio.emailkit"
+    >
+
+  <!-- Set overrides folder for Just-a-Bunch-Of-Templates product.
+
+       The WHOLE package, never `file="meta.zcml"` (Phase 0 caveat D1).
+       `meta.zcml` registers only the `browser:jbot` directive; the
+       `ViewPageTemplateFile.__get__` monkeypatches that make an override
+       effective live in `z3c.jbot/configure.zcml`
+       (`<include package="z3c.jbot.patches" />`). With `meta.zcml` alone the
+       directive parses, the TemplateManager is built with the CORRECT path
+       mapping, and the stock template still renders: no error, no warning.
+
+       CMFPlone does not include z3c.jbot itself. In a real instance
+       z3c.autoinclude pulls it in, but PLONE_FIXTURE disables autoinclude, so
+       the include has to be here and test layers must not rely on autoinclude.
+  -->
+  <include package="z3c.jbot" />
+
+  <!-- SPEC §8.1/§8.2: bound to IEmailkitLayer, which only the `:default`
+       profile installs. That binding IS the opt-out mechanism: with `:base`
+       installed the directory below is registered but unreachable, so stock
+       Plone mails stay untouched. -->
+  <browser:jbot
+      directory="overrides"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
+      />
+
+  <!-- The kit layout's last resort for the theme tokens, used by the two
+       jbot-overridden Plone default mails: a stock CMFPlone view renders them,
+       so neither `theme` nor `options/theme` is in scope there. Registered on
+       IDefaultBrowserLayer rather than IEmailkitLayer so a `:base` consumer
+       rendering its own templates through a stock view has the same escape. -->
+  <browser:page
+      name="emailkit_theme"
+      for="*"
+      class=".theme.EmailkitThemeView"
+      permission="zope2.View"
+      />
+
+</configure>

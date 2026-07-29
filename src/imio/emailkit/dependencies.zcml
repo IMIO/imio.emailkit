@@ -1,0 +1,10 @@
+<configure xmlns="http://namespaces.zope.org/zope">
+
+  <!-- List all packages you depend here.
+
+       z3c.jbot is deliberately NOT included here but in browser/configure.zcml,
+       immediately above the `browser:jbot` directive that needs it: including
+       only its `meta.zcml` is a silent no-op (Phase 0 caveat D1), and the
+       comment explaining that has to sit where the mistake would be made. -->
+
+</configure>

@@ -1,0 +1,25 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:i18n="http://namespaces.zope.org/i18n"
+    i18n_domain="imio.emailkit"
+    >
+
+  <i18n:registerTranslations directory="locales" />
+
+  <include file="dependencies.zcml" />
+  <include file="profiles.zcml" />
+
+  <include package=".browser" />
+
+  <!-- SPEC §4: "warning at startup" for a template shipping no plaintext twin.
+       Scanning here rather than lazily is what makes that literally true.
+       Otherwise the warning lands in the log of whoever sends the first mail,
+       weeks after the build that dropped the file. Warms the cache too. -->
+  <subscriber
+      for="zope.processlifetime.IDatabaseOpenedWithRoot"
+      handler=".discovery.warm_cache"
+      />
+
+  <!-- -*- extra stuff goes here -*- -->
+
+</configure>
