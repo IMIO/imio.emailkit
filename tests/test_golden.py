@@ -18,6 +18,12 @@ CI contract §7 asks of every consumer add-on, applied to us first.
 They are covered instead in ``tests/test_default_mails.py``, on invariants, through
 the real call site. Golden files cover the ``render()`` path, where §6.1's purity
 guarantee makes a byte comparison meaningful.
+
+**Two harnesses, one contract.** ``TestOwnTemplateGoldens`` snapshots the authored
+templates through ``render()``; ``TestShellGoldens`` snapshots a realistic legacy
+body through §9 phase 3's ``render_shell()``. Both are the same §7 gate -- fixture
+in, snapshot out, regenerated deliberately -- and the shell needs its own class only
+because it has no template *name* to look up.
 """
 
 import golden_harness
@@ -36,6 +42,39 @@ class TestOwnTemplateGoldens(golden_harness.GoldenTemplateTests):
     """
 
     templates = support.RENDERABLE_TEMPLATES
+
+
+class TestShellGoldens(golden_harness.GoldenTemplateTests):
+    """SPEC §9 phase 3 -- a realistic legacy body wrapped by ``render_shell``.
+
+    ``docs/plans/phase-3.md`` §4 gate 4 asks for exactly this and §1 explains why
+    it is the phase's *evidence* rather than a nicety: the exit criterion claims
+    "zero template redesign", and the only honest way to support that claim
+    without the PloneMeeting codebase is to snapshot the HTML idioms those
+    notifications really emit and let a diff speak. ``tests/fixtures/
+    shell_plonemeeting.py`` documents each idiom and why it is there.
+
+    The one seam ``golden_harness`` exposes is :meth:`render_parts`, and this is
+    what it exists for: the shell has no registered name (``render_shell`` takes
+    ``subject`` and ``body_html``, not a template name), so the fixture holds the
+    call rather than a context. Everything else -- one test per language per part,
+    the deliberate-regeneration rule, the placeholder audit of the committed
+    snapshot -- is inherited unchanged.
+    """
+
+    templates = support.SHELL_FIXTURES
+
+    def render_parts(self, template, language):
+        from imio.emailkit import render_shell
+
+        subject, body_html = support.load_shell_fixture(template)
+        return render_shell(subject, body_html, language=language)
+
+
+#: Every fixture/snapshot name this module renders, in either harness. The orphan
+#: tests below read this rather than one class's ``templates``, so adding a
+#: harness cannot silently stop the orphan checks from covering it.
+COVERED = set(TestOwnTemplateGoldens.templates) | set(TestShellGoldens.templates)
 
 
 class TestFixtureCoverage:
@@ -112,17 +151,15 @@ class TestFixtureCoverage:
         )
 
     def test_no_orphan_fixtures(self):
-        covered = set(TestOwnTemplateGoldens.templates)
-        orphans = sorted(set(support.available_fixtures()) - covered)
+        orphans = sorted(set(support.available_fixtures()) - COVERED)
 
         assert orphans == [], f"fixtures with no template in the harness: {orphans}"
 
     def test_no_orphan_golden_files(self):
-        covered = set(TestOwnTemplateGoldens.templates)
         orphans = sorted({
             path.name.split(".")[0]
             for path in support.GOLDEN_DIR.glob("*.*.*")
-            if path.name.split(".")[0] not in covered
+            if path.name.split(".")[0] not in COVERED
         })
 
         assert orphans == [], f"golden files with no template: {orphans}"
