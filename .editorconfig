@@ -1,0 +1,58 @@
+
+# EditorConfig Configuration file, for more details see:
+# https://EditorConfig.org
+# EditorConfig is a convention description, that could be interpreted
+# by multiple editors to enforce common coding conventions for specific
+# file types
+
+# top-most EditorConfig file:
+# Will ignore other EditorConfig files in Home directory or upper tree level.
+root = true
+
+
+[*]  # For All Files
+# Unix-style newlines with a newline ending every file
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+# Set default charset
+charset = utf-8
+# Indent style default
+indent_style = space
+
+[*.{py,cfg,ini}]
+# 4 space indentation
+indent_size = 4
+
+[*.{html,dtml,pt,zpt,xml,zcml,js,json,ts,less,scss,css,sass,yml,yaml,vue}]
+# 2 space indentation
+indent_size = 2
+
+# Compiled email templates are build output: Maizzle owns their formatting
+# (`html.format: true` re-indents via oxfmt) and the staleness gate compares them
+# byte for byte. An editor that "fixes" whitespace here turns every checkout into
+# a stale build.
+[src/imio/emailkit/templates/**]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = false
+insert_final_newline = unset
+
+[src/imio/emailkit/browser/overrides/**]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = false
+insert_final_newline = unset
+
+# Golden snapshots are compared byte for byte for the same reason.
+[tests/golden/**]
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = false
+insert_final_newline = unset
+
+[{Makefile,.gitmodules}]
+# Tab indentation (no size specified, but view as 4 spaces)
+indent_style = tab
+indent_size = unset
+tab_width = unset
