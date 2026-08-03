@@ -20,20 +20,26 @@ docs/site/.next/
 docs/site/out/
 
 # venv / buildout related
-.eggs/
-.installed.cfg
-.mr.developer.cfg
-.venv/
-bin/
-develop-eggs/
-eggs/
-etc/
-include/
-lib/
-lib64
-parts/
-pyvenv.cfg
-var/
+#
+# Anchored with a leading `/`: every one of these exists only at the repository
+# root, and unanchored they match at any depth. `lib/` silently swallowed
+# `docs/site/src/lib/`, so the documentation site committed without the four
+# modules its components import and failed to build in CI while building fine
+# locally. Keep new entries here anchored.
+/.eggs/
+/.installed.cfg
+/.mr.developer.cfg
+/.venv/
+/bin/
+/develop-eggs/
+/eggs/
+/etc/
+/include/
+/lib/
+/lib64
+/parts/
+/pyvenv.cfg
+/var/
 
 # mxdev
 .installed.txt
