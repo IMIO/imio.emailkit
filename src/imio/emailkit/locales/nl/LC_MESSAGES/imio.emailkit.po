@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: imio.emailkit\n"
-"POT-Creation-Date: 2026-07-29 15:41+0000\n"
+"POT-Creation-Date: 2026-08-03 12:24+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -67,14 +67,44 @@ msgstr "Deze inhoud bekijken"
 #. Default: "This message was sent automatically. Please do not reply to it."
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:142
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:138
-#: imio/emailkit/templates/notification.pt:98
+#: imio/emailkit/templates/get_username.pt:120
 msgid "email_footer_default"
 msgstr "Dit bericht is automatisch verzonden. Gelieve niet te antwoorden."
+
+#. Default: "Log in"
+#: imio/emailkit/templates/get_username.pt:98
+#: imio/emailkit/templates/get_username.txt.pt:8
+msgid "email_get_username_cta"
+msgstr "Aanmelden"
+
+#. Default: "Dear ${fullname},"
+#: imio/emailkit/templates/get_username.pt:81
+#: imio/emailkit/templates/get_username.txt.pt:2
+msgid "email_get_username_greeting"
+msgstr "Beste ${fullname},"
+
+#. Default: "Your username"
+#: imio/emailkit/templates/get_username.pt:90
+#: imio/emailkit/templates/get_username.txt.pt:6
+msgid "email_get_username_label"
+msgstr "Uw gebruikersnaam"
+
+#. Default: "You asked to be reminded of your username for ${site_name}."
+#: imio/emailkit/templates/get_username.pt:85
+#: imio/emailkit/templates/get_username.txt.pt:4
+msgid "email_get_username_lead"
+msgstr "U hebt een herinnering van uw gebruikersnaam voor ${site_name} aangevraagd."
+
+#. Default: "If you did not ask for this, simply ignore this message. The request came from the IP address ${ipaddress}."
+#: imio/emailkit/templates/get_username.pt:107
+#: imio/emailkit/templates/get_username.txt.pt:10
+msgid "email_get_username_tracking"
+msgstr "Als u dit niet hebt aangevraagd, kunt u dit bericht negeren. De aanvraag kwam van het IP-adres ${ipaddress}."
 
 #. Default: "iMio"
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:83
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:83
-#: imio/emailkit/templates/notification.pt:72
+#: imio/emailkit/templates/get_username.pt:72
 msgid "email_logo_alt"
 msgstr "iMio"
 
@@ -108,13 +138,18 @@ msgstr "Gebruik de knop hieronder om een nieuw wachtwoord voor ${site_name} te k
 msgid "email_mail_password_tracking"
 msgstr "Als u dit niet hebt aangevraagd, kunt u dit bericht negeren: uw wachtwoord is niet gewijzigd. De aanvraag kwam van het IP-adres ${ipaddress}."
 
+#. Default: "Here is the username you asked for."
+#: imio/emailkit/__init__.py:68
+msgid "email_preheader_get_username"
+msgstr "Hier is de gebruikersnaam die u hebt aangevraagd."
+
 #. Default: "Follow the link to choose a new password."
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:71
 msgid "email_preheader_mail_password_template"
 msgstr "Volg de link om een nieuw wachtwoord te kiezen."
 
 #. Default: "You have a new notification."
-#: imio/emailkit/__init__.py:49
+#: imio/emailkit/__init__.py:58
 msgid "email_preheader_notification"
 msgstr "U hebt een nieuwe melding."
 
@@ -153,13 +188,18 @@ msgstr "Als de knop niet werkt, kopieer dan dit adres in uw browser:"
 msgid "email_registered_notify_greeting"
 msgstr "Hallo ${fullname},"
 
+#. Default: "Your username"
+#: imio/emailkit/__init__.py:64
+msgid "email_subject_get_username"
+msgstr "Uw gebruikersnaam"
+
 #. Default: "Password reset request"
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:3
 msgid "email_subject_mail_password_template"
 msgstr "Aanvraag om wachtwoord opnieuw in te stellen"
 
 #. Default: "Notification"
-#: imio/emailkit/__init__.py:45
+#: imio/emailkit/__init__.py:54
 msgid "email_subject_notification"
 msgstr "Melding"
 

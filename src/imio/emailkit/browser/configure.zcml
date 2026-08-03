@@ -29,11 +29,40 @@
       layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
+  <!-- The THIRD restyled Plone default mail, and the one that is not a jbot
+       override: the username reminder from the login-help form.
+
+       Stock Plone has no template for it. It is `SEND_USERNAME_TEMPLATE`, a
+       module-level i18n string in `Products.CMFPlone.browser.login.login_help`,
+       declared text/plain and handed straight to MailHost by
+       `RequestUsername.send_username()`. z3c.jbot keys on a resolved filename and
+       there is no file, so the view is the only seam.
+
+       Same `name`, same `for` and same `permission` as the stock registration in
+       `Products/CMFPlone/browser/login/configure.zcml`, differing only by layer.
+       No `template=`: the class supplies `index` itself, pointing at Plone's own
+       login_help.pt by absolute path, so the form markup is not forked and stays
+       jbot-overridable.
+
+       On IEmailkitLayer, exactly like the jbot directory above, so the opt-out
+       covers this mail too: a `:base` site gets stock Plone's view and stock
+       Plone's plaintext mail. -->
+  <browser:page
+      name="login-help"
+      for="plone.base.interfaces.INavigationRoot"
+      class=".login_help.LoginHelpForm"
+      permission="zope.Public"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
+      />
+
   <!-- The kit layout's last resort for the theme tokens, used by the two
        jbot-overridden Plone default mails: a stock CMFPlone view renders them,
        so neither `theme` nor `options/theme` is in scope there. Registered on
        IDefaultBrowserLayer rather than IEmailkitLayer so a `:base` consumer
-       rendering its own templates through a stock view has the same escape. -->
+       rendering its own templates through a stock view has the same escape.
+
+       `get_username` does not need it: its own view renders it through
+       `render()`, which injects `theme` into the flat context directly. -->
   <browser:page
       name="emailkit_theme"
       for="*"

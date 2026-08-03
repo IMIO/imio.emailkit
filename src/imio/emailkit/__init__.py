@@ -22,19 +22,28 @@ logger = logging.getLogger(PACKAGE_NAME)
 # translated per recipient language at send time; ``preheader`` is the optional
 # hidden inbox-preview line the kit layout renders (SPEC §3).
 #
-# The restyled Plone default mails of SPEC §8 are deliberately NOT registered
-# here. They are rendered by a *stock Plone view*, which means two things:
+# Two of the three restyled Plone default mails are deliberately NOT registered
+# here: ``mail_password_template`` and ``registered_notify_template``.
+# They are rendered by a *stock Plone view*, which means two things:
 # their subject is emitted by the template as its own ``Subject:`` header, and
 # their body speaks the hosting view's dialect (``options/...`` plus ``python:``
 # expressions, because ``MemberData`` cannot be path-traversed at all). A
 # registration would therefore resolve to a template ``render()`` can never
 # render -- ``render()`` supplies a flat context. See docs/DECISIONS.md.
 #
-# §8's claim that those mails are "authored, compiled, discovered, tested and
-# shipped exactly like consumer templates" holds for every verb except
-# *discovered*, and cannot hold for that one while a stock view renders them.
-# The dogfooding intent is intact: they use the same kit, the same build, the
-# same staleness gate and the same golden tests.
+# For those two, the original claim that the default mails are "authored,
+# compiled, discovered, tested and shipped exactly like consumer templates" holds
+# for every verb except *discovered*, and cannot hold for that one while a stock
+# view renders them. The dogfooding intent is intact: they use the same kit, the
+# same build, the same staleness gate and the same golden tests.
+#
+# ``get_username`` is the third restyled default mail, and it IS registered --
+# the exception to the paragraph above. Stock Plone has no template for that mail
+# at all: it is a hardcoded plaintext string in ``login_help.py``, so there was
+# nothing for z3c.jbot to key on and this package overrides the *view* instead
+# (``browser/login_help.py``). Owning the view is what buys the flat dialect back:
+# it renders through ``render()``, so unlike its two siblings it is genuinely
+# discovered, golden-tested and previewable.
 #
 # ``notification`` is the template that exercises the ordinary consumer flow --
 # flat dialect, discovered, rendered through ``render()``.
@@ -49,6 +58,16 @@ emailkit = {
             "preheader": _(
                 "email_preheader_notification",
                 default="You have a new notification.",
+            ),
+        },
+        "get_username": {
+            "subject": _(
+                "email_subject_get_username",
+                default="Your username",
+            ),
+            "preheader": _(
+                "email_preheader_get_username",
+                default="Here is the username you asked for.",
             ),
         },
     },

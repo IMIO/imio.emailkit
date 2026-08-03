@@ -1,0 +1,14 @@
+<tal:body
+  ><span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_get_username_greeting">Dear <span i18n:name="fullname" tal:omit-tag="" tal:content="fullname">Name</span>,</span>
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_get_username_lead">You asked to be reminded of your username for <span i18n:name="site_name" tal:omit-tag="" tal:content="site_name">the site</span>.</span>
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_get_username_label">Your username</span> : <span tal:omit-tag="" tal:content="login" />
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_get_username_cta">Log in</span> : <span tal:omit-tag="" tal:content="login_url" />
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_get_username_tracking">If you did not ask for this, simply ignore this message. The request came from the IP address <span i18n:name="ipaddress" tal:omit-tag="" tal:content="client_addr">0.0.0.0</span>.</span>
+
+--
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_footer_default">This message was sent automatically. Please do not reply to it.</span>
+</tal:body>

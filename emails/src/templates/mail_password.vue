@@ -107,10 +107,32 @@ Precedence: bulk
           <p i18n:translate="email_mail_password_tracking" class="m-0 text-sm leading-6 text-imio-black">
             If you did not ask for this, simply ignore this message: your password has not
             been changed. The request came from the IP address
+            <!--
+              `request/getClientAddr`, NOT stock Plone's
+              `request/HTTP_X_FORWARDED_FOR | request/REMOTE_ADDR`.
+
+              That expression renders EMPTY whenever no `X-Forwarded-For` header is
+              present, and stock Plone has the bug too
+              (`Products/CMFPlone/browser/login/templates/mail_password_template.pt`).
+              Two behaviours combine: `HTTPRequest.get()` special-cases CGI and
+              `HTTP_` keys and returns `''` for a missing one instead of raising
+              (`ZPublisher/HTTPRequest.py`), while `ZopePathExpr._eval` falls through
+              a `|` chain only on a traversal *exception*, never on a falsy result
+              (`Products/PageTemplates/Expressions.py`). So the first subexpression
+              succeeds with `''` and `REMOTE_ADDR` is dead code.
+
+              `getClientAddr` is Zope's supported accessor and resolves the proxy
+              chain itself, but only for proxies declared as `trusted-proxy` in
+              zope.conf, since `HTTPRequest.trusted_proxies` defaults to empty. That
+              is a deployment requirement, documented in the README. Reading the raw
+              header instead would work with no configuration at all and was
+              rejected: `X-Forwarded-For` is client-settable, so the sender could
+              choose which IP this mail names.
+            -->
             <span
               i18n:name="ipaddress"
               tal:omit-tag=""
-              tal:define="host request/HTTP_X_FORWARDED_FOR | request/REMOTE_ADDR"
+              tal:define="host request/getClientAddr"
               tal:content="host"
             >0.0.0.0</span>.
           </p>

@@ -78,8 +78,17 @@ DEFAULT_MAIL_TEMPLATES = (MAIL_PASSWORD, REGISTERED_NOTIFY)
 #: Templates that go through ``render()`` -- the flat-context dialect §3 teaches
 #: and the one every consumer addon will use. Driven off discovery in the tests
 #: that can; this tuple is for parametrisation, which needs values at import time.
+#: ``get_username`` is here and **not** in :data:`DEFAULT_MAIL_TEMPLATES` above,
+#: even though it too restyles a stock Plone mail. Stock Plone has no template for
+#: it (it is a hardcoded plaintext string in ``login_help.py``), so jbot cannot
+#: reach it, so this package overrides the *view* -- and owning the view means the
+#: template speaks the flat dialect and really is ``render()``-able. Adding it to
+#: ``DEFAULT_MAIL_TEMPLATES`` instead would trip
+#: ``test_the_default_mails_are_not_registered_for_discovery``, which exists to
+#: protect the other two and should keep doing exactly that.
 NOTIFICATION = "notification"
-RENDERABLE_TEMPLATES = (NOTIFICATION,)
+GET_USERNAME = "get_username"
+RENDERABLE_TEMPLATES = (NOTIFICATION, GET_USERNAME)
 
 
 def qualified(name):
