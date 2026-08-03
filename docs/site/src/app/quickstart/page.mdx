@@ -1,0 +1,96 @@
+export const metadata = {
+  title: 'Quickstart',
+  description:
+    'Install imio.emailkit, see the restyled Plone mails, then send your first styled mail from your own code.',
+}
+
+# Quickstart
+
+Two things happen when you install `imio.emailkit`: Plone's stock transactional mails start looking like they were designed, and you get an API for sending your own. This page covers both, in that order, because the first one needs no code from you at all. {{ className: 'lead' }}
+
+## Install the add-on
+
+```shell
+pip install imio.emailkit
+```
+
+Then install it in Site Setup, or apply the `imio.emailkit:default` GenericSetup profile.
+
+<Note>
+  Nothing here needs Node.js. Node compiles templates on a developer machine or
+  in CI; the released egg carries the compiled output. See
+  [Architecture](/architecture).
+</Note>
+
+## Check that it worked
+
+Trigger a password reset for any user. The mail that arrives is the kit's, not Plone's: an iMio header, a real call-to-action button, an inlined stylesheet and a hidden preheader line.
+
+To look at every template at once, `@@emailkit-preview` renders all of them against their committed fixtures, with a language switcher and a send-test button. See [Preview & send-test](/authoring/preview).
+
+## Send a mail from your own code
+
+The `Email` builder is the normal path. It resolves recipients, groups them by language, renders once per language, and hands each message to `MailHost` inside the current transaction.
+
+```python
+from imio.emailkit import Email
+
+Email("imio.emailkit:notification").to(member).to("greffe@commune.be").with_context(
+    title="Budget 2026",
+    intro="The item you follow has changed state.",
+    cta_url=item.absolute_url(),
+).send()
+```
+
+That is a complete send. There is no message assembly to write, no `From` header to set, and no `MailHost` call to make.
+
+<Note>
+  `imio.emailkit:notification` is the worked example the package ships. Use it
+  to get an end-to-end send working before you author a template of your own.
+</Note>
+
+## What just happened
+
+<Properties>
+  <Property name="Subject">
+    Taken from the template's registration as an i18n msgid and translated per
+    language group — not passed by you. `.subject()` overrides it when you need
+    to.
+  </Property>
+  <Property name="Recipients">
+    `member` and the literal address were both adapted to `IEmailRecipient`. An
+    unresolvable recipient raises `RecipientError` at `.send()`, never a silent
+    drop.
+  </Property>
+  <Property name="Language">
+    One message per distinct recipient language. An FR member and an NL member
+    get two different mails from this one call.
+  </Property>
+  <Property name="Delivery">
+    Queued through `IMailHost`. If the transaction aborts, nothing is sent.
+  </Property>
+</Properties>
+
+## If you only need the HTML
+
+`render()` is the layer underneath, and it is a pure function — no recipients, no sending, nothing but the template, your context and the registry:
+
+```python
+from imio.emailkit import render
+
+html, text = render(
+    "imio.emailkit:notification",
+    context={"title": title, "intro": intro, "cta_url": url},
+    language="fr",
+)
+```
+
+Use it for previews, tests, or when something other than `MailHost` will deliver the result.
+
+## Where to go next
+
+- **[Architecture](/architecture)** — the build-time / runtime seam, and why it is shaped that way.
+- **[Installation & profiles](/installation)** — `:base` versus `:default`, and how to opt out.
+- **[Email builder](/api/email)** — every method, and what `.send()` guarantees.
+- **[Shipping templates](/integration/shipping-templates)** — get your own add-on's templates discovered.
+- **[Migrating a mail](/integration/migrating)** — you already build HTML bodies and want the shell around them.

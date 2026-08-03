@@ -1,0 +1,90 @@
+export const metadata = {
+  title: 'Installation & profiles',
+  description:
+    'The two GenericSetup profiles, what each one installs, and how to keep Plone default mails untouched.',
+}
+
+# Installation & profiles
+
+`imio.emailkit` ships two profiles. One gives you the API; the other gives you the API _and_ restyles Plone's own transactional mails. Almost everybody wants the second one. {{ className: 'lead' }}
+
+## Install
+
+```shell
+pip install imio.emailkit
+```
+
+Then install the add-on in Site Setup, or apply the profile directly.
+
+## The two profiles
+
+| Profile                 | Installs                                             | Use it when                                    |
+| ----------------------- | ---------------------------------------------------- | ---------------------------------------------- |
+| `imio.emailkit:default` | the runtime **and** the restyled Plone default mails | almost always                                  |
+| `imio.emailkit:base`    | the runtime only; stock Plone mails are untouched    | you want the API without the restyled defaults |
+
+`:default` extends `:base`, so installing it gives you both.
+
+<Note>
+  On a `:base`-only site, Site Setup lists `imio.emailkit` as *available* rather
+  than *installed*. Plone's quick-installer answers "has the `default` profile
+  been applied?", not "is this add-on working?" — the add-on is installed and
+  its API works. Check `imio.emailkit:base` in `portal_setup` if you need
+  certainty.
+</Note>
+
+## What `:base` installs
+
+- The three theme records under the `imio.emailkit.theme` prefix, built from `IEmailkitTheme` and seeded with that interface's own field defaults.
+
+The runtime itself — `render()`, the `Email` builder, template discovery — needs no profile at all. It is available as soon as the egg is importable. The profile exists for the parts that are site state.
+
+## What `:default` adds
+
+- The `IEmailkitLayer` browser layer, which carries the `z3c.jbot` overrides of Plone's password-reset and registration mail templates **and** the overridden login-help view behind the username-reminder mail.
+- The **Send styled email** content-rule action. See [Content-rule action](/integration/content-rules).
+
+Registering the layer is the whole mechanism: both the jbot directory and the login-help view are bound to `IEmailkitLayer`, so neither takes effect on a site where that layer is not installed. Uninstalling removes the layer and Plone's stock mails come back.
+
+## Behind a reverse proxy
+
+Two of the restyled login-help mails — password reset and username reminder — tell the recipient which IP address the request came from. That value comes from Zope's `request.getClientAddr()`, which honours `X-Forwarded-For` **only** for proxies you have declared:
+
+```
+# zope.conf
+trusted-proxy 127.0.0.1
+```
+
+Without it, `HTTPRequest.trusted_proxies` is empty and Zope reports the proxy's own address — so the mail says `127.0.0.1` instead of the real client. That is Zope behaving correctly, not a bug in this add-on.
+
+<Note>
+  Reading `X-Forwarded-For` directly would need no configuration, and is deliberately
+  **not** what these templates do: the header is client-settable, so anyone triggering a
+  password reset could choose which IP address the mail names.
+</Note>
+
+## Opting out
+
+Install `imio.emailkit:base` instead of `:default`. You keep the API, the discovery and the kit; Plone's own mails are left exactly as they were.
+
+```shell
+PROFILE=base make create-site
+```
+
+That is the third of the three override levels. The other two — replacing markup per site, and adjusting branding only — are on [Overrides & theming](/integration/overrides).
+
+## Requirements
+
+<Properties>
+  <Property name="Plone" type="6.0, 6.1, 6.2">
+    Classic UI only. There is no Volto component and no REST endpoint, because
+    these are emails.
+  </Property>
+  <Property name="Python" type="3.10 – 3.13">
+    No Python-2 support and none planned.
+  </Property>
+  <Property name="Node.js" type="22+, developers only">
+    Needed to *build* templates. Never needed to install, test or run the
+    add-on.
+  </Property>
+</Properties>

@@ -1,0 +1,148 @@
+export const metadata = {
+  title: 'Shipping templates',
+  description:
+    'Declare one entry point and your own add-on’s templates become discoverable, previewable, testable and sendable.',
+}
+
+# Shipping templates from your add-on
+
+One entry point pointing at one dict. That is the whole registration mechanism — `imio.emailkit` uses exactly the same one for its own templates, so it is its own first consumer. {{ className: 'lead' }}
+
+## Declare the entry point
+
+```python
+entry_points = {
+    "imio.emailkit.templates": [
+        "imio.pm.notifications = imio.pm.notifications:emailkit",
+    ],
+}
+```
+
+## Point it at a dict
+
+```python
+# imio/pm/notifications/__init__.py
+emailkit = {
+    "directory": "templates",          # relative to the package
+    "templates": {
+        "item_published": {
+            "subject": _("email_subject_item_published"),
+            "preheader": _("email_preheader_item_published"),  # optional
+        },
+        "meeting_convocation": {
+            "subject": _("email_subject_meeting_convocation"),
+        },
+    },
+}
+```
+
+<Properties>
+  <Property name="directory" type="str, default 'templates'">
+    Where the compiled `.pt` files live, relative to your package.
+  </Property>
+  <Property name="subject" type="i18n msgid">
+    Lives **in the registration**, translated per recipient language at send
+    time. There is no metadata sidecar and no front-matter round-trip.
+  </Property>
+  <Property name="preheader" type="i18n msgid, optional">
+    The hidden inbox-preview line next to the subject — the highest-visibility
+    email feature everyone forgets, and every inbox shows it. Omitted, the div
+    collapses to nothing.
+  </Property>
+</Properties>
+
+Names are namespaced at lookup: `imio.pm.notifications:item_published`. An unknown name raises `TemplateNotFound` carrying the list of names that _are_ registered.
+
+The entry-point group is scanned once at start-up and cached.
+
+## Lay the package out
+
+```
+src/imio/pm/notifications/
+├── emails/                      # Maizzle project — dev-only, excluded from sdist
+│   ├── package.json
+│   ├── maizzle.config.js        # extends the kit base config
+│   └── src/templates/
+│       ├── item_published.vue
+│       └── meeting_convocation.vue
+├── templates/                   # ✅ committed build output
+│   ├── item_published.pt
+│   ├── item_published.txt.pt    # hand-authored plaintext twin
+│   ├── meeting_convocation.pt
+│   └── meeting_convocation.txt.pt
+└── tests/
+    ├── fixtures/item_published.py
+    └── golden/item_published.fr.html
+```
+
+In `MANIFEST.in`:
+
+```
+recursive-include src/imio/pm/notifications/templates *.pt
+prune src/imio/pm/notifications/emails
+```
+
+The `emails/` sources are dev-only; the compiled `.pt` files are what ship.
+
+## Wire up the buildout
+
+```ini
+[buildout]
+parts = ... emails
+
+[emails]
+recipe = imio.recipe.emailkit
+eggs = ${instance:eggs}
+# compile-on-install = false   (default)
+# kit-mode = path | copy       (default: path)
+# node-bin = node
+```
+
+The recipe resolves the part's eggs, collects every distribution exposing the `imio.emailkit.templates` entry point, resolves the design kit from the `imio.emailkit` egg, and generates three scripts:
+
+<Properties>
+  <Property name="bin/compile-emails [--package NAME] [--watch] [--new NAME]">
+    Wire the kit, `npm ci` if `node_modules` is stale against the lockfile, run
+    Maizzle, rename `*.html` to `*.pt`, move into `templates/`. `--new NAME`
+    scaffolds the four files a template needs — a `.vue` skeleton, a fixture, a
+    golden placeholder and a registration stub to paste.
+  </Property>
+  <Property name="bin/check-emails [--package NAME]">
+    The staleness gate plus the authoring lint. **This is the CI gate.**
+  </Property>
+  <Property name="bin/preview-emails [--package NAME]">
+    Watch the `.vue` sources, compile, render through `render()` with the
+    committed fixtures, serve with live reload and a language switcher.
+  </Property>
+</Properties>
+
+<Note>
+  The recipe **does not compile during buildout** by default, and must not.
+  Compiling at buildout time would make Node a production dependency across
+  roughly 350 applications and couple deployments to npm availability. With the
+  default, the recipe imports nothing that knows Node exists and runs no
+  subprocess.
+</Note>
+
+## The CI contract
+
+Two gates, for every add-on that ships templates:
+
+1. `bin/check-emails --package <self>` — the build output is not stale, and the sources pass the lint.
+2. Golden-file tests — runtime rendering is intact.
+
+## What each template needs
+
+- `<name>.pt` — the compiled output, committed.
+- `<name>.txt.pt` — the hand-authored plaintext twin, where plaintext quality matters. Without it, `render()` falls back to naive extraction and logs a deprecation.
+- `tests/fixtures/<name>.py` — a `CONTEXT` dict.
+- `tests/golden/<name>.<lang>.html` and `.txt` — the snapshots.
+
+`bin/compile-emails --new <name>` scaffolds all four. Templates have a rigid shape; making the right structure the path of least resistance beats documenting it.
+
+## Related
+
+- **[Authoring rules](/authoring/rules)** — read this before writing your first `.vue`.
+- **[The design kit](/authoring/kit)** — the layout and components you compose.
+- **[Testing](/authoring/testing)** — fixtures, snapshots and the golden base class.
+- Source: [`imio/emailkit/discovery.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/discovery.py)

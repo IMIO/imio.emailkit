@@ -1,0 +1,85 @@
+export const metadata = {
+  title: 'Architecture',
+  description:
+    'Two-stage templating with a build-time seam: Maizzle compiles Vue SFC to email-safe HTML, Chameleon renders the committed output at runtime.',
+}
+
+# Architecture
+
+`imio.emailkit` is two pipelines with one seam between them. Maizzle turns Vue single-file components into email-safe HTML on a developer machine; Chameleon renders that committed HTML with real data in production. The seam is a directory of `.pt` files in git. {{ className: 'lead' }}
+
+## The two stages
+
+```
+┌────────── dev machine / CI (Node) ─────────┐   ┌──── production (Python only) ────┐
+│                                            │   │                                  │
+│  .vue templates ──► Maizzle 6 ──► .pt ─────┼──►│  render(context) ──► HTML + text │
+│  (kit: layout,      (Tailwind,      │      │   │        │                         │
+│   components)        inline CSS)  committed│   │        ▼                         │
+│                                    to git  │   │  Email ──► IMailHost (queued)    │
+└────────────────────────────────────────────┘   └──────────────────────────────────┘
+```
+
+**Stage 1, build time, Node.** Maizzle compiles Vue SFC plus Tailwind into email-safe HTML: CSS inlined, Outlook fallbacks emitted, unused utilities purged. Chameleon syntax passes through untouched, because Vue owns `{{ }}` and Chameleon owns `${...}` and `tal:` — there is no delimiter conflict. The output is renamed to `.pt` and **committed**.
+
+**Stage 2, runtime, Python.** Chameleon renders the compiled `.pt` with real data. That is what buys `i18n:translate`, `tal:repeat`, `metal:` macros and `z3c.jbot` overrides for free — none of which the Node stage would have given us.
+
+## Why the seam is in git
+
+The alternative is compiling at deploy time, which would make Node a production dependency across roughly 350 applications and couple every deployment to npm availability. It is explicitly rejected. The buildout recipe can do it — `compile-on-install = true` — but never by default.
+
+The consequence you have to live with is **staleness**: a `.vue` source and its committed `.pt` can disagree. That is what `make check-emails` exists for, and it is a CI gate. See [Testing](/authoring/testing).
+
+## Why the design kit lives in the egg
+
+The kit — one canonical layout, three components, the Tailwind preset, the Maizzle base config — ships inside the Python package, at `imio/emailkit/kit/`.
+
+One artifact, one version pin. The buildout already pins `imio.emailkit`; that same pin governs the design system every consumer compiles against. No npm registry, no git-tag npm dependencies, and no way for the runtime and the kit to drift apart.
+
+A standalone `@imio/emailkit` npm package is the extraction target if the kit ever needs to live outside this ecosystem. It is deliberately not built now.
+
+## Two findings that shape the runtime
+
+These are not stylistic choices. Both were measured, and both fail _silently_ if you get them wrong.
+
+<Note>
+  Templates load through `Products.PageTemplates.PageTemplateFile`, never
+  through bare `chameleon.PageTemplateFile`. Bare Chameleon has no TAL path
+  expressions — `${member/fullname}` raises `NameError` — and `z3c.jbot`
+  patches only the Zope classes, so overridability depends on this class
+  specifically.
+</Note>
+
+<Note>
+  Without the `IPageTemplateEngine` utility, `zope.pagetemplate` falls back to
+  `zope.tal`, where `${...}` passes through **verbatim and raises nothing** while
+  `tal:repeat` still works. Any test over rendering must assert on substituted
+  *values*, never on marker strings — otherwise it stays green while raw
+  placeholders ship.
+</Note>
+
+## The artifacts
+
+<Properties>
+  <Property name="imio.emailkit" type="PyPI egg">
+    The runtime: `render()`, `render_shell()`, the `Email` builder, entry-point
+    discovery. Plus the built-in design kit, the restyled Plone default mails
+    and the content-rule action.
+  </Property>
+  <Property name="imio.recipe.emailkit" type="PyPI egg">
+    The buildout recipe that generates `bin/compile-emails`, `bin/check-emails`
+    and `bin/preview-emails` for every add-on in the buildout that ships
+    templates.
+  </Property>
+</Properties>
+
+## What is out of scope
+
+Deliberately, and permanently unless the reasoning changes:
+
+- **Through-the-web template editing.** Templates are dev-owned and versioned in git.
+- **Re-skinning arbitrary outgoing MIME.** No `MailHost` monkey-patching: it breaks on the first calendar invite or signed message, and it is undebuggable.
+- **Scheduling, digests, retry policies, campaigns.** These may be built _on top of_ this package; they are not in it.
+- **Third-party form mailers** such as easyform.
+
+Full reasoning for every decision on this page, including the ones that were tried and reverted, is in [`docs/DECISIONS.md`](https://github.com/IMIO/imio.emailkit/blob/main/docs/DECISIONS.md) and [`SPEC.md`](https://github.com/IMIO/imio.emailkit/blob/main/SPEC.md).

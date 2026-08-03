@@ -1,0 +1,74 @@
+export const metadata = {
+  title: 'Migrating a mail',
+  description:
+    'Two routes to get the styled shell around an HTML body you already build, neither of which adds any API.',
+}
+
+# Migrating a mail you already send
+
+If your add-on already builds an HTML body — a notification assembled by string concatenation, say — you do not have to re-author it as a kit template to get the styled shell. There are two routes, and **neither adds any API**. {{ className: 'lead' }}
+
+## Route 1 — you already own your sending code
+
+```python
+from imio.emailkit import render_shell
+
+html, text = render_shell("Point 'Budget 2026' : état modifié", legacy_body_html)
+```
+
+`render_shell` drops `legacy_body_html` into the kit shell's `body_html` slot and returns the same `(html, text)` pair `render()` does. The shell contributes the whole document: inlined CSS, accessibility defaults, `lang`, the header and footer, the theme tokens and dark mode.
+
+Your body goes in **byte-for-byte** — nothing is sanitised, reformatted or rewritten.
+
+<Note>
+  `${...}` inside the body is emitted **literally**. It is not re-parsed as a template, so a
+  body assembled by string concatenation cannot accidentally — or deliberately — read the
+  render namespace. That is verified, not assumed.
+</Note>
+
+## Route 2 — you want the `Email` builder (usually better)
+
+```python
+from imio.emailkit import Email
+
+Email("imio.emailkit:notification").to(member).with_context(
+    title=subject, body_html=legacy_body_html
+).send()
+```
+
+The kit layout defines the `body_html` slot for **every** template, not just the shell, so the builder can carry a legacy body too.
+
+Prefer this when you can. You get per-language sending, recipient adapters, attachments and transaction-safe delivery, and you keep the registration's subject, its preheader and its hand-authored plaintext twin — none of which `render_shell` has.
+
+<Note>
+  `Email("imio.emailkit:shell")` does **not** work. The shell is resolved by
+  path and deliberately not registered for discovery, so it has no name to look
+  up. Use one of the two routes above.
+</Note>
+
+## What you do not change
+
+Your existing markup, your existing data-gathering code, and your existing recipient logic if you take route 1. The shell wraps; it does not redesign.
+
+## One thing to check in your legacy body
+
+<Note>
+  If your body carries its own `<style>` block, **most clients will drop it.** The block ends
+  up inside the document `<body>`, which is invalid placement, and Gmail and Outlook.com
+  strip it. Inline styles in the body are fine and survive untouched; a `<style>` block is
+  not. Move anything load-bearing to inline `style="…"` attributes, or author the template
+  properly and use the kit.
+</Note>
+
+Everything else about a legacy body survives: inline styles, `bgcolor`, nested tables, `cellpadding`, entities, unclosed tags, even a whole pasted `<html>` document. None of it raises — but a pasted full document does produce a nested `<html>`/`<body>`, which is invalid HTML that clients tolerate rather than something to rely on.
+
+## When to stop migrating and author properly
+
+The shell buys you the frame. It cannot give you a real call-to-action button, a data table with screen-reader structure, a preheader, a decent plaintext twin, or per-language body copy — all of which are template-level features.
+
+So: use `render_shell` to get every mail looking right this quarter, and author the ones that matter as kit templates when you next touch them. See [Shipping templates](/integration/shipping-templates).
+
+## Related
+
+- **[render_shell()](/api/render-shell)** — the same material as an API entry, with the plaintext and preheader details.
+- **[Email builder](/api/email)** — route 2 in full.

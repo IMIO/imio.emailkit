@@ -1,0 +1,88 @@
+export const metadata = {
+  title: 'Translations',
+  description:
+    'French, Dutch and German, with subjects translated per recipient language — and the one i18n failure that looks exactly like success.',
+}
+
+# Translations
+
+French, Dutch and German. Source labels are in English. Subjects live in the template registration as msgids and are translated per recipient language at send time — there is no metadata sidecar and no front-matter round-trip. {{ className: 'lead' }}
+
+```shell
+make i18n              # update the catalogs
+```
+
+## The one failure that looks like success
+
+<Note>
+  A missing `i18n:domain` makes every `i18n:translate` render its msgid's
+  **default text** — which is *indistinguishable from success*, because the
+  English default appears either way. You cannot tell by looking.
+</Note>
+
+Two things follow from that, and both are already done for you:
+
+- The kit's layout emits `i18n:domain`, so no author has to remember it.
+- The test suite asserts that FR and NL output actually **differ**. That assertion is the only thing standing between you and a site quietly sending English to every commune.
+
+## In a template
+
+```html
+<p i18n:translate="">email_intro_item_published</p>
+<img src="${theme/logo_url}" i18n:attributes="alt logo_alt" alt="iMio" />
+```
+
+Use `i18n:translate=""` with the msgid as the element's text. For attributes, `i18n:attributes`.
+
+## In a registration
+
+The subject and the optional preheader are msgids:
+
+```python
+from imio.pm.notifications import _
+
+emailkit = {
+    "directory": "templates",
+    "templates": {
+        "item_published": {
+            "subject": _("email_subject_item_published"),
+            "preheader": _("email_preheader_item_published"),
+        },
+    },
+}
+```
+
+They are translated once per language group, so an FR member and an NL member get different subject lines from one `.send()` call.
+
+## Pass msgids, not translated strings
+
+<Note>
+  `.with_context()` runs once, **before** `.send()` groups recipients by
+  language. A string you translated at that point would send one language's
+  wording to every recipient. Pass msgids and let the render translate them per
+  language group.
+</Note>
+
+This is why the content-rule action passes `cta_label` as a msgid rather than a translated string. The same trap applies to anything you pass through `.with_context()` yourself.
+
+## Language resolution
+
+`render()` translates into the language it was given, or the negotiated one. Inside `.send()`, that language comes from each recipient's own preference, and recipients without one are grouped under the **site's** default.
+
+`fr` and `fr-BE` are two distinct groups, with no normalisation: Belgian French groups thousands differently from French French, so they are genuinely two different renders.
+
+## Dates and numbers
+
+Do not format them by hand in a template. The three locale helpers are already bound to the render language:
+
+```html
+<td>${python: format_date(item.effective)}</td>
+<td>${python: format_number(amount)}</td>
+```
+
+See [`render()`](/api/render#locale-helpers) for the full list and the `fr` / `en` output of each.
+
+## Related
+
+- **[Testing](/authoring/testing)** — the FR ≠ NL assertion, and why it is not optional.
+- **[Recipients](/api/recipients)** — how each recipient's language is resolved.

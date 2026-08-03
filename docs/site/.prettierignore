@@ -1,0 +1,22 @@
+# Prettier must not touch the documentation pages.
+#
+# It corrupts them, silently and in two distinct ways:
+#
+#  1. Inline code inside a JSX element is reformatted as if it were a JS
+#     expression, so `${item/title}` in a <Note> comes back as `${item / title}` —
+#     wrong text, shipped to the reader, no error anywhere.
+#
+#  2. Code fences are reformatted by the embedded formatter. It "fixed" an
+#     `html` fence that deliberately showed an unclosed tag by closing it and
+#     relocating the explanatory comment *inside* the element, inverting what the
+#     example was demonstrating.
+#
+# Both are exactly the class of failure this package's own docs are about: a
+# successful run that quietly produces the wrong output. Prose formatting is not
+# worth it.
+src/app/**/*.mdx
+
+# Build output and vendored files.
+.next/
+out/
+package-lock.json

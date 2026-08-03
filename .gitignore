@@ -15,6 +15,10 @@ dist/
 docs/_build
 node_modules/
 
+# documentation site (docs/site) -- Next.js build output
+docs/site/.next/
+docs/site/out/
+
 # venv / buildout related
 .eggs/
 .installed.cfg

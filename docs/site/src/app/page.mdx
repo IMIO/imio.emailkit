@@ -1,0 +1,52 @@
+import { Guides } from '@/components/Guides'
+import { HeroPattern } from '@/components/HeroPattern'
+import { Resources } from '@/components/Resources'
+
+export const metadata = {
+  title: 'Introduction',
+  description:
+    'Transactional email templating for the iMio Plone ecosystem: author HTML mails with Maizzle 6, render them with Chameleon, and never run Node.js in production.',
+}
+
+<HeroPattern />
+
+# imio.emailkit
+
+Transactional email templating for the iMio Plone ecosystem. Author HTML mails with a modern toolchain — [Maizzle 6](https://maizzle.com), which is Vue SFC plus Tailwind CSS 4 — and render them at runtime with Chameleon, so that **no Node.js ever runs in production**. {{ className: 'lead' }}
+
+Installing it restyles Plone's stock password-reset, registration and username-reminder mails immediately. That is the point: the mails a citizen actually receives from a commune are the ones nobody ever gets round to designing.
+
+<div className="not-prose mt-6 mb-16 flex gap-3">
+  <Button href="/quickstart" arrow="right">
+    <>Quickstart</>
+  </Button>
+  <Button href="/architecture" variant="outline">
+    <>How it works</>
+  </Button>
+</div>
+
+## What you get {{ anchor: false }}
+
+- **Better defaults out of the box.** The `imio.emailkit:default` profile restyles Plone's password-reset, user-registration and username-reminder mails, with no extra package and no opt-in step.
+- **A two-stage pipeline with a build-time seam.** Maizzle compiles `.vue` into email-safe HTML — inlined CSS, Outlook fallbacks — and the output is committed as `.pt` and rendered by Chameleon at runtime. Node is a developer and CI tool only.
+- **A design system shipped inside the egg**, so the buildout pin that governs the runtime governs the design system too. No npm registry, no version skew.
+- **`render(name, context, language)`** returning `(html, text)`: a pure function of template, context and registry state, so previews, tests and real sends all take the same path.
+- **Locale-aware helpers** bound to the render language, so no template reinvents French date formatting.
+- **Accessibility and i18n baked into the kit**, not left to authors: `role="presentation"` on layout tables, an enforced `alt` on images, `lang` on `<html>`, and the hidden preheader line every inbox shows next to the subject.
+- **Three levels of override**, from a registry record to a full markup replacement, plus a complete opt-out.
+
+## Compatibility {{ anchor: false }}
+
+Plone 6.0, 6.1 and 6.2 on Python 3.10 to 3.13.
+
+<Note>
+  **Classic UI only, and deliberately so.** These are emails: there is no Volto
+  component and no REST endpoint to write. Rendering is isolated in
+  `imio.emailkit.render`, which has no dependency on the request.
+</Note>
+
+Building templates needs Node.js 22 or newer. Installing, testing and _running_ the add-on never does — that is the whole architecture. If you only consume the mails it ships, you will never install Node.
+
+<Resources />
+
+<Guides />

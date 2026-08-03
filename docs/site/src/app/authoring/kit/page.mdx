@@ -1,0 +1,144 @@
+export const metadata = {
+  title: 'The design kit',
+  description:
+    'The canonical shell and the three components every iMio mail is built from, shipped inside the Python egg.',
+}
+
+# The design kit
+
+One canonical layout, three components, one Tailwind preset. It ships inside the Python package at `imio/emailkit/kit/`, so the buildout pin that governs the runtime governs the design system too. {{ className: 'lead' }}
+
+```
+imio/emailkit/kit/
+├── maizzle.config.base.js   # shared build config
+├── tailwind.css             # the CSS entry, including the dark-mode block
+├── layouts/
+│   └── Main.vue             # the single canonical shell
+└── components/
+    ├── Button.vue
+    ├── Panel.vue
+    └── DataTable.vue
+```
+
+## KitMain — the shell
+
+`Main.vue` owns exactly the document: the `<html>` namespace declarations, the accessibility defaults, the preheader, the header, the footer and the content well. Anything else is a component.
+
+It provides these slots:
+
+<Properties>
+  <Property name="default">
+    Your authored markup, dropped into the white content well.
+  </Property>
+  <Property name="preheader">
+    The build-time fallback for the hidden inbox-preview line. At runtime the
+    `preheader` msgid from the template registration takes precedence.
+  </Property>
+  <Property name="body_html" type="runtime only">
+    Filled from the render context with `structure`, for a legacy body. Defined
+    for **every** template, not just the shell — which is what lets the `Email`
+    builder carry a migrated body. See [render_shell()](/api/render-shell).
+  </Property>
+</Properties>
+
+### What it does so you never have to
+
+- `role="presentation"` on every layout table.
+- `lang="${lang}"` on `<html>`, so screen readers pick the right pronunciation.
+- `i18n:domain` on the document, so no author has to remember it. A missing `i18n:domain` makes every `i18n:translate` render its msgid's default text — which is _indistinguishable from success_, because the English default appears either way.
+- The `color-scheme` and `supported-color-schemes` meta tags.
+- The hidden preheader div, collapsing to nothing when there is no preheader.
+
+### It serves two hosts
+
+Your templates render through [`render()`](/api/render), whose context is flat. Two of the three restyled Plone default mails — password reset and registration — are rendered by a _stock Plone view_ instead, whose kwargs land in `options`. TAL's `|` operator lets the shell serve both hosts without the author knowing which one is which.
+
+This is also what makes theme tokens reach the jbot-hosted default mails, which cannot see `render()`'s context at all: the chain ends at `context/@@emailkit_theme`, a view returning the three registry-backed tokens as a mapping.
+
+## KitButton
+
+The bulletproof call-to-action. A single-cell table rather than a padded `<a>`, because cell padding is the one form of padding every mail client including Outlook honours — so no MSO spacer hacks are needed.
+
+```html
+<KitButton href="${cta_url}" align="center">
+  <span i18n:translate="">email_cta_view_item</span>
+</KitButton>
+```
+
+<Properties>
+  <Property name="href" type="String, required">
+    Destination. A Chameleon placeholder is fine here — `href` is not CSS.
+  </Property>
+  <Property name="align" type="String, default 'left'">
+    Horizontal placement of the button block: `left`, `center` or `right`.
+  </Property>
+</Properties>
+
+The `primary_color` theme token rides on `bgcolor`, not on `style`. `primary_color` is defined by the shell, so this component only works inside it — which is the only place it is meant to be used.
+
+## KitPanel
+
+A tinted callout inside the shell's white content well. The shell already provides the white card, so a panel is for **emphasis, not layout**.
+
+```html
+<KitPanel tone="accent">
+  <p i18n:translate="">email_deadline_warning</p>
+</KitPanel>
+```
+
+<Properties>
+  <Property name="tone" type="String, default 'neutral'">
+    `neutral` for supporting detail, `accent` for the one thing the reader must
+    not miss.
+  </Property>
+</Properties>
+
+Two tones only. Magenta is high-signal at iMio and is used sparingly by design.
+
+`tone` is resolved at _build_ time, so the class strings are literal in the compiled output and both Tailwind's scanner and `css.purge` see them. This is not a runtime-computed class, which the [authoring rules](/authoring/rules) forbid.
+
+## KitDataTable
+
+Table chrome for tabular data — and the one table in the kit that is **not** `role="presentation"`. It holds real data, and marking a data table as presentational hides its structure from screen readers.
+
+```html
+<KitDataTable>
+  <template #head>
+    <th scope="col" i18n:translate="">col_title</th>
+    <th scope="col" i18n:translate="">col_state</th>
+  </template>
+  <tr tal:repeat="row rows">
+    <td>${row/title}</td>
+    <td>${row/state}</td>
+  </tr>
+</KitDataTable>
+```
+
+Rows are yours, not the kit's: `tal:` attributes on a kit component are forbidden, because attribute fallthrough lands them on an unpredictable root element. So the `tal:repeat` lives on your own `<tr>` inside the default slot.
+
+<Note>
+  Header cells want `scope="col"`. The kit cannot add it for you, because the
+  cells come from the slot.
+</Note>
+
+## Dark mode
+
+Currently `color-scheme` hints plus a `prefers-color-scheme` block keyed on `data-dark` attributes, which the shell places on the four surfaces it owns: the page canvas, the content well, the body copy and the footer.
+
+`data-dark` is not decoration. `css.purge` only understands `class=` and `id=`, so a class-keyed dark block is deleted silently with a successful build; an attribute selector is outside purge's model and survives untouched.
+
+## The kit is locked
+
+Consumers compose the layout and components but **do not extend the Tailwind config**. That is what keeps every iMio product's mails recognisably the same, and it is drastically simpler to maintain.
+
+The escape hatch is not a config option, it is the three theme tokens — see [Overrides & theming](/integration/overrides). If two products genuinely need different shells, a second layout in the kit is the cheap first answer.
+
+## Why it is import-free
+
+Every kit file is read from inside a Python egg, and a `site-packages` directory has no `node_modules` ancestor for Vite to walk up to. So no kit file imports anything: `defineProps` is a compiler macro, and `useConfig` and every built-in component are auto-imported by Maizzle.
+
+## Related
+
+- **[Authoring rules](/authoring/rules)** — the eight ways a template breaks with a green build.
+- **[Preview & send-test](/authoring/preview)** — the loop for actually looking at what you built.
+- Source: [`imio/emailkit/kit/`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/kit/)
