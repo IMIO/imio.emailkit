@@ -74,10 +74,11 @@ of the sidebar sub-nav.
 - **A push to `main`** additionally deploys to GitHub Pages.
 - The workflow can be run by hand from the Actions tab.
 
-### The one piece of manual setup
+### Repository setting this depends on
 
-**Settings → Pages → Source must be set to "GitHub Actions".** Without it the deploy
-job fails; there is no way to set it from a workflow.
+**Settings → Pages → Source = "GitHub Actions"** — already set. It cannot be set from a
+workflow, so if the deploy job ever starts failing with a Pages error, check that it has
+not been switched back to a branch source.
 
 ### `basePath`
 
