@@ -94,8 +94,20 @@ jobs:
       - name: Rebuild the templates
         run: |
           set -euo pipefail
-          cd emails
-          npx maizzle build
+          # `make build-emails`, NOT a bare `npx maizzle build`.
+          #
+          # `maizzle build` empties its output directory, silently, so the
+          # hand-authored `.txt.pt` plaintext twins are kept in `emails/twins/` as
+          # source and copied into the package after the build. That copy lives in
+          # `make build-emails`; a bare `maizzle build` therefore leaves every twin
+          # deleted, and the staleness check below reports those deletions as stale
+          # templates -- which is a real diff, just not the one the message names.
+          # See `emails/twins/README.md`.
+          #
+          # Calling the same target the developer calls is also the only way this
+          # gate means anything: if CI builds differently from `make`, it is
+          # comparing against something nobody produces.
+          make build-emails
 
       - name: Fail if the committed .pt files differ from a fresh build
         run: |
