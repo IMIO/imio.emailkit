@@ -33,22 +33,30 @@ QUALIFIED = support.qualified(TEMPLATE)
 
 
 @pytest.fixture
-def marked_request(http_request):
-    """``http_request`` carrying the add-on's browser layer.
+def marked_request():
+    """A **fresh** request carrying the add-on's browser layer.
 
-    Applied by hand because ``plone.browserlayer`` marks requests from an
-    ``IBeforeTraverseEvent`` subscriber and an integration test never traverses.
+    The layer is applied by hand because ``plone.browserlayer`` marks requests from
+    an ``IBeforeTraverseEvent`` subscriber and an integration test never traverses.
 
-    **This is one-way.** Marking inserts the layer into the request's interface
-    *declaration*, and ``noLongerProvides`` does not take it back out -- which
-    matters because the test layers share a single request object. Any negative
-    control that needs an unmarked request must therefore build its own rather than
-    rely on this one having been cleaned up; see
-    ``TestTheViewSwap.test_stock_wins_without_the_layer``.
+    Built here rather than taken from the layer fixture, and that matters: marking
+    inserts the layer into the request's interface *declaration*, where
+    ``noLongerProvides`` will not take it back out, and the test layers hand out a
+    shared request object. Marking that shared request leaks the layer into every
+    later test that needs an unmarked one -- which is precisely what
+    ``tests/test_optout.py``'s ``unmarked_request`` guard exists to catch, and it
+    fails as an *error in another module*, a long way from the cause.
+
+    A request built on the spot is disposable, so nothing leaks and the lookup is
+    still the real ZCA lookup.
     """
     from imio.emailkit.interfaces import IEmailkitLayer
+    from zope.interface import alsoProvides
+    from zope.publisher.browser import TestRequest
 
-    return support.mark_request(http_request, IEmailkitLayer)
+    request = TestRequest()
+    alsoProvides(request, IEmailkitLayer)
+    return request
 
 
 def os_path_of(module):
@@ -426,6 +434,21 @@ class TestReachability:
         view = LoginHelpForm(mail_portal, mail_request)
         view.request = mail_request
         return view
+
+    @pytest.fixture(autouse=True)
+    def restore_login_setting(self, mail_portal):
+        """Put ``use_email_as_login`` back, whatever the test did to it.
+
+        The layer rolls the database back between tests, so this is belt and
+        braces -- but a registry record that silently stays flipped changes which
+        mails the *rest* of the suite thinks exist, and that failure would surface
+        somewhere unrelated.
+        """
+        from plone import api
+
+        before = api.portal.get_registry_record("plone.use_email_as_login")
+        yield
+        api.portal.set_registry_record("plone.use_email_as_login", before)
 
     def _set(self, value):
         from plone import api

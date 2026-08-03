@@ -107,8 +107,8 @@ def previewed_bodies(mail_portal, mail_request, preview):
     stopped looking at it would be the worst outcome here.
     """
 
-    def bodies(language=None):
-        page = preview(language=language)
+    def bodies(language=None, **form):
+        page = preview(language=language, **form)
         sources = support.IFRAME_SRC.findall(page)
         if not sources:
             return [page]
@@ -197,7 +197,13 @@ class TestItRendersWithTheCommittedFixtures:
         nothing."""
         context = support.load_fixture(support.NOTIFICATION)
         expected = context["title"]
-        bodies = previewed_bodies(language="fr")
+        # The template is named explicitly. The preview defaults to the
+        # alphabetically first registered one, so relying on the default made this
+        # assertion depend on registration order -- it broke the moment a second
+        # template was registered whose name sorts earlier.
+        bodies = previewed_bodies(
+            language="fr", template=support.qualified(support.NOTIFICATION)
+        )
 
         assert any(expected in body for body in bodies), (
             f"no previewed body contains the committed fixture's title "

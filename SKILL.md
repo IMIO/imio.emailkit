@@ -317,7 +317,7 @@ from zope.i18nmessageid import MessageFactory
 _ = MessageFactory("my.addon")
 
 emailkit = {
-    "directory": "templates",          # relative to this package; this is the default
+    "directory": "templates",  # relative to this package; this is the default
     "templates": {
         "item_published": {
             "subject": _("email_subject_item_published", default="Item published"),
@@ -402,7 +402,7 @@ class TestEmailGoldens(GoldenTemplateTests):
 # tests/fixtures/item_published.py
 CONTEXT = {
     "title": "Séance du conseil communal du 12 août",
-    "when": "2026-08-12T19:30:00",          # ISO string; format_date coerces it
+    "when": "2026-08-12T19:30:00",  # ISO string; format_date coerces it
     "rows": [{"title": "Budget 2026", "decision": "approuvé"}],
 }
 ```
@@ -446,12 +446,11 @@ from imio.emailkit import Email, render, render_shell
 
 html, text = render("my.addon:item_published", context={"item": item}, language="fr")
 
-Email("my.addon:item_published") \
-    .to(member).to("greffe@commune.be").cc(managers) \
-    .reply_to("noreply@imio.be") \
-    .with_context(item=item) \
-    .attach(pdf, filename="convocation.pdf") \
-    .send()
+Email("my.addon:item_published").to(member).to("greffe@commune.be").cc(
+    managers
+).reply_to("noreply@imio.be").with_context(item=item).attach(
+    pdf, filename="convocation.pdf"
+).send()
 ```
 
 - The builder holds data and does not grow behaviour. Nine methods, frozen: `to`,
