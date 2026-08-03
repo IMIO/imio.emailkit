@@ -312,13 +312,14 @@ A provided test base class renders each registered template against its fixture 
 
 ### 8.1 Mechanism
 
-- `imio.emailkit` ships compiled kit-based replacements for the CMFPlone/PasswordReset mail templates (password reset, user registration/enrolment) as `z3c.jbot` overrides.
-- The jbot directory is registered **on a dedicated browser layer** (`IEmailkitLayer`) installed by the `imio.emailkit:default` GenericSetup profile.
+- `imio.emailkit` ships compiled kit-based replacements for three CMFPlone mails: **password reset**, **user registration/enrolment** and the **username reminder** from the login-help form.
+- The first two are page templates on disk and are replaced as `z3c.jbot` overrides. The **username reminder is not**: stock Plone sends it as a hardcoded plaintext string (`SEND_USERNAME_TEMPLATE` in `Products/CMFPlone/browser/login/login_help.py`), so there is no file for jbot to key on and the **`login-help` view is overridden instead**. Consequence, and it is a gain rather than a compromise: because that view is ours, the template speaks §3's flat dialect, renders through §6.1 `render()` and is genuinely discovered, previewable and golden-tested — the one restyled default mail for which §8's "exactly like consumer templates" is true of *every* verb.
+- The jbot directory **and the `login-help` view registration** are bound **to a dedicated browser layer** (`IEmailkitLayer`) installed by the `imio.emailkit:default` GenericSetup profile.
 - Subjects are re-registered as i18n msgids in the `imio.emailkit` domain (FR/NL/DE shipped).
 
 ### 8.2 Override story (three levels, most common first)
 
-1. **Replace the template markup per site/client:** register a jbot directory on a *more specific* browser layer (the site package's own layer). z3c.jbot layer precedence applies — the most specific layer wins. This is the standard iMio pattern already used elsewhere; no new mechanism.
+1. **Replace the template markup per site/client:** register a jbot directory on a *more specific* browser layer (the site package's own layer). z3c.jbot layer precedence applies — the most specific layer wins. This is the standard iMio pattern already used elsewhere; no new mechanism. (The username reminder's *markup* is overridable this way like any other template; what is layer-bound rather than jbot-bound is the `login-help` **view** that sends it.)
 2. **Adjust branding only:** theme tokens (`logo_url`, `primary_color`, `footer_html`) via `plone.app.registry` — covers the majority of per-commune needs without touching markup.
 3. **Opt out entirely:** install the `imio.emailkit:base` profile instead of `:default`. `:base` provides the runtime (API, discovery, kit) without the Plone-default overrides; stock Plone mails remain untouched. `:default` extends `:base`.
 

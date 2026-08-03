@@ -92,6 +92,26 @@ GenericSetup profile.
 > been applied?", not "is this add-on working?" — the add-on is installed and its
 > API works. Check `imio.emailkit:base` in `portal_setup` if you need certainty.
 
+### Behind a reverse proxy: declare `trusted-proxy`
+
+Two of the restyled login-help mails (password reset, username reminder) tell the
+recipient which IP address the request came from. That value comes from Zope's
+`request.getClientAddr()`, which honours `X-Forwarded-For` **only** for proxies you
+have declared:
+
+```
+# zope.conf
+trusted-proxy 127.0.0.1
+```
+
+Without it, `HTTPRequest.trusted_proxies` is empty and Zope reports the proxy's own
+address — so the mail says `127.0.0.1` instead of the real client. That is Zope
+behaving correctly, not a bug in this add-on.
+
+Reading `X-Forwarded-For` directly would need no configuration, and is deliberately
+*not* what these templates do: the header is client-settable, so anyone triggering
+a password reset could choose which IP address the mail names.
+
 ## Sending a mail
 
 ```python

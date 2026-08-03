@@ -1425,3 +1425,64 @@ apply to every contributor's assistant, not just one machine.
 **Note.** Claude Code loads the agent registry at session start, so definitions created
 mid-session are not selectable until the next session; during this session the same roles
 are run with their instructions passed inline.
+
+## 2026-08-03 — RESOLVED (§8.1 amendment): the username reminder needs a *view* override, not jbot
+
+**Context.** §8.1 said the restyled Plone default mails ship "as `z3c.jbot` overrides", and named two
+(password reset, registration). The username reminder from the login-help form was missing, and it cannot
+be added the same way.
+
+**Finding.** Stock Plone has no template for that mail. It is `SEND_USERNAME_TEMPLATE`, a module-level
+i18n string in `Products/CMFPlone/browser/login/login_help.py`, declared `text/plain`, interpolated with
+`str.format()` and handed straight to `MailHost` by `RequestUsername.send_username()`. `z3c.jbot` keys on
+a resolved filename; there is no file, so there is nothing to displace.
+
+**Decision.** Override the `login-help` browser page on `IEmailkitLayer` with a subclass whose subform is
+our own `RequestUsername`, delegating to `Email(...)`. This keeps §8.2's opt-out intact (a `:base` site
+gets stock Plone's view and stock Plone's mail) and keeps the stock mail action untouched.
+
+**Consequence, and it is a gain.** Because the view is ours, the template gets the flat dialect back: it
+renders through §6.1 `render()`, so it is registered for discovery, previewable and golden-tested. It is
+the one restyled default mail for which §8's "authored, compiled, discovered, tested and shipped exactly
+like consumer templates" is true of *every* verb. `tests/support.py` therefore lists it in
+`RENDERABLE_TEMPLATES` and deliberately **not** in `DEFAULT_MAIL_TEMPLATES`.
+
+**The one cost.** `LoginHelpForm.update` is *forked*, not extended. Stock instantiates `RequestUsername`
+by direct class reference and the mail is sent inside the subform's own `update()`, so `super().update()`
+would already have sent the plaintext mail — there is no seam. Temporarily rebinding the module global
+was rejected: Zope's publisher is threaded and two concurrent requests would race. The fork is twelve
+lines and is guarded by `test_stock_update_is_what_we_forked_from`, which pins the upstream source so a
+Plone upgrade fails loudly instead of silently un-styling the mail.
+
+**Reachability.** Plone only renders the subform when `use_email_as_login` is off. On email-as-login sites
+this mail is never sent — inert, not broken. Both registry states are covered by tests.
+
+## 2026-08-03 — Upstream bug: the origin IP in the password-reset mail renders empty
+
+Our `mail_password` template carried stock Plone's expression verbatim:
+
+```
+tal:define="host request/HTTP_X_FORWARDED_FOR|request/REMOTE_ADDR"
+```
+
+It renders **empty** whenever no `X-Forwarded-For` header is present, and stock
+`Products/CMFPlone/browser/login/templates/mail_password_template.pt` has the same defect. Two behaviours
+combine:
+
+- `HTTPRequest.get()` special-cases CGI and `HTTP_` keys and returns `''` for a missing one **instead of
+  raising** (`ZPublisher/HTTPRequest.py`);
+- `ZopePathExpr._eval` falls through a `|` chain only on a traversal **exception**, never on a falsy value
+  (`Products/PageTemplates/Expressions.py`).
+
+So the first subexpression succeeds with `''` and the `REMOTE_ADDR` fallback is dead code.
+
+**Fix.** `request/getClientAddr`, Zope's supported accessor, in both login-help mails.
+
+**Deployment requirement.** `getClientAddr` honours `X-Forwarded-For` only for proxies declared as
+`trusted-proxy` in `zope.conf`; `HTTPRequest.trusted_proxies` defaults to empty, so behind an
+undeclared nginx it reports `127.0.0.1`. Documented in the README rather than worked around. Reading the
+raw header instead needs no configuration and was **rejected**: the header is client-settable, so the
+sender could choose which IP the mail names.
+
+Pinned by `TestClientAddressSemantics` in `tests/test_get_username.py`, which asserts the Zope-level
+behaviour directly so a future Zope change surfaces there rather than as an empty line in a mail.

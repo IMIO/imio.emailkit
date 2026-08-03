@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: imio.emailkit\n"
-"POT-Creation-Date: 2026-07-29 15:41+0000\n"
+"POT-Creation-Date: 2026-08-03 12:24+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -67,14 +67,44 @@ msgstr "Consulter ce contenu"
 #. Default: "This message was sent automatically. Please do not reply to it."
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:142
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:138
-#: imio/emailkit/templates/notification.pt:98
+#: imio/emailkit/templates/get_username.pt:120
 msgid "email_footer_default"
 msgstr "Ce message a été envoyé automatiquement. Merci de ne pas y répondre."
+
+#. Default: "Log in"
+#: imio/emailkit/templates/get_username.pt:98
+#: imio/emailkit/templates/get_username.txt.pt:8
+msgid "email_get_username_cta"
+msgstr "Se connecter"
+
+#. Default: "Dear ${fullname},"
+#: imio/emailkit/templates/get_username.pt:81
+#: imio/emailkit/templates/get_username.txt.pt:2
+msgid "email_get_username_greeting"
+msgstr "Bonjour ${fullname},"
+
+#. Default: "Your username"
+#: imio/emailkit/templates/get_username.pt:90
+#: imio/emailkit/templates/get_username.txt.pt:6
+msgid "email_get_username_label"
+msgstr "Votre nom d’utilisateur"
+
+#. Default: "You asked to be reminded of your username for ${site_name}."
+#: imio/emailkit/templates/get_username.pt:85
+#: imio/emailkit/templates/get_username.txt.pt:4
+msgid "email_get_username_lead"
+msgstr "Vous avez demandé un rappel de votre nom d’utilisateur pour ${site_name}."
+
+#. Default: "If you did not ask for this, simply ignore this message. The request came from the IP address ${ipaddress}."
+#: imio/emailkit/templates/get_username.pt:107
+#: imio/emailkit/templates/get_username.txt.pt:10
+msgid "email_get_username_tracking"
+msgstr "Si vous n’êtes pas à l’origine de cette demande, ignorez simplement ce message. La demande provient de l’adresse IP ${ipaddress}."
 
 #. Default: "iMio"
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:83
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.registered_notify_template.pt:83
-#: imio/emailkit/templates/notification.pt:72
+#: imio/emailkit/templates/get_username.pt:72
 msgid "email_logo_alt"
 msgstr "iMio"
 
@@ -108,13 +138,18 @@ msgstr "Utilisez le bouton ci-dessous pour choisir un nouveau mot de passe pour 
 msgid "email_mail_password_tracking"
 msgstr "Si vous n’êtes pas à l’origine de cette demande, ignorez simplement ce message : votre mot de passe n’a pas été modifié. La demande provient de l’adresse IP ${ipaddress}."
 
+#. Default: "Here is the username you asked for."
+#: imio/emailkit/__init__.py:68
+msgid "email_preheader_get_username"
+msgstr "Voici le nom d’utilisateur que vous avez demandé."
+
 #. Default: "Follow the link to choose a new password."
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:71
 msgid "email_preheader_mail_password_template"
 msgstr "Suivez le lien pour choisir un nouveau mot de passe."
 
 #. Default: "You have a new notification."
-#: imio/emailkit/__init__.py:49
+#: imio/emailkit/__init__.py:58
 msgid "email_preheader_notification"
 msgstr "Vous avez une nouvelle notification."
 
@@ -153,13 +188,18 @@ msgstr "Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigate
 msgid "email_registered_notify_greeting"
 msgstr "Bonjour ${fullname},"
 
+#. Default: "Your username"
+#: imio/emailkit/__init__.py:64
+msgid "email_subject_get_username"
+msgstr "Votre nom d’utilisateur"
+
 #. Default: "Password reset request"
 #: imio/emailkit/browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt:3
 msgid "email_subject_mail_password_template"
 msgstr "Demande de réinitialisation de mot de passe"
 
 #. Default: "Notification"
-#: imio/emailkit/__init__.py:45
+#: imio/emailkit/__init__.py:54
 msgid "email_subject_notification"
 msgstr "Notification"
 
