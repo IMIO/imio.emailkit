@@ -1,0 +1,54 @@
+export const metadata = {
+  title: 'Content-rule action',
+  description:
+    'Send a styled mail from a Plone content rule, with no code — and the fixed set of names a rule can put in the template context.',
+}
+
+# Content-rule action
+
+Installing the `default` profile adds a content-rule action, **Send styled email**, alongside Plone's own. Plone's stock mail action is left untouched. {{ className: 'lead' }}
+
+The edit form offers every registered template — including templates from other add-ons, because the vocabulary is built from the same discovery the preview view uses — plus a list of recipients and a "send to the owner" box.
+
+## It is a thin caller of the builder
+
+The executor delegates to `Email(...)`, so everything on [Email builder](/api/email) applies unchanged: recipients are resolved through `IEmailRecipient`, one message is sent **per recipient language**, and delivery is transaction-safe — if the transaction that fired the rule aborts, nothing is sent.
+
+## What a rule can put in the template context
+
+A content rule cannot know what any given template wants, so it passes a **fixed** set of names:
+
+<Properties>
+  <Property name="item">The content object the rule fired on.</Property>
+  <Property name="title">Its title.</Property>
+  <Property name="intro">A short lead line.</Property>
+  <Property name="cta_label">The call-to-action label.</Property>
+  <Property name="cta_url">The content's URL.</Property>
+</Properties>
+
+A template that needs a name outside this set **fails loudly at render** rather than quietly producing a mail with a gap in it.
+
+If yours needs more, send it from your own code with `Email(...)` instead — the builder takes any context you like.
+
+<Note>
+  `cta_label` reaches the template as an **i18n msgid, not a translated
+  string**. `.with_context()` runs once, *before* `.send()` groups recipients by
+  language, so a string translated at that point would send one language's
+  wording to every recipient. The same trap applies to anything you pass through
+  `.with_context()` yourself.
+</Note>
+
+## Configuring one
+
+In Site Setup → Content Rules, add a rule, then add a **Send styled email** action. You choose:
+
+- **The template** — from the vocabulary of every registered name.
+- **Recipients** — addresses, userids or members, resolved exactly as `.to()` resolves them.
+- **Send to the owner** — a checkbox that adds the fired-on item's owner.
+
+## Related
+
+- **[Email builder](/api/email)** — what the executor actually calls.
+- **[Recipients](/api/recipients)** — how the configured recipients are resolved.
+- **[Installation & profiles](/installation)** — this action comes with `:default`, not `:base`.
+- Source: [`imio/emailkit/contentrules/mail.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/contentrules/mail.py) — its module docstring is the authoritative list of context names.

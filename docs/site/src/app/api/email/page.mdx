@@ -1,0 +1,113 @@
+export const metadata = {
+  title: 'Email builder',
+  description:
+    'Recipients, attachments, per-language sending and transaction-safe delivery in one chained expression.',
+}
+
+# Email builder
+
+`Email` collects the parts of one styled mail, then sends it. It is a plain data holder: each method returns `self`, and **it holds data, it does not grow behavior** — no conditionals, no scheduling, no retries. Everything that can fail, fails in one place: `.send()`. {{ className: 'lead' }}
+
+```python
+from imio.emailkit import Email
+
+Email("imio.pm.notifications:item_published").to(member).to(
+    "greffe@commune.be"
+).cc(meeting_managers).reply_to("noreply@imio.be").with_context(
+    item=item, meeting=meeting
+).attach(convocation_pdf, filename="convocation.pdf").send()
+```
+
+<Note>
+  The template is **not** looked up in the constructor. `Email("typo")` is legal
+  and silent; `TemplateNotFound` arrives from `.send()`. That is deliberate, and
+  it matches how recipients and attachments behave — one place where things
+  fail, one place to look.
+</Note>
+
+## Recipients
+
+<Properties>
+  <Property name=".to(value)">
+    Add To recipients. Accepts, in any mix: an email string, a Plone member
+    object, a userid, or an iterable of those.
+  </Property>
+  <Property name=".cc(value)">
+    Add Cc recipients. Same accepted values.
+  </Property>
+  <Property name=".bcc(value)">
+    Add Bcc recipients. The `Bcc` header is removed before the message goes out,
+    by `MailHost`, after it has collected the envelope recipients from it. Blind
+    means blind.
+  </Property>
+  <Property name=".reply_to(value)">
+    Set the `Reply-To` addresses. Same accepted values as `.to()` —
+    `.reply_to(item_author)` should not need you to dig out an address by hand.
+  </Property>
+  <Property name=".sender(value)">
+    Override the `From` address. Omitted, `From` is the site's configured
+    sender.
+  </Property>
+</Properties>
+
+How each value is resolved, and what happens when one cannot be: [Recipients](/api/recipients).
+
+## Content
+
+<Properties>
+  <Property name=".with_context(**context)">
+    Add names to the render context, exactly as [`render()`](/api/render) takes
+    them.
+  </Property>
+  <Property name=".subject(value)">
+    Override the subject; an i18n msgid or a literal string. Omitted, the
+    subject is the msgid in the template's registration, translated per language
+    group.
+  </Property>
+  <Property name=".attach(source, filename=None, mimetype=None)">
+    Add an attachment. Callable repeatedly, order preserved. Nothing is read
+    until `.send()`. See [Attachments](/api/attachments).
+  </Property>
+</Properties>
+
+<Note>
+  **Pass msgids through `.with_context()`, not translated strings.**
+  `.with_context()` runs once, *before* `.send()` groups recipients by language.
+  A string you translated at that point would send one language's wording to
+  every recipient. Pass the msgid and let the render translate it per language
+  group.
+</Note>
+
+## Sending
+
+<Properties>
+  <Property name=".send(immediate=False)">
+    Resolve, render per language group, and hand each message to `MailHost`.
+    Returns the `EmailMessage` objects it built, one per language group, in
+    group order.
+  </Property>
+</Properties>
+
+Three things happen, in this order:
+
+1. **Resolution.** Every recipient and every attachment is resolved _before_ the first render, so a mistyped userid does not surface only after half the language groups have been queued. Raises `RecipientError` or `AttachmentError`, each reporting **every** problem it found rather than the first.
+2. **Per-language render.** Recipients are grouped by resolved language; the template is rendered once per group, with the subject msgid translated accordingly. One message per group. FR and NL communes are handled with no caller effort.
+3. **Queued delivery.** Each message goes to `IMailHost` inside the current transaction.
+
+### Transaction safety
+
+Delivery is queued by default: **if the transaction that built the mail aborts, nothing is sent.** This is the behaviour you want in a content rule, an event subscriber or a form handler, and it is why there is no "did it send?" callback to write.
+
+`.send(immediate=True)` bypasses the transaction and talks to the MTA now. It is the only escape hatch here; leave it alone unless you know why you want it.
+
+### Message assembly
+
+`email.message.EmailMessage`, with `set_content(text)` followed by `add_alternative(html, subtype="html")`, correct headers and correct encoding. Nothing is hand-built by callers, ever. Attachments ride the same message and are identical across language groups.
+
+## Related
+
+- **[Recipients](/api/recipients)** — the `IEmailRecipient` adapter and language resolution.
+- **[Attachments](/api/attachments)** — every accepted source type.
+- **[Errors](/api/errors)** — what `.send()` raises and what each error carries.
+- **[Content-rule action](/integration/content-rules)** — a thin caller of this builder, usable without code.
+- Source: [`imio/emailkit/email.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/email.py)

@@ -1,0 +1,83 @@
+name: "Docs"
+
+# Deliberately separate from main.yml. The Python suite must not gate a typo fix in
+# the documentation, and a broken MDX page must not gate a release — they are
+# different artifacts with different reviewers and very different run times.
+on:
+  push:
+    paths:
+      - 'docs/site/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'docs/site/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+# GitHub Pages needs these on the deploy job. `contents: read` is the default for
+# the rest; nothing here writes to the repository.
+permissions:
+  contents: read
+
+# One deploy at a time, and never cancel one in flight: a cancelled deploy-pages run
+# can leave the Pages site pointing at a half-uploaded artifact.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: docs/site
+
+jobs:
+
+  build:
+    name: "Docs: Build"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: docs/site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build the static site
+        # The site is served from https://<owner>.github.io/<repo>/, so every asset
+        # and link needs a /<repo> prefix. Reading it from the repository name rather
+        # than hardcoding it means a fork builds correctly with no edit.
+        env:
+          NEXT_BASE_PATH: /${{ github.event.repository.name }}
+        run: npm run build
+
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/site/out
+
+  deploy:
+    name: "Docs: Deploy to GitHub Pages"
+    # Only the default branch publishes. Every other push and every pull request
+    # still runs `build` above, so a page that fails to render is caught before merge.
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

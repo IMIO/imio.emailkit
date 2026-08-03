@@ -1,0 +1,69 @@
+export const metadata = {
+  title: 'Preview & send-test',
+  description:
+    'Render committed templates with committed fixtures in a real Plone site, with a language switcher and a send-to-self button.',
+}
+
+# Preview & send-test
+
+Two ways to look at a template: a make target that serves the rendered mails locally, and a view inside a running site. Both render through [`render()`](/api/render) with the committed fixtures, so what you see is what a recipient gets. {{ className: 'lead' }}
+
+## The authoring loop
+
+```shell
+make build-emails      # compile emails/ into the package; commit the .pt files
+make check-emails      # the lint and the staleness gate CI runs
+make preview-emails    # render the committed templates with the committed fixtures
+```
+
+<Note>
+  `make preview-emails` is deliberately **not** Maizzle's `--watch`. Maizzle's
+  dev server shows *build-time* output: raw `${item/title}` and unexpanded
+  `tal:repeat` — a miserable authoring loop, and one that hides exactly the
+  class of bug the [authoring rules](/authoring/rules) are about. This target
+  pipes the build through Chameleon first.
+</Note>
+
+## `@@emailkit-preview`
+
+Manager-only. Lists every registered template, renders each one in an iframe against its committed fixture, with a language switcher and a theme-token panel.
+
+It is two views rather than one:
+
+<Properties>
+  <Property name="@@emailkit-preview">
+    The chrome — the template list, the language switcher, the theme-token panel and the
+    send-test form.
+  </Property>
+  <Property name="@@emailkit-preview-body">
+    The rendered mail and nothing else, loaded by the chrome in an `<iframe>`.
+  </Property>
+</Properties>
+
+**Why two.** A transactional email carries a full stylesheet written for mail clients — `body { }` rules, table resets, `!important` utilities. Inlining that markup into the chrome would let it restyle the Plone UI and let the Plone UI flatter it, so the one thing this view exists to show would be the one thing it shows wrongly. An iframe is the boring browser-level answer and costs one extra registration.
+
+## Send test
+
+A button that mails the currently previewed template, fixture and language to the logged-in user's own address.
+
+**Browser previews lie, Outlook doesn't.** This is the only way to find out what a client actually does with your markup, and it closes the loop for the cost of one form.
+
+## Where fixtures come from
+
+`tests/fixtures/<name>.py`, inside the _checkout_ of whichever add-on ships the template — not inside the installed package. `tests/` is not shipped, and must not be: it is not importable from a released egg.
+
+So the fixture is resolved by walking up from the template directory to find the checkout. **Its absence is reported as a plain fact rather than an error**: an egg installed without its source tree is the normal production case, and the preview simply has nothing to show for that template there.
+
+## Which Plone default mails show up here
+
+Two of the three do not appear in the preview list, and cannot: **password reset** and **registration** are rendered by a stock Plone view, so they speak that view's namespace and `render()` — which supplies a flat context — can never render them. They are shipped, tested and overridable; just not discoverable.
+
+The **username reminder** does appear, as `imio.emailkit:get_username`. Stock Plone has no template for that mail at all — it is a hardcoded plaintext string — so this package overrides the *view* rather than a file, and owning the view is what buys the flat dialect back. It renders through `render()` like any consumer template.
+
+Use `imio.emailkit:notification` as the worked example of an ordinary template.
+
+## Related
+
+- **[Testing](/authoring/testing)** — the fixtures this view reads, and the golden files beside them.
+- **[Authoring rules](/authoring/rules)** — what a preview will _not_ catch for you.
+- Source: [`imio/emailkit/browser/preview.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/browser/preview.py)

@@ -1,0 +1,78 @@
+export const metadata = {
+  title: 'Errors',
+  description:
+    'Every exception imio.emailkit raises deliberately, what it carries, and where it is raised from.',
+}
+
+# Errors
+
+Every error here is raised deliberately, and every one exists to replace a silent failure that happened at least once. The shape of the hierarchy follows one rule: **fail loud, never drop.** {{ className: 'lead' }}
+
+```python
+from imio.emailkit.interfaces import (
+    AttachmentError,
+    EmailkitError,
+    RecipientError,
+    TemplateNotFound,
+)
+```
+
+## The hierarchy
+
+<Properties>
+  <Property name="EmailkitError" type="Exception">
+    Base class of every error this package raises deliberately. Catch this if
+    you want all of them and nothing else.
+  </Property>
+  <Property name="TemplateNotFound" type="EmailkitError">
+    No template is registered under the requested name. **Carries the list of
+    names that are registered** — the mistake is nearly always a typo or a
+    forgotten entry point, and both are obvious once the list is in front of
+    you.
+  </Property>
+  <Property name="RecipientError" type="EmailkitError">
+    One or more recipients could not be resolved. Raised at `.send()`, listing
+    every one that failed and saying *why* each failed.
+  </Property>
+  <Property name="AttachmentError" type="EmailkitError">
+    One or more attachments could not be resolved — an unreadable source, or a
+    missing `filename` / `mimetype` that could not be inferred. Raised at
+    `.send()`.
+  </Property>
+</Properties>
+
+## Why they all arrive at `.send()`
+
+`RecipientError` and `AttachmentError` are raised at `.send()`, not when you called `.to()` or `.attach()`. `TemplateNotFound` likewise — `Email("typo")` is legal and silent until you send it.
+
+Two reasons, and both are deliberate:
+
+1. **One place where things fail, one place to look.** The builder holds data; it does not validate incrementally.
+2. **Every problem, not the first one.** A caller who mistyped three userids should learn about three, not fix one and run again. So resolution collects problems and raises once.
+
+Resolution also happens **before the first render**, so a mistyped userid does not surface only after half the language groups have already been queued.
+
+## What is not an error
+
+<Properties>
+  <Property name="A missing plaintext twin">
+    `render()` falls back to a naive text extraction of the HTML and **logs a
+    deprecation**. The mail still sends. See [render()](/api/render).
+  </Property>
+  <Property name="An unset theme record">
+    A missing registry, a missing record and `None` all collapse to the empty
+    string. A token is interpolated straight into markup, and the string
+    `"None"` in a mail is worse than nothing.
+  </Property>
+  <Property name="A missing fixture in the preview view">
+    Reported as a plain fact rather than an error. An egg installed without its
+    source tree is the normal production case, and the preview simply has
+    nothing to show for that template there.
+  </Property>
+</Properties>
+
+## Related
+
+- **[Recipients](/api/recipients)** — what resolves and what is refused.
+- **[Attachments](/api/attachments)** — metadata precedence and required arguments.
+- Source: [`imio/emailkit/interfaces.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/interfaces.py)

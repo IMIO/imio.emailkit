@@ -62,7 +62,7 @@ jobs:
             docs:
               - '.readthedocs.yaml'
               - 'docs/**'
-              - '.github/workflows/docs.yaml'
+              - '.github/workflows/docs.yml'
             emails:
               - 'emails/**'
               - 'src/imio/emailkit/kit/**'

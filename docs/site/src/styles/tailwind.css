@@ -1,0 +1,101 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+@config '../../typography.js';
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* The iMio brand faces, loaded and self-hosted by `next/font` in
+     `src/app/layout.jsx`. Quicksand is the display face for every heading;
+     Nunito is the open stand-in the brand uses for the licensed Avenir LT Std.
+     Both fall through to the Tailwind default stack if the font fails to load. */
+  --font-sans:
+    var(--font-nunito), ui-sans-serif, system-ui, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+  --font-display:
+    var(--font-quicksand), var(--font-sans);
+
+  /* The iMio brand accent. Every accent in this site resolves here, so
+     rebranding is a one-block edit: components reference `accent-*`, never a
+     literal colour. 500 is the official magenta (#E6007E) and 700 the official
+     dark magenta (#B3004B); 200 is the official soft pink. The remaining stops
+     are interpolated to give the scale Tailwind's usual light/dark headroom.
+
+     Note that 500 sits at ~4.5:1 on white — right at the AA threshold. Prose
+     link text uses 600 in light mode for margin; 500 and above are for marks,
+     icons and rules rather than small text. */
+  --color-accent-50: #fff0f8;
+  --color-accent-100: #ffe1f1;
+  --color-accent-200: #ffadd9;
+  --color-accent-300: #ff7bc0;
+  --color-accent-400: #fa3f9f;
+  --color-accent-500: #e6007e;
+  --color-accent-600: #cc0070;
+  --color-accent-700: #b3004b;
+  --color-accent-800: #8e0040;
+  --color-accent-900: #6b0031;
+  --color-accent-950: #40001d;
+
+  --text-2xs: 0.75rem;
+  --text-2xs--line-height: 1.25rem;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5rem;
+  --text-sm: 0.875rem;
+  --text-sm--line-height: 1.5rem;
+  --text-base: 1rem;
+  --text-base--line-height: 1.75rem;
+  --text-lg: 1.125rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.25rem;
+  --text-xl--line-height: 1.75rem;
+  --text-2xl: 1.5rem;
+  --text-2xl--line-height: 2rem;
+  --text-3xl: 1.875rem;
+  --text-3xl--line-height: 2.25rem;
+  --text-4xl: 2.25rem;
+  --text-4xl--line-height: 2.5rem;
+  --text-5xl: 3rem;
+  --text-5xl--line-height: 1;
+  --text-6xl: 3.75rem;
+  --text-6xl--line-height: 1;
+  --text-7xl: 4.5rem;
+  --text-7xl--line-height: 1;
+  --text-8xl: 6rem;
+  --text-8xl--line-height: 1;
+  --text-9xl: 8rem;
+  --text-9xl--line-height: 1;
+
+  --shadow-glow: 0 0 4px rgb(0 0 0 / 0.1);
+
+  --container-lg: 33rem;
+  --container-2xl: 40rem;
+  --container-3xl: 50rem;
+  --container-5xl: 66rem;
+}
+
+@layer base {
+  /* Quicksand on headings, brand-wide. Set here rather than per-component so
+     that MDX headings — which nobody hand-writes a class onto — pick it up too.
+     `prose` styles size and colour, never family, so nothing overrides this. */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+  }
+
+  :root {
+    --shiki-color-text: var(--color-white);
+    --shiki-token-constant: var(--color-emerald-300);
+    --shiki-token-string: var(--color-emerald-300);
+    --shiki-token-comment: var(--color-zinc-500);
+    --shiki-token-keyword: var(--color-sky-300);
+    --shiki-token-parameter: var(--color-pink-300);
+    --shiki-token-function: var(--color-violet-300);
+    --shiki-token-string-expression: var(--color-emerald-300);
+    --shiki-token-punctuation: var(--color-zinc-200);
+  }
+
+  [inert] ::-webkit-scrollbar {
+    display: none;
+  }
+}

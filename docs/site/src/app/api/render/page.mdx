@@ -1,0 +1,115 @@
+export const metadata = {
+  title: 'render()',
+  description:
+    'Render a registered template to an HTML part and a plaintext part. A pure function of template, context and registry state.',
+}
+
+# render()
+
+The one way a registered template becomes text. `render()` is a pure function of template, context and registry state — no request faking, no site, no database. Previews, golden-file tests and the `Email` builder all go through this same door. {{ className: 'lead' }}
+
+```python
+from imio.emailkit import render
+
+html, text = render(
+    "imio.pm.notifications:item_published",
+    context={"item": item, "meeting": meeting},
+    language="fr",
+)
+```
+
+## Signature
+
+<Properties>
+  <Property name="name" type="str">
+    The namespaced template name, e.g. `"imio.emailkit:notification"`. Raises
+    `TemplateNotFound` if nothing is registered under it — carrying the list of
+    names that *are* registered.
+  </Property>
+  <Property name="context" type="mapping, optional">
+    Injected into the template namespace as **top-level names**, so a template
+    reads `${item/title}` and not `${options/item}`.
+  </Property>
+  <Property name="language" type="str, optional">
+    The language to render in. Defaults to the negotiated language.
+  </Property>
+</Properties>
+
+Returns a `(html, text)` tuple.
+
+## What ends up in the namespace
+
+Precedence runs low to high: the registration's `preheader`, then your `context`, then the names the package injects. **The injected names win** — a caller who shadowed `theme` or `lang` would break the shell, not just their own template.
+
+<Properties>
+  <Property name="lang" type="str">
+    The render language. The kit layout emits it on `<html>`, so screen readers pick
+    the right pronunciation.
+  </Property>
+  <Property name="theme" type="mapping">
+    `logo_url`, `primary_color`, `footer_html`, read from `plone.app.registry`. A
+    missing registry, a missing record and `None` all collapse to the empty string —
+    the string `"None"` in a mail is worse than nothing.
+  </Property>
+  <Property name="preheader" type="str">
+    The translated `preheader` msgid from the registration, if the template declared
+    one. Rendered into the layout's hidden div.
+  </Property>
+  <Property name="portal_url" type="str">
+    The portal's absolute URL, or `""` when there is no request to build one from.
+  </Property>
+  <Property name="translate" type="callable">
+    Translates a msgid into the render language.
+  </Property>
+  <Property name="format_date, format_datetime, format_number" type="callables">
+    Locale-aware formatting, already bound to the render language. See
+    [the helpers](#locale-helpers).
+  </Property>
+  <Property name="target_language" type="str">
+    Zope's page-template i18n machinery reads the render language from this name.
+    Without it, `i18n:translate` negotiates from the request — that is, renders the
+    wrong language, silently, whenever `language` was passed explicitly.
+  </Property>
+</Properties>
+
+## Locale helpers
+
+Three callables, bound to the render language, so no template reinvents French date formatting — and half of them would get it wrong.
+
+```html
+<td>${python: format_date(item.effective)}</td>
+<td>${python: format_datetime(meeting.date)}</td>
+<td>${python: format_number(amount)}</td>
+```
+
+| Helper                   | `fr`                 | `en`                      |
+| ------------------------ | -------------------- | ------------------------- |
+| `format_date(value)`     | `12 août 2026`       | `August 12, 2026`         |
+| `format_datetime(value)` | `12 août 2026 17:30` | `August 12, 2026 5:30 PM` |
+| `format_number(value)`   | `1 234,5`            | `1,234.5`                 |
+
+`format_date` and `format_datetime` take an optional `length`; `format_datetime` also takes `time_length`; `format_number` takes a `pattern`.
+
+<Note>
+  **Use `python:`, not a path.** TAL path expressions cannot call functions: `$
+  {format_date(when)}` raises `"Invalid variable name"` when Chameleon compiles
+  the `.pt`. The `python:` prefix is what makes it an expression rather than a
+  path. The authoring lint catches this as `path-call`.
+</Note>
+
+## The plaintext part
+
+If the template ships a hand-authored `<name>.txt.pt` twin, that is what you get. Without one, `render()` falls back to a naive text extraction of the HTML **and logs a deprecation**.
+
+The twin is hand-authored on purpose. Maizzle's own plaintext output destroys `tal:` and `i18n:` constructs, so generating it would ship a plausible-looking body carrying the wrong content in the wrong language. See [Testing](/authoring/testing).
+
+## Escaping
+
+`${...}` values are HTML-escaped by Chameleon by default, which is the safe behaviour and the one you want. `structure` — unescaped insertion — is reserved for exactly two places: the shell's `body_html` slot and the `footer_html` theme token. Nothing else.
+
+## Related
+
+- **[Email builder](/api/email)** — what you almost always want instead, if you are sending rather than inspecting.
+- **[render_shell()](/api/render-shell)** — the sibling for bodies that already exist.
+- **[Errors](/api/errors)** — `TemplateNotFound` and what it carries.
+- Source: [`imio/emailkit/render.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/render.py)

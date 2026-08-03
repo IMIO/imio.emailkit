@@ -1,0 +1,114 @@
+export const metadata = {
+  title: 'Recipients',
+  description:
+    'How .to() values are resolved to an address, a display name and a language — and why one message is sent per language group.',
+}
+
+# Recipients
+
+`.to()`, `.cc()`, `.bcc()`, `.reply_to()` and `.sender()` all accept the same things, because they all go through one adapter. Adding a new kind of recipient is one adapter registration and no change to the builder. {{ className: 'lead' }}
+
+## The interface
+
+```python
+from zope.interface import Attribute, Interface
+
+
+class IEmailRecipient(Interface):
+    email = Attribute("address")
+    fullname = Attribute("display name, may be empty")
+    language = Attribute("preferred language code, may be None")
+```
+
+An adapter that cannot resolve its value returns `None` — the ordinary `zope.component` "not adaptable" answer — and resolution turns that into `RecipientError`. **It must never invent an address.**
+
+## What the shipped adapters accept
+
+<Properties>
+  <Property name="An email string" type="str">
+    `"greffe@commune.be"`, or `"Greffe <greffe@commune.be>"` — the display name is kept.
+  </Property>
+  <Property name="A userid" type="str">
+    Looked up in `portal_membership`. A string is read as an address if it contains `@`,
+    otherwise as a userid.
+  </Property>
+  <Property name="A Plone member" type="MemberData">
+    Read through `getProperty`, because `MemberData` is not attribute-traversable for its
+    properties. An empty `language` property — what Plone stores for "no preference" —
+    becomes `None`.
+  </Property>
+  <Property name="An iterable of any of those" type="list, tuple, generator">
+    Mixed freely. `.to([member, "greffe@commune.be", "jdupont"])` is fine.
+  </Property>
+</Properties>
+
+<Note>
+  **A string with `@` is read as an address, never as a userid** — even on a
+  site running `use_email_as_login`, where a userid can look like an address.
+  Taking the string at face value can only ever send to the address you wrote.
+  The other order would take `"greffe@commune.be"` and, if some member happened
+  to carry that userid with a different `email` property, deliver somewhere else
+  entirely. A wrong address is much worse than a missing display name.
+</Note>
+
+The documented trade-off: **a bare address resolves with no `fullname` and no `language`**, so it lands in the default-language group. Pass the member object, or its userid, when the language matters.
+
+## What is refused
+
+A string carrying _several_ addresses is refused rather than silently reduced to its first. Same for a member whose `email` property holds several addresses. Both were silent drops before they were refused — the header came out as `Full Name <>` and the recipient simply vanished from the envelope while every other recipient in the same call was delivered. Pass a list.
+
+## De-duplication
+
+Within one field, recipients are de-duplicated by address, case-insensitively, because a mail server is. The **first** occurrence wins — it is the one most likely to carry a `fullname` and a `language`, since callers naturally write `.to(member).to(some_shared_list)` and not the reverse.
+
+Duplicates are removed _within_ one field, never across To/Cc/Bcc. Dropping an address from Cc because it is also in To would change what every recipient sees in the header, and that is your editorial decision, not the builder's.
+
+## Per-language sending
+
+`.send()` groups recipients by resolved language and emits **one message per group**, with the subject msgid and the body both translated accordingly.
+
+A group holds only _its own_ recipients in every field, so a French To and a Dutch Cc produce two messages — the second with no `To` header. That is the honest consequence: the alternative, repeating the full header lists in every message, would put the French body in front of the Dutch reader, which is the exact failure per-language sending exists to prevent.
+
+<Note>
+  Languages are grouped on the string as resolved, with **no normalisation**.
+  `fr` and `fr-BE` are two groups: they are two different renders as far as the
+  locale helpers are concerned — Belgian French groups thousands differently
+  from French French — so merging them would be wrong, not thrifty.
+</Note>
+
+Recipients with no language of their own are grouped under the **site's** default language, deliberately not the current request's: a mail is sent for the recipient's benefit, and the request language belongs to whoever happened to trigger it — often a manager, sometimes a cron job with no request at all.
+
+## When resolution fails
+
+`RecipientError` at `.send()`, listing **every** value that could not be resolved. A caller who mistyped three userids should learn about three, not fix one and run again.
+
+The message says _why_ each one failed, not merely that it did: the two realistic causes — a typo in a userid versus a missing adapter registration — need different fixes, and the message is the only place you find out which one you have.
+
+## Adding your own recipient type
+
+Register an adapter to `IEmailRecipient` for your type. The builder does not change:
+
+```python
+from imio.emailkit.interfaces import IEmailRecipient
+from imio.emailkit.recipients import Recipient
+from zope.component import adapter
+from zope.interface import implementer
+
+
+@adapter(IMyOrganisationalUnit)
+@implementer(IEmailRecipient)
+def recipient_from_unit(unit):
+    if not unit.contact_email:
+        return None          # not adaptable; becomes RecipientError
+    return Recipient(
+        email=unit.contact_email,
+        fullname=unit.title,
+        language=unit.language,
+    )
+```
+
+## Related
+
+- **[Email builder](/api/email)** — where these values are collected.
+- **[Errors](/api/errors)** — `RecipientError` in context.
+- Source: [`imio/emailkit/recipients.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/recipients.py)

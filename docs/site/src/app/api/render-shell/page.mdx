@@ -1,0 +1,94 @@
+export const metadata = {
+  title: 'render_shell()',
+  description:
+    'Wrap an HTML mail body you already build in the kit shell, without re-authoring it as a template.',
+}
+
+# render_shell()
+
+The migration path for mails whose body already exists — a notification assembled by string concatenation, say — and which nobody wants to re-author as a kit template. The shell contributes the whole document; your body contributes its own markup and nothing else about it changes. {{ className: 'lead' }}
+
+```python
+from imio.emailkit import render_shell
+
+html, text = render_shell("Point 'Budget 2026' : état modifié", legacy_body_html)
+```
+
+It is a `render()` **sibling**, not a builder method — it returns the same `(html, text)` pair and shares `render()`'s code path, so `Email` sends its output with no change at all.
+
+## Signature
+
+<Properties>
+  <Property name="subject" type="msgid or str">
+    An i18n msgid **or** a literal string, exactly like `.subject()`. Translated
+    into the render language and handed to the shell as its heading, under the
+    name `subject`.
+  </Property>
+  <Property name="body_html" type="str">
+    The existing body, inserted **verbatim** into the shell's `body_html` slot.
+    Not sanitised, not reformatted.
+  </Property>
+  <Property name="language" type="str, optional">
+    As `render()` — the negotiated language when omitted.
+  </Property>
+</Properties>
+
+Raises `EmailkitError` if the compiled shell is absent from the egg.
+
+## What the shell contributes
+
+The inlined CSS, the accessibility defaults, `lang` on `<html>`, the header and footer, the theme tokens and the dark-mode hints. Your body goes in **byte-for-byte**.
+
+<Note>
+  `${...}` inside `body_html` is emitted **literally**. It is not re-parsed as a
+  template, so a body assembled by string concatenation cannot accidentally — or
+  deliberately — read the render namespace. That is verified, not assumed; see
+  [`docs/DECISIONS.md`](https://github.com/IMIO/imio.emailkit/blob/main/docs/DECISIONS.md).
+</Note>
+
+## The plaintext part
+
+Always a naive text extraction of the rendered HTML, and **not** warned about.
+
+A hand-authored `shell.txt.pt` twin could not exist even in principle: its only content would be `body_html`, which is HTML, so the twin would put tags in the plaintext part. This is the designed path here, not the missing-twin fallback that [`render()`](/api/render) logs a deprecation for.
+
+## No preheader
+
+The hidden preheader div collapses, and that is the shell's decision rather than an omission: spending the whole inbox snippet repeating the subject line the client already shows is worse than letting the client continue the snippet into the legacy body.
+
+The runtime path in the layout still exists, so nothing here forecloses a future `preheader` argument.
+
+## One thing to check in your legacy body
+
+<Note>
+  If your body carries its own `<style>` block, **most clients will drop it.** The
+  block ends up inside the document `<body>`, which is invalid placement, and Gmail
+  and Outlook.com strip it. Inline styles in the body are fine and survive untouched;
+  a `<style>` block is not. Move anything load-bearing to inline `style="…"`
+  attributes, or author the template properly and use the kit.
+</Note>
+
+Everything else about a legacy body survives: inline styles, `bgcolor`, nested tables, `cellpadding`, entities, unclosed tags, even a whole pasted `<html>` document. None of it raises — but a pasted full document does produce a nested `<html>`/`<body>`, which is invalid HTML that clients tolerate rather than something to rely on.
+
+## You usually want the builder instead
+
+`Email` can carry a legacy body too, because the kit layout defines the `body_html` slot for **every** template and not just the shell:
+
+```python
+Email("imio.emailkit:notification").to(member).with_context(
+    title=subject, body_html=legacy_body_html
+).send()
+```
+
+Prefer this when you can. You get per-language sending, recipient adapters, attachments and transaction-safe delivery, and you keep the registration's subject, its preheader and its hand-authored plaintext twin — none of which `render_shell` has.
+
+<Note>
+  `Email("imio.emailkit:shell")` does **not** work. The shell is resolved by
+  path and deliberately not registered for discovery, so it has no name to look
+  up. Use one of the two routes above.
+</Note>
+
+## Related
+
+- **[Migrating a mail](/integration/migrating)** — the same material as a task rather than an API entry.
+- Source: [`imio/emailkit/render.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/render.py)

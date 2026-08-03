@@ -1,0 +1,124 @@
+export const metadata = {
+  title: 'Authoring rules',
+  description:
+    'Eight ways an email template breaks while the Maizzle build reports success — and the lint that catches each one.',
+}
+
+# Authoring rules
+
+Every rule on this page is a failure this project actually hit, and **every one of them produced a successful Maizzle build**. That is the whole reason the lint exists: the Maizzle exit code carries almost no information about correctness, and three of these eight only ever fail in a mail client or inside Chameleon at _send_ time, long after CI was green. {{ className: 'lead' }}
+
+```shell
+make lint-emails                        # just the lint
+make check-emails                       # the lint, then the staleness gate — this is CI
+python -m imio.emailkit.lint --list-rules
+```
+
+The lint is plain regex, no parser, standard library only — it has to run in a buildout-generated script on a machine with nothing but the egg installed. It prefers a missed case to a false positive, because a lint that cries wolf gets disabled.
+
+## The eight rules
+
+### `style-placeholder`
+
+**A Chameleon `${...}` placeholder in a literal `style` attribute.** The single most damaging item in this file.
+
+Juice parses every `style` attribute as CSS: the `{` opens a block, the closing `}` is **eaten**, and CSS inlining then stops for the **whole document** — measured at 31 inline styles down to 6 — with exit code 0.
+
+```html
+<!-- fatal, and silent -->
+<td style="background-color: ${theme/primary_color}">
+
+<!-- correct -->
+<td tal:attributes="style string:background-color: ${theme/primary_color}">
+
+<!-- or better, since bgcolor is never parsed as CSS -->
+<td bgcolor="${theme/primary_color}">
+```
+
+### `class-placeholder`
+
+**A Chameleon `${...}` placeholder in a literal `class` attribute.** Tailwind's `css.safe` transform rewrites `$` to `-` and strips the braces inside class atoms, so the placeholder is corrupted rather than substituted — `${item/css_class}` becomes `-item-css_class`.
+
+Use `tal:attributes="class string:…"` if it is truly needed — but see `runtime-class` first: a runtime class has no CSS behind it.
+
+### `runtime-class`
+
+**A class value that is not literal in the build output.** Tailwind's scanner and `css.purge` only see build-time markup, so the utilities are never generated and the class silently styles nothing.
+
+Use `tal:attributes="style string:…"` with literal values for runtime styling, and keep whole class names literal in the source.
+
+### `tal-on-component`
+
+**A `tal:`, `i18n:` or `metal:` attribute on a kit component.** Vue attribute fallthrough lands it on the component's root element, which the kit owns and may change. The build succeeds either way.
+
+```html
+<!-- wrong -->
+<KitPanel tal:repeat="row rows">…</KitPanel>
+
+<!-- right: the tal: goes on your own markup -->
+<KitDataTable>
+  <tr tal:repeat="row rows">
+    …
+  </tr>
+</KitDataTable>
+```
+
+### `path-call`
+
+**A function call in a TAL path expression.** TAL paths cannot call functions: this raises `"Invalid variable name"` when Chameleon compiles the `.pt` — at runtime, not at build.
+
+```html
+<!-- wrong -->
+<td>${format_date(when)}</td>
+
+<!-- right -->
+<td>${python: format_date(when)}</td>
+```
+
+### `comment-double-dash`
+
+**A `--` sequence inside an HTML comment.** `--` is illegal inside any XML/HTML comment: Chameleon raises `"The string '--' is not allowed in a comment"` and the `.pt` is **unparseable at runtime** while the build reports success.
+
+Use `;` or a full stop instead.
+
+<Note>
+  The same rule holds for every ZCML and GenericSetup XML comment in the
+  repository, which have no comment stripper protecting them.
+</Note>
+
+### `raw-in-comment`
+
+**The `Raw` component named in angle brackets inside a comment.** Maizzle extracts `<Raw>` with one naive global regex over the whole file, comments included, so the mention becomes the opening tag of the match, swallows the real block and deletes it from the output.
+
+Write `Raw` without the angle brackets in prose, or spell it `&lt;Raw&gt;`.
+
+### `missing-alt`
+
+**An image with no `alt` attribute.** A screen reader announces the file name or nothing at all, and a client that blocks remote images shows an empty box with no label. RGAA applies to iMio's clients.
+
+Add `alt="…"`, or `i18n:attributes="alt <msgid>"` to translate it. `alt=""` is the correct spelling for a purely decorative image.
+
+## Suppressing a rule
+
+If you have a deliberate exception, put an ignore hint in a comment on that line or just above the tag:
+
+```html
+<!-- emailkit-lint: ignore=runtime-class -->
+```
+
+## Two more rules the lint cannot check
+
+### Escaping what must survive the Vue compiler
+
+Use `v-pre` for one element or `<Raw>` for a block. To reach the inbox as literal text, a placeholder also needs Chameleon-level escaping: `$${...}`.
+
+### `structure` is reserved
+
+For the shell's `body_html` slot and for `footer_html`. Everything else is HTML-escaped, which is the safe default and the one you want.
+
+## Related
+
+- **[The design kit](/authoring/kit)** — what the components accept, so you do not reach for `tal:` on them.
+- **[Preview & send-test](/authoring/preview)** — the loop that shows you the rendered mail, not the build output.
+- **[Testing](/authoring/testing)** — the golden files that catch a purged class after the fact.
+- Source: [`imio/emailkit/lint.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/lint.py)

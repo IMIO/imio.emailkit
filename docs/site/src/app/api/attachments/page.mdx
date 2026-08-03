@@ -1,0 +1,68 @@
+export const metadata = {
+  title: 'Attachments',
+  description:
+    'Every source type .attach() accepts, how filename and mimetype are inferred, and when you must pass them.',
+}
+
+# Attachments
+
+`.attach(source, filename=None, mimetype=None)`, callable as many times as you like, order preserved. Attachments ride the same message and are identical across language groups. **Nothing is read until `.send()`.** {{ className: 'lead' }}
+
+```python
+from pathlib import Path
+
+Email("imio.pm.notifications:meeting_convocation").to(members).attach(
+    convocation
+).attach(Path("/srv/exports/annexe.pdf")).attach(
+    pdf_bytes, filename="rapport.pdf", mimetype="application/pdf"
+).send()
+```
+
+`convocation` there is a Plone File object, which carries its own filename and content
+type; the path carries a filename and a guessable type; the raw bytes carry neither,
+which is why both are passed.
+
+## Accepted sources
+
+<Properties>
+  <Property name="bytes">
+    Carries nothing but the data, so **both `filename` and `mimetype` are
+    required**.
+  </Property>
+  <Property name="A filesystem path" type="str or pathlib.Path">
+    `filename` comes from the path; `mimetype` is guessed from it via
+    `mimetypes.guess_type`.
+  </Property>
+  <Property name="An open binary file object">
+    Anything with `.read()`. A `name` attribute, if present, supplies the
+    filename.
+  </Property>
+  <Property name="A blob value" type="NamedFile, NamedBlobFile">
+    Carries both its own `filename` and its own `contentType`.
+  </Property>
+  <Property name="A Plone content object" type="File, Image">
+    Resolved through its primary field, so it carries both too.
+  </Property>
+</Properties>
+
+## Metadata precedence
+
+For both `filename` and `mimetype`: **what you passed wins**, then what the source carries, then — for the mimetype only — what `mimetypes.guess_type` makes of the filename.
+
+An explicit argument overriding a blob's own `contentType` is the point of having the arguments at all: a stored `application/octet-stream` should not be what a recipient's mail client sees.
+
+## When it fails
+
+`AttachmentError` at `.send()`, for an unreadable source or for a `filename` / `mimetype` that could not be inferred and was not passed. Like `RecipientError`, it reports **every** problem it found rather than the first one.
+
+Nothing is silently skipped. A mail that arrives without the convocation it was sent to deliver is the failure mode this exception exists to make impossible.
+
+## Not in this version
+
+Inline `cid:` images. The theme logo and any imagery are remote URLs. `.attach(..., inline=True)` with `cid` generation is the natural extension point if a client environment ever blocks remote images as policy.
+
+## Related
+
+- **[Email builder](/api/email)** — where `.attach()` fits.
+- **[Errors](/api/errors)** — `AttachmentError` in context.
+- Source: [`imio/emailkit/attachments.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/attachments.py)

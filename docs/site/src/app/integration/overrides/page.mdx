@@ -1,0 +1,99 @@
+export const metadata = {
+  title: 'Overrides & theming',
+  description:
+    'Three levels of override — a registry record, a z3c.jbot markup replacement, or a full opt-out — and the two traps in the jbot route.',
+}
+
+# Overrides & theming
+
+Three levels, most common first. Level 2 covers the majority of per-commune needs and touches no markup at all. {{ className: 'lead' }}
+
+## Level 1 — adjust the branding only
+
+Three `plone.app.registry` records:
+
+| Record                              | Used by              | Default          |
+| ----------------------------------- | -------------------- | ---------------- |
+| `imio.emailkit.theme.logo_url`      | the layout header    | empty            |
+| `imio.emailkit.theme.primary_color` | buttons, header rule | the iMio magenta |
+| `imio.emailkit.theme.footer_html`   | the layout footer    | empty            |
+
+`logo_url` and `footer_html` default to empty on purpose: a URL is site-specific, and footer wording is user-facing text, which the house convention leaves to i18n and to the site rather than freezing one language in a profile. An empty value collapses the block that would have used it.
+
+The field defaults live in `IEmailkitTheme` and nowhere else — `profiles/base` declares the records _from_ that interface and ships no values of its own, so a default is written once.
+
+<Note>
+  Theme tokens reach the restyled Plone default mails too, even though those
+  cannot see `render()`'s context at all. The layout resolves them through
+  `context/@@emailkit_theme`, a view returning the three records as a mapping.
+  If the view is absent the path raises, TAL's `|` falls through, and the shell
+  degrades to the brand defaults instead of failing.
+</Note>
+
+### The design system itself is locked
+
+Consumers compose the layout and components but **do not extend the Tailwind config**. That is what keeps every iMio product's mails recognisably the same. The three tokens above are the whole runtime-variable surface.
+
+## Level 2 — replace the markup, per site or per client
+
+Register your own `z3c.jbot` directory on your site package's browser layer.
+
+```python
+from imio.emailkit.interfaces import IEmailkitLayer
+
+
+class IMyCommuneLayer(IEmailkitLayer):
+    """This commune's browser layer."""
+```
+
+```xml
+<include package="z3c.jbot" />
+<browser:jbot directory="overrides" layer=".interfaces.IMyCommuneLayer" />
+```
+
+Override files are named after the dotted path of the file they shadow, e.g.
+
+```
+Products.CMFPlone.browser.login.templates.mail_password_template.pt
+```
+
+That is how you replace the password-reset and registration mails, because those are jbot overrides of stock Plone templates. The **username reminder** is a registered template rather than a jbot override, so you shadow it the way you shadow any registered template — `imio.emailkit.templates.get_username.pt` — and the same layer rule below applies.
+
+### Two traps, both silent
+
+<Note>
+  **Your layer must `extend` `IEmailkitLayer`.** "More specific layer wins" is
+  only true for a layer that subclasses ours. For a *sibling* layer, z3c.jbot
+  precedence follows `ILocalBrowserLayerType` registration order, which is
+  effectively arbitrary — it will work on your machine and lose in production.
+</Note>
+
+<Note>
+  Include the **package** `z3c.jbot`, never just its `meta.zcml`. `meta.zcml`
+  registers the directive but not the monkeypatches that make an override
+  effective, so with it alone the directive parses, the path mapping is correct,
+  and the stock template still renders — with no error and no warning.
+</Note>
+
+Because of that second trap: when you test an override, **assert on rendered output, never only that a file was resolved.**
+
+## Level 3 — opt out entirely
+
+Install `imio.emailkit:base` instead of `:default`. You keep the API, the discovery and the kit; Plone's own mails are left exactly as they were.
+
+```shell
+PROFILE=base make create-site
+```
+
+The mechanism is the browser layer: the jbot directory is bound to `IEmailkitLayer`, which only `:default` installs, so the overrides are inert without it.
+
+## What is deliberately not offered
+
+- **`MailHost` monkey-patching** to re-skin arbitrary outgoing MIME. It breaks on the first calendar invite or signed message, and it is undebuggable.
+- **A composable Tailwind preset.** Revisit only if two products turn out to need genuinely different shells — and then a second layout in the kit is the cheap first answer.
+
+## Related
+
+- **[Installation & profiles](/installation)** — what each profile installs.
+- **[The design kit](/authoring/kit)** — what the tokens actually style.
+- **[Testing](/authoring/testing)** — how to assert an override took effect.

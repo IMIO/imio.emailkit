@@ -1,0 +1,117 @@
+export const metadata = {
+  title: 'Contributing',
+  description:
+    'Set up the checkout, the make targets that matter, and where the design record lives.',
+}
+
+# Contributing
+
+`imio.emailkit` is GPLv2 and developed in the open. Node.js is deliberately not part of `make install` — you only need it if you are going to build templates. {{ className: 'lead' }}
+
+- [Issue tracker](https://github.com/IMIO/imio.emailkit/issues)
+- [Source code](https://github.com/IMIO/imio.emailkit)
+
+## Prerequisites
+
+- An [operating system](https://6.docs.plone.org/install/create-project-cookieplone.html#prerequisites-for-installation) that runs all the requirements.
+- [uv](https://6.docs.plone.org/install/create-project-cookieplone.html#uv)
+- [Make](https://6.docs.plone.org/install/create-project-cookieplone.html#make) and [Git](https://6.docs.plone.org/install/create-project-cookieplone.html#git)
+- [Node.js](https://nodejs.org) 22 or newer — **only** to build email templates.
+
+## Set up
+
+```shell
+git clone git@github.com:IMIO/imio.emailkit.git
+cd imio.emailkit
+make install
+```
+
+## The targets that matter
+
+<Properties>
+  <Property name="make install">
+    Install Plone and dependencies. `make build` is an alias. Node is not
+    involved.
+  </Property>
+  <Property name="make start">
+    Start a Plone instance on localhost:8080. `make create-site` makes one from
+    scratch; `PROFILE=base make create-site` for a site with the opt-out.
+  </Property>
+  <Property name="make check">
+    Format, then lint, to Plone standards. `make lint` and `make format` are the
+    halves.
+  </Property>
+  <Property name="make test">
+    The whole suite. `make test-coverage` for coverage.
+  </Property>
+  <Property name="make build-emails">
+    Compile `emails/` into the package. **Commit the resulting `.pt` files.**
+  </Property>
+  <Property name="make check-emails">
+    The authoring lint, then the staleness gate. This is what CI runs.
+  </Property>
+  <Property name="make preview-emails">
+    Render the committed templates with the committed fixtures and serve them.
+  </Property>
+  <Property name="make update-golden">
+    Regenerate the golden snapshots. Deliberate, never automatic.
+  </Property>
+  <Property name="make i18n">Update the translation catalogs.</Property>
+  <Property name="make recipe-test">
+    Run `imio.recipe.emailkit`'s own suite. `make buildout-test` is the full
+    buildout-then-compile acceptance run.
+  </Property>
+</Properties>
+
+Run `make help` for the complete list.
+
+## Before you open a pull request
+
+1. `make check` — formatting and lint.
+2. `make test` — the suite.
+3. `make check-emails` — if you touched anything under `emails/` or `kit/`. A stale `.pt` fails CI.
+
+If you changed a template's output on purpose, `make update-golden` and commit the new snapshots in the same change as the template.
+
+## Adding a template
+
+```shell
+bin/compile-emails --new my_template
+```
+
+That scaffolds the four files a template needs: the `.vue` skeleton, a fixture, a golden placeholder and a registration stub to paste. Read [Authoring rules](/authoring/rules) first — the failures it prevents all produce a _successful_ build.
+
+## Scaffolding with plonecli
+
+The package provides `<!-- extra stuff goes here -->` markers compatible with [`plonecli`](https://github.com/plone/plonecli) and [`bobtemplates.plone`](https://github.com/plone/bobtemplates.plone).
+
+```shell
+make add <template_name>
+```
+
+## Where the reasoning lives
+
+This site documents _what the package does_. Two files in the repository document _why_, and they are the authority when the two disagree:
+
+<Properties>
+  <Property name="SPEC.md">
+    The specification: goals, non-goals, the architecture, the phasing, and what
+    was explicitly rejected. [Read
+    it](https://github.com/IMIO/imio.emailkit/blob/main/SPEC.md).
+  </Property>
+  <Property name="docs/DECISIONS.md">
+    The decision record — every measured finding, every reverted attempt, every
+    "this looked like it worked and did not". [Read
+    it](https://github.com/IMIO/imio.emailkit/blob/main/docs/DECISIONS.md).
+  </Property>
+</Properties>
+
+There is also a [`SKILL.md`](https://github.com/IMIO/imio.emailkit/blob/main/SKILL.md) covering the authoring conventions for AI-assisted work, which is how much of the template work here is done.
+
+## Editing this site
+
+The documentation is a Next.js app under [`docs/site/`](https://github.com/IMIO/imio.emailkit/tree/main/docs/site). Adding a page is two steps, and the "Edit this page" link at the bottom of any page takes you straight to its source. See [`docs/site/README.md`](https://github.com/IMIO/imio.emailkit/blob/main/docs/site/README.md).
+
+## Credits
+
+Built on [Maizzle](https://maizzle.com). Scaffolded from [Cookieplone](https://github.com/plone/cookieplone) following [`imio.reportproblem`](https://github.com/IMIO/imio.reportproblem)'s layout.

@@ -1,0 +1,110 @@
+export const metadata = {
+  title: 'Testing',
+  description:
+    'Fixtures, golden snapshots and the staleness gate — the three things that catch a purged Tailwind class and a placeholder that stopped resolving.',
+}
+
+# Testing
+
+Every template ships a fixture and a snapshot. The golden tests catch the two regressions nothing else does: a Tailwind class silently purged at build, and a `${}` placeholder that stopped resolving after a refactor. {{ className: 'lead' }}
+
+```shell
+make test              # the whole suite
+make test-coverage     # with coverage
+make update-golden     # regenerate the snapshots, deliberately
+make check-emails      # the lint and staleness gates CI runs
+```
+
+## The layout
+
+```
+tests/
+├── fixtures/
+│   └── item_published.py        # a CONTEXT dict
+└── golden/
+    ├── item_published.fr.html
+    ├── item_published.fr.txt
+    ├── item_published.en.html
+    └── item_published.en.txt
+```
+
+A fixture is a module exporting `CONTEXT`. A snapshot is the rendered output, per template, per language, per part.
+
+## The golden test base class
+
+`imio.emailkit.golden.GoldenTemplateTests` generates one test per template × language × part. Subclass it in your add-on:
+
+```python
+from imio.emailkit.golden import GoldenTemplateTests
+
+
+class TestGoldenTemplates(GoldenTemplateTests):
+    """Render every template this add-on registers, diff against the snapshots."""
+```
+
+It asserts three things:
+
+<Properties>
+  <Property name="test_matches_golden">
+    The render matches the committed snapshot, with a truncated unified diff on failure —
+    labelled so the two sides cannot be confused.
+  </Property>
+  <Property name="test_golden_has_no_unresolved_placeholder">
+    No `${...}` survived into the output, and no `tal:` / `i18n:` / `metal:` attribute
+    was left behind.
+  </Property>
+  <Property name="test_every_template_has_a_fixture">
+    A registered template with no fixture is a failure, not a skip.
+  </Property>
+</Properties>
+
+## Regenerating snapshots
+
+```shell
+make update-golden
+```
+
+<Note>
+  Snapshots are regenerated **only** by this target, never as a side effect of a
+  failing comparison. A snapshot that repairs itself when it breaks is not a
+  snapshot.
+</Note>
+
+## Two rules for anyone adding a test here
+
+**Assert on substituted values, never on marker strings.** Without the `IPageTemplateEngine` utility, `zope.pagetemplate` falls back to `zope.tal`, where `${...}` passes through verbatim and raises nothing — so a test that only checks "our marker is present" stays green while raw placeholders ship.
+
+**Assert on rendered output, never only that a file was resolved.** A `z3c.jbot` override can be correctly mapped and still not take effect; see the `meta.zcml` warning on [Overrides & theming](/integration/overrides).
+
+## The staleness gate
+
+`make check-emails` runs two gates in one script:
+
+1. **Staleness.** Compile each package into a temporary directory and diff against the committed `templates/`. Exit 1 with a per-file diff summary if they disagree.
+2. **Authoring lint.** The [eight rules](/authoring/rules), over the `.vue` sources.
+
+This is the CI gate. Every add-on that ships templates — including `imio.emailkit` itself — runs it in its pipeline. It is the price of committing the build output, and it is cheaper than making Node a production dependency.
+
+## The plaintext twin
+
+A `<name>.txt.pt` twin is **hand-authored** where plaintext quality matters. Maizzle's plaintext output destroys `tal:` and `i18n:` constructs, so generating it would ship a plausible-looking body with the wrong content in the wrong language.
+
+Without a twin, `render()` falls back to a naive text extraction and logs a deprecation. The mail still sends; it just is not as good.
+
+## What `imio.emailkit` tests about itself
+
+Worth knowing, because these double as living documentation of the contracts:
+
+- Discovery, with two dummy add-ons.
+- Golden files and `check-emails` for its own templates — dogfooding the full consumer contract.
+- Recipient resolution: strings, members, userids, mixed iterables, and every failure.
+- Attachment sources: bytes, path, file object, blob value, content object; metadata inference; every `AttachmentError` case.
+- Language grouping for `.send()`.
+- A transaction-abort test: `.send()` then abort, and the MailHost queue is empty.
+- That FR and NL output actually **differ** — because a missing `i18n:domain` makes every `i18n:translate` render its msgid's English default, which is indistinguishable from success.
+
+## Related
+
+- **[Translations](/authoring/translations)** — why the FR/NL assertion above exists.
+- **[Preview & send-test](/authoring/preview)** — the same fixtures, rendered in a browser.
+- Source: [`imio/emailkit/golden.py`](https://github.com/IMIO/imio.emailkit/blob/main/src/imio/emailkit/golden.py)
