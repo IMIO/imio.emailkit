@@ -104,6 +104,7 @@ def ensure_dependencies(emails_dir, npm, force=False):
         logger.info("%s: node_modules is up to date", emails_dir)
         return False
 
+    command = [npm, "ci"] if lockfile.is_file() else [npm, "install"]
     if not lockfile.is_file():
         logger.warning(
             "%s has no %s yet; running `npm install` to create it. Commit it -- "
@@ -111,29 +112,18 @@ def ensure_dependencies(emails_dir, npm, force=False):
             emails_dir,
             LOCKFILE,
         )
-        run([npm, "install"], cwd=emails_dir)
-    else:
-        try:
-            run([npm, "ci"], cwd=emails_dir)
-        except NodeError:
-            # `npm ci` refuses to run when the lockfile disagrees with
-            # package.json, and npm major versions disagree with each other about
-            # which *optional* platform packages belong in a lockfile: one written
-            # by npm 11 is rejected by npm 10 for missing `@emnapi/*` entries, and
-            # one written by npm 10 is rejected by npm 11 in reverse. A consumer's
-            # npm is not ours to pin, so a rejected lockfile installs instead of
-            # failing the build.
-            #
-            # This does not weaken the guarantee that matters: the caller goes on
-            # to byte-compare the committed .pt against a fresh build, which pins
-            # far more than the toolchain's transitive wasm shims.
-            logger.warning(
-                "%s: `npm ci` rejected %s, most likely an npm version difference. "
-                "Falling back to `npm install`.",
-                emails_dir,
-                LOCKFILE,
-            )
-            run([npm, "install", "--no-audit", "--no-fund"], cwd=emails_dir)
+    # Deliberately no `npm install` fallback when `npm ci` refuses the lockfile.
+    # Falling back resolves a *different* toolchain than the lockfile pins, so the
+    # compiled output drifts and the staleness gate downstream reports the
+    # committed templates as stale -- blaming the templates for a dependency
+    # problem, several steps from the cause.
+    #
+    # `npm ci` failing with `Missing: ... from lock file` means the lockfile was
+    # regenerated on top of an existing node_modules: npm then records that tree
+    # rather than a full resolution and drops the optional platform packages.
+    # Regenerate with both removed:
+    #   cd emails && rm -rf node_modules package-lock.json && npm install
+    run(command, cwd=emails_dir)
     if lockfile.is_file():
         stamp.parent.mkdir(parents=True, exist_ok=True)
         stamp.write_text(_digest(lockfile), encoding="utf-8")

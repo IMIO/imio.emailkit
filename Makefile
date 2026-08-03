@@ -246,22 +246,17 @@ emails-deps: node-check ## Install the Maizzle toolchain (npm ci when a lockfile
 	@if [[ -e node_modules && -f package-lock.json && node_modules -nt package-lock.json ]]; then
 		echo "$(YELLOW)==> node_modules is up to date$(RESET)"
 	elif [[ -f package-lock.json ]]; then
-		# `npm ci` refuses to run when the lockfile disagrees with package.json,
-		# and npm major versions disagree with each other about which *optional*
-		# platform packages belong in a lockfile: a lockfile written by npm 11 is
-		# rejected by npm 10 for missing `@emnapi/*`, and one written by npm 10 is
-		# rejected by npm 11 for the same reason in reverse. Pinning either version
-		# only decides who gets the broken half, so a mismatch falls back to
-		# `npm install` instead of failing the build.
+		# No `npm install` fallback on failure, deliberately: it would resolve a
+		# different toolchain than the lockfile pins, so the compiled output drifts
+		# and `check-emails` then reports the committed templates as stale --
+		# blaming the templates for a dependency problem.
 		#
-		# Reproducibility does not rest on `npm ci` here anyway: `check-emails`
-		# byte-compares the committed .pt against a fresh build, which is a far
-		# stronger guarantee than pinning the toolchain's transitive wasm shims.
+		# `Missing: ... from lock file` means the lockfile was regenerated on top of
+		# an existing node_modules, so npm recorded that tree instead of a full
+		# resolution and dropped the optional platform packages. Regenerate with
+		# both removed: `cd emails && rm -rf node_modules package-lock.json && npm install`.
 		echo "$(GREEN)==> npm ci$(RESET)"
-		$(NPM) ci || {
-			echo "$(YELLOW)==> npm ci rejected the lockfile (npm version skew); npm install$(RESET)"
-			$(NPM) install --no-audit --no-fund
-		}
+		$(NPM) ci
 	else
 		echo "$(YELLOW)==> No package-lock.json yet; running npm install to create it$(RESET)"
 		$(NPM) install
