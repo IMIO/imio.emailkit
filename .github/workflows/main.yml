@@ -73,6 +73,13 @@ jobs:
         with:
           node-version: '22'
 
+      # The Makefile hard-errors at parse time when `uv` is absent, and the build
+      # step below goes through `make build-emails` so that CI and the developer
+      # build identically. `build-emails` itself needs only Node; uv is here to
+      # satisfy the guard, not because this job installs Python.
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Install the Maizzle toolchain
         run: |
           set -euo pipefail
