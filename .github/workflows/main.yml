@@ -76,23 +76,20 @@ jobs:
       - name: Install the Maizzle toolchain
         run: |
           set -euo pipefail
-          cd emails
-          # `npm ci` refuses to run when the lockfile disagrees with package.json,
-          # and npm major versions disagree with each other about which *optional*
-          # platform packages (`@emnapi/*` and friends) belong in a lockfile: one
-          # written by npm 11 is rejected by npm 10 for missing entries, and one
-          # written by npm 10 is rejected by npm 11 for the same reason in reverse.
-          # Pinning a version here only decides whether CI or the developer gets
-          # the broken half, so a rejected lockfile falls back to `npm install`.
+          # npm's major versions disagree about which *optional* platform packages
+          # (`@emnapi/*` and friends) belong in a lockfile, so `npm ci` rejects a
+          # lockfile written by the other major: Node 22 ships npm 10, developers
+          # here run npm 11, and each refuses the other's file.
           #
-          # Reproducibility does not rest on `npm ci`: the next step rebuilds and
-          # byte-compares the committed .pt against the result, which pins far more
-          # than the toolchain's transitive wasm shims ever could.
-          if [ -f package-lock.json ]; then
-            npm ci || npm install --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
-          fi
+          # Pinning the major is the fix, and `npm install` is NOT an acceptable
+          # fallback: it resolves a different toolchain than the lockfile pins, the
+          # rebuild below then produces different bytes, and the staleness gate
+          # fails claiming the committed templates are stale when what actually
+          # drifted was Maizzle. A wrong lockfile has to fail here, with npm's own
+          # message, rather than three steps later wearing someone else's name.
+          npm install -g npm@11
+          cd emails
+          npm ci
 
       - name: Rebuild the templates
         run: |
@@ -161,6 +158,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # Same reason as the Emails job: the acceptance test drives the recipe, which
+      # runs `npm ci` in `emails/`, and Node 22's bundled npm 10 rejects a lockfile
+      # written by npm 11.
+      - name: Pin npm to the major the lockfile was written with
+        run: npm install -g npm@11
 
       # `recipe/` has its own ruff config and is outside the house `make lint`'s
       # RUFF_TARGETS (`src tests scripts`), so it is linted here or nowhere.
