@@ -41,7 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.12', '3.13', '3.14']
         # 6.0 dropped: it does not support Python 3.13, so a quarter of its rows
         # can only ever fail on dependency resolution.
         plone-version: ['6.2-latest', '6.1-latest']
@@ -77,7 +77,22 @@ jobs:
         run: |
           set -euo pipefail
           cd emails
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+          # `npm ci` refuses to run when the lockfile disagrees with package.json,
+          # and npm major versions disagree with each other about which *optional*
+          # platform packages (`@emnapi/*` and friends) belong in a lockfile: one
+          # written by npm 11 is rejected by npm 10 for missing entries, and one
+          # written by npm 10 is rejected by npm 11 for the same reason in reverse.
+          # Pinning a version here only decides whether CI or the developer gets
+          # the broken half, so a rejected lockfile falls back to `npm install`.
+          #
+          # Reproducibility does not rest on `npm ci`: the next step rebuilds and
+          # byte-compares the committed .pt against the result, which pins far more
+          # than the toolchain's transitive wasm shims ever could.
+          if [ -f package-lock.json ]; then
+            npm ci || npm install --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
 
       - name: Rebuild the templates
         run: |

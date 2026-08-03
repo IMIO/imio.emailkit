@@ -17,12 +17,11 @@ from setuptools import setup
 
 
 setup(
-    python_requires=">=3.10,<3.14",
+    python_requires=">=3.12,<3.15",
     classifiers=[
         "Programming Language :: Python",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
     ],
 )
