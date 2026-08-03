@@ -204,10 +204,9 @@ deliberately) read the render namespace. That is verified, not assumed — see
 ```python
 from imio.emailkit import Email
 
-Email("imio.emailkit:notification") \
-    .to(member) \
-    .with_context(title=subject, body_html=legacy_body_html) \
-    .send()
+Email("imio.emailkit:notification").to(member).with_context(
+    title=subject, body_html=legacy_body_html
+).send()
 ```
 
 The kit layout defines the `body_html` slot for **every** template, not just the

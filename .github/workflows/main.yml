@@ -18,6 +18,20 @@ jobs:
     with:
       python-version: ${{ needs.config.outputs.python-version }}
       plone-version: ${{ needs.config.outputs.plone-version }}
+      # zpretty must never see the compiled .pt files under src/. They are Maizzle
+      # build output, and zpretty's formatting is not Maizzle's, so reformatting
+      # them would make `make check-emails` fail forever: the two gates would
+      # fight, and the staleness gate is the one that protects production.
+      #
+      # The upstream default is `src`, which makes zpretty recurse into every .pt
+      # it finds, so this narrows it to the hand-written ZCML/XML instead. Same
+      # expression as ZPRETTY_TARGETS in the Makefile, so the two cannot drift.
+      #
+      # The reusable workflow interpolates this value unquoted into a bash line,
+      # which is what lets the command substitution run. If upstream ever quotes
+      # it, zpretty gets a path that does not exist and fails loudly rather than
+      # silently checking nothing.
+      zpretty-check-path: "$(find src -name '*.zcml' -o -name '*.xml' | sort)"
 
   test:
     name: "Backend: Test"

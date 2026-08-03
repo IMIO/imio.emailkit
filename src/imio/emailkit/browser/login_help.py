@@ -21,6 +21,7 @@ view and stock Plone's plaintext mail.
 """
 
 from imio.emailkit import Email
+
 # Plone's factory, not ours, for the one message below: it is stock Plone's own
 # string and Plone already ships it translated. Re-declaring it in the
 # `imio.emailkit` domain would make us re-translate FR/NL/DE for no gain and would

@@ -6,6 +6,7 @@
 # tools related
 __pycache__/
 .coverage
+.idea/
 .mypy_cache
 .pytest_cache
 .ruff_cache
