@@ -246,8 +246,22 @@ emails-deps: node-check ## Install the Maizzle toolchain (npm ci when a lockfile
 	@if [[ -e node_modules && -f package-lock.json && node_modules -nt package-lock.json ]]; then
 		echo "$(YELLOW)==> node_modules is up to date$(RESET)"
 	elif [[ -f package-lock.json ]]; then
+		# `npm ci` refuses to run when the lockfile disagrees with package.json,
+		# and npm major versions disagree with each other about which *optional*
+		# platform packages belong in a lockfile: a lockfile written by npm 11 is
+		# rejected by npm 10 for missing `@emnapi/*`, and one written by npm 10 is
+		# rejected by npm 11 for the same reason in reverse. Pinning either version
+		# only decides who gets the broken half, so a mismatch falls back to
+		# `npm install` instead of failing the build.
+		#
+		# Reproducibility does not rest on `npm ci` here anyway: `check-emails`
+		# byte-compares the committed .pt against a fresh build, which is a far
+		# stronger guarantee than pinning the toolchain's transitive wasm shims.
 		echo "$(GREEN)==> npm ci$(RESET)"
-		$(NPM) ci
+		$(NPM) ci || {
+			echo "$(YELLOW)==> npm ci rejected the lockfile (npm version skew); npm install$(RESET)"
+			$(NPM) install --no-audit --no-fund
+		}
 	else
 		echo "$(YELLOW)==> No package-lock.json yet; running npm install to create it$(RESET)"
 		$(NPM) install

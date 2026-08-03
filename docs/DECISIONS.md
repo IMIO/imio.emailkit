@@ -1486,3 +1486,14 @@ sender could choose which IP the mail names.
 
 Pinned by `TestClientAddressSemantics` in `tests/test_get_username.py`, which asserts the Zope-level
 behaviour directly so a future Zope change surfaces there rather than as an empty line in a mail.
+
+## 2026-08-03 — `spike/` removed
+
+The Phase 0 spike has been deleted, as the entries above anticipated ("throwaway
+evidence, slated for deletion"): the kit, the build pipeline and the golden files
+supersede every question it existed to answer.
+
+Earlier entries still cite paths inside it (`spike/build/theme-token-literal.pt`,
+`spike/maizzle/strip-comments.js`). Those citations are left as written — they are
+dated records of how a decision was reached, not live pointers. The shipped
+equivalent of the second one is `src/imio/emailkit/kit/strip-comments.js`.

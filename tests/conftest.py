@@ -63,6 +63,30 @@ def package_name():
     return "imio.emailkit"
 
 
+@pytest.fixture(scope="session")
+def grant_roles():
+    """``grant_roles(context, ["Manager"])`` for the default test user.
+
+    Defined here rather than taken from ``pytest_plone``, which grew this fixture
+    only in a later release: the version resolved for older Plone releases does not
+    have it, and every test that needs Manager rights then errors with
+    ``fixture 'grant_roles' not found`` on those rows of the matrix alone.
+
+    A conftest fixture shadows a plugin one, so this is what runs everywhere and
+    the suite no longer depends on which ``pytest_plone`` a given Plone pulls in.
+    Same name, same scope and same signature as upstream, so it can be deleted the
+    day the floor moves.
+    """
+
+    def granter(context, roles):
+        from plone import api
+        from plone.app.testing import TEST_USER_ID
+
+        api.user.grant_roles(username=TEST_USER_ID, roles=roles, obj=context)
+
+    return granter
+
+
 # ---------------------------------------------------------------------------
 # pytest_plone binds ``portal`` / ``http_request`` / ``browser_layers`` to the
 # fixture literally named ``integration``, so the two extra layers need their
