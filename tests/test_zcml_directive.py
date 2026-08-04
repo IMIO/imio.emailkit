@@ -60,12 +60,6 @@ def clean_registry():
         yield
 
 
-@pytest.fixture(autouse=True)
-def warnings_captured(caplog):
-    """The registration warnings are logged at WARNING by ``discovery``."""
-    caplog.set_level("WARNING", logger="imio.emailkit.discovery")
-
-
 def test_registers_namespaced_templates():
     execute(
         '<emailkit:templates directory="templates">'
@@ -128,6 +122,29 @@ def test_duplicate_name_is_a_configuration_conflict():
             "<emailkit:templates>"
             '  <emailkit:template name="welcome" subject="[a] A" />'
             '  <emailkit:template name="welcome" subject="[b] B" />'
+            "</emailkit:templates>"
+        )
+
+
+def test_second_templates_block_in_one_package_conflicts():
+    with pytest.raises(ConfigurationConflictError):
+        execute(
+            "<emailkit:templates>"
+            '  <emailkit:template name="welcome" subject="[a] A" />'
+            "</emailkit:templates>"
+            "<emailkit:templates>"
+            '  <emailkit:template name="plain" subject="[b] B" />'
+            "</emailkit:templates>"
+        )
+
+
+def test_absolute_directory_is_refused():
+    from zope.configuration.exceptions import ConfigurationError
+
+    with pytest.raises(ConfigurationError):
+        execute(
+            '<emailkit:templates directory="/etc">'
+            '  <emailkit:template name="welcome" subject="[a] A" />'
             "</emailkit:templates>"
         )
 

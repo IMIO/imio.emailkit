@@ -27,7 +27,10 @@ class ITemplatesDirective(Interface):
     directory = TextLine(
         title="Directory holding the compiled templates",
         description=(
-            "Relative to the package the ZCML file belongs to. Defaults to `templates`."
+            "Relative to the package the ZCML file belongs to. Defaults to "
+            "`templates`. Relative traversal is allowed on purpose -- a "
+            "subpackage's block may point at its parent's files with "
+            "`../templates` -- but absolute paths are rejected."
         ),
         required=False,
     )
@@ -76,13 +79,20 @@ class TemplatesDirective:
                 "package is the template namespace and the base the directory "
                 "resolves against."
             )
+        if directory is not None and Path(directory).is_absolute():
+            raise ConfigurationError(
+                f"emailkit:templates directory={directory!r} must be relative "
+                "to the package, not absolute."
+            )
         self.context = context
         self.package = package.__name__
         self.package_dir = Path(package.__file__).parent
         self.directory = directory or discovery.DEFAULT_DIRECTORY
-        # One directory record per package: a second block with a different
-        # directory in the same package conflicts here, which is deliberate --
-        # the build tooling needs a single answer to "where does output land".
+        # One directory record per package: any second <emailkit:templates>
+        # block in the same package conflicts here, regardless of what
+        # directory it names -- the discriminator carries no directory
+        # component. That is deliberate: the build tooling needs a single
+        # answer to "where does output land" for a given package.
         context.action(
             discriminator=("emailkit:templates", self.package),
             callable=discovery.register_directory,
