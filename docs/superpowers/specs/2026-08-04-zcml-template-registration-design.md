@@ -125,13 +125,19 @@ conditions are false at build time.
 
 The scan lives in `imio.emailkit` (e.g. `imio.emailkit.scan`), next to the
 directive it executes — no duplicated namespace constant, no parity test.
-`imio.emailkit.zcml`, `imio.emailkit.scan`, `discovery.py` and
-`interfaces.py` must stay importable without Zope2/Plone (zope.configuration,
-zope.schema, zope.i18nmessageid only) — that constraint is what lets the
-`bin/` scripts run the scan outside an instance, and it gets a dedicated test.
-The recipe's install step only records candidate packages via the substring
-pre-filter; the generated scripts (which run with the instance's eggs, so
-`imio.emailkit` is importable) invoke the real scan.
+
+Two execution contexts, deliberately split:
+
+- The **recipe's install step** runs in the buildout process, where the
+  instance eggs are not importable — it therefore only records candidate
+  packages via the substring pre-filter and generates the scripts.
+- The **generated scripts** run with `${instance:eggs}` on `sys.path`, so
+  Zope/Plone are importable *as libraries*; they invoke the real scan. The
+  constraint on the scan chain is that it must not require a **booted**
+  instance — no `getSite()`, no registry/utility lookups, no fully-loaded
+  ZCML — which the permissive machine and the module-level registry satisfy
+  by construction. A dedicated test runs the scan in a bare Python process
+  (instance eggs present, no Zope app started).
 
 `bin/preview-emails` calls the same scan to populate the registry before
 calling `render()` — one parser (`zope.configuration`), one registry, one
@@ -160,8 +166,8 @@ dict approach and gets an explicit line in SPEC §4.
   skipped, `overrides.zcml` root honored, `zcml:condition` respected,
   feature-flag condition false at build time, pre-filter skips non-matching
   eggs, scan and runtime populate identical registries for the same fixture.
-- Import-lightness test: `imio.emailkit.scan` (and what it pulls in) imports
-  without Zope2/Plone on the path.
+- No-instance test: the scan runs to completion in a bare Python subprocess
+  (instance eggs on the path, no Zope app booted, no site set).
 - Recipe tests shrink to the install step: candidate recording via the
   pre-filter and script generation.
 - `bin/preview-emails`: a test that the scan-fed registry renders a fixture
