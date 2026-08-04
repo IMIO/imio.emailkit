@@ -1,23 +1,26 @@
-"""Named vocabularies over SPEC §4's entry-point discovery.
+"""Named vocabularies over the template registry.
 
 One vocabulary, ``imio.emailkit.templates``, listing every registered template
-name. It exists because §8.3's content-rule edit form "offers the registered
-template names (vocabulary from discovery)", and it is a *named* utility rather
-than a function the schema imports so that the form, the schema and any other
-consumer all reach the same list by name.
+name. It exists because the content-rule edit form offers the registered
+template names, and it is a *named* utility rather than a function the schema
+imports so that the form, the schema and any other consumer all reach the same
+list by name.
 
-**It reads discovery and nothing else.** ``get_templates()`` is the same call
-``@@emailkit-preview`` makes (§6.3) and the same cache the ``Email`` builder
-resolves through (§6.2), so a template registered by *any* add-on shows up in
-the form without a line of code changing here. That is the whole point: §4 makes
-the set of templates a property of the installed distributions, and a hardcoded
-list in a schema would quietly disagree with it.
+**It reads the discovery registry and nothing else.** That is the same registry
+``@@emailkit-preview`` lists and the same one the ``Email`` builder resolves
+through, so a template any add-on declares with ``<emailkit:templates>`` shows
+up in the form without a line of code changing here. That is the whole point:
+the set of templates is a property of the ZCML the instance loaded, and a
+hardcoded list in a schema would quietly disagree with it.
 
-**Not cached here.** :func:`imio.emailkit.discovery.get_templates` already caches
-the scan for the life of the process, and it has an ``invalidate_cache()`` that
-tests use to install a dummy add-on. A second cache in this module would survive
-that invalidation and make the vocabulary the one place in the package that
-still believes in a template nobody registers any more.
+**Read live, never copied.** :func:`imio.emailkit.discovery.available_templates`
+answers straight from the registry the ``emailkit:templates`` directive fills at
+configuration time; there is no cache to go stale, and none is added here. A
+list captured at import time in this module would be built before the directives
+that fill the registry have run, and would then survive every later change --
+an add-on installed in the same process, or a test that registers a throwaway
+package -- making the vocabulary the one place in the package that still
+believes in a template nobody registers any more.
 """
 
 from imio.emailkit.discovery import available_templates
@@ -37,14 +40,15 @@ TEMPLATES = "imio.emailkit.templates"
 
 @implementer(IVocabularyFactory)
 class Templates:
-    """Every template SPEC §4's discovery knows about, sorted by name.
+    """Every template the registry knows about, sorted by name.
 
     Term value, token and title are all the namespaced name
     (``"dummy.complete:convocation"``). Deliberately not prettified: the name is
-    what §4 makes the identity of a template, it is what the stored rule holds,
-    it is what ``TemplateNotFound`` reports, and its ``<package>:<basename>``
-    shape is the only thing that tells three add-ons' ``notification`` templates
-    apart.
+    the identity of a template, it is what the stored rule holds, it is what
+    ``TemplateNotFound`` reports, and its ``<package>:<basename>`` shape is the
+    only thing that tells three add-ons' ``notification`` templates apart.
+    Sorting is this vocabulary's own doing, so the order a form shows never
+    depends on which package's ZCML the instance happened to load first.
     """
 
     def __call__(self, context=None):

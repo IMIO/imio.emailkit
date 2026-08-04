@@ -1,8 +1,11 @@
 <configure
     xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
     xmlns:i18n="http://namespaces.zope.org/i18n"
     i18n_domain="imio.emailkit"
     >
+
+  <include file="meta.zcml" />
 
   <i18n:registerTranslations directory="locales" />
 
@@ -12,20 +15,31 @@
 
   <include package=".browser" />
 
-  <!-- SPEC §8.3's content-rule action, and the discovery-backed vocabulary its
+  <!-- The content-rule action, and the discovery-backed vocabulary its
        edit form offers. The vocabulary is included first because the action's
        schema names it. -->
   <include package=".vocabularies" />
   <include package=".contentrules" />
 
-  <!-- SPEC §4: "warning at startup" for a template shipping no plaintext twin.
-       Scanning here rather than lazily is what makes that literally true.
-       Otherwise the warning lands in the log of whoever sends the first mail,
-       weeks after the build that dropped the file. Warms the cache too. -->
-  <subscriber
-      for="zope.processlifetime.IDatabaseOpenedWithRoot"
-      handler=".discovery.warm_cache"
-      />
+  <!-- imio.emailkit is its own first consumer: its templates register through
+       exactly the directive external addons use. Two of the three restyled
+       Plone default mails (mail_password_template, registered_notify_template)
+       are deliberately NOT here: a stock Plone view renders them, their bodies
+       speak that view's dialect, and a registration would resolve to a template
+       render() can never render. get_username IS here because this package owns
+       that view and renders it through render(). See docs/DECISIONS.md. -->
+  <emailkit:templates directory="templates">
+    <emailkit:template
+        name="notification"
+        subject="[email_subject_notification] Notification"
+        preheader="[email_preheader_notification] You have a new notification."
+        />
+    <emailkit:template
+        name="get_username"
+        subject="[email_subject_get_username] Your username"
+        preheader="[email_preheader_get_username] Here is the username you asked for."
+        />
+  </emailkit:templates>
 
   <!-- -*- extra stuff goes here -*- -->
 

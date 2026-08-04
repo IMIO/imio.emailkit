@@ -145,11 +145,10 @@ class TestTemplatesAreReallyTranslated:
         reason: a msgid with no catalog entry returns its English default, which
         reads exactly like a successful translation.
         """
-        from imio.emailkit import emailkit
+        from imio.emailkit import discovery
         from zope.i18n import translate
 
-        registration = emailkit["templates"][template]
-        msgid = registration["subject"]
+        msgid = discovery.get_template(support.qualified(template)).subject
 
         fr = translate(msgid, target_language="fr")
         nl = translate(msgid, target_language="nl")
@@ -166,11 +165,10 @@ class TestTemplatesAreReallyTranslated:
         the layout's hidden div -- "the highest-visibility email feature that
         everyone forgets; every inbox shows it". An untranslated one is shown to
         every recipient, in the wrong language, next to the subject."""
-        from imio.emailkit import emailkit
+        from imio.emailkit import discovery
         from zope.i18n import translate
 
-        registration = emailkit["templates"][template]
-        msgid = registration.get("preheader")
+        msgid = discovery.get_template(support.qualified(template)).preheader
         if msgid is None:
             pytest.skip(f"{template} registers no preheader, which §4 allows")
 

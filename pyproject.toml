@@ -49,11 +49,6 @@ Tracker = "https://github.com/IMIO/imio.emailkit/issues"
 [project.entry-points."z3c.autoinclude.plugin"]
 target = "plone"
 
-# imio.emailkit is its own first consumer (SPEC §4): it registers its own
-# templates through exactly the mechanism external addons use.
-[project.entry-points."imio.emailkit.templates"]
-"imio.emailkit" = "imio.emailkit:emailkit"
-
 [tool.uv]
 managed = false
 
