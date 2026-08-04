@@ -1,19 +1,25 @@
-"""Entry-point discovery of email templates (SPEC §4).
+"""The registry of email templates the ``emailkit:templates`` directive fills.
 
-A consumer addon declares one ``imio.emailkit.templates`` entry point pointing
-at a module-level ``emailkit`` dict; this module turns every such registration
-into a flat mapping of ``<package>:<name>`` -> :class:`Template`, with the
-``.pt`` and ``.txt.pt`` files already resolved on disk.
+A consumer addon declares its templates in ZCML (see ``meta.zcml`` and
+``zcml.py``); each ``<emailkit:template>`` becomes a configuration action whose
+callable resolves the ``.pt`` / ``.txt.pt`` files on disk and writes one
+:class:`Template` here. Lookup stays namespaced: ``"<package>:<basename>"``.
 
-The scan runs once and is cached: its answer only changes when the set of
-installed distributions does, which does not happen inside a running instance.
-:func:`invalidate_cache` exists for tests that install a dummy addon.
+There is no scan and no cache: ZCML execution *is* the startup scan, so the
+"missing plaintext twin" warning lands in the startup log by construction, and
+duplicate registrations are a ``ConfigurationConflictError`` instead of a
+silent overwrite. Re-executing the same ZCML (test layers stack it) simply
+rewrites the same values, which is why :func:`register_template` overwrites
+without complaint -- within one configuration run the action discriminator
+already guarantees uniqueness.
+
+:func:`overlay` is the test seam: it snapshots the registry so a block can
+register throwaway addons (the dummies) and leave no trace.
 """
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from imio.emailkit.interfaces import TemplateNotFound
-from importlib import import_module
-from importlib.metadata import entry_points
 from pathlib import Path
 
 import logging
@@ -21,14 +27,11 @@ import logging
 
 logger = logging.getLogger("imio.emailkit.discovery")
 
-#: The entry-point group consumers declare. SPEC §4.
-ENTRY_POINT_GROUP = "imio.emailkit.templates"
-
 #: Suffixes of the two compiled artifacts a template ships.
 HTML_SUFFIX = ".pt"
 TEXT_SUFFIX = ".txt.pt"
 
-#: ``directory`` key of the registration dict, when the addon omits it.
+#: ``directory`` attribute of ``<emailkit:templates>``, when the addon omits it.
 DEFAULT_DIRECTORY = "templates"
 
 
@@ -38,31 +41,46 @@ class Template:
 
     #: Namespaced lookup name, ``"<package>:<basename>"``.
     name: str
-    #: The entry-point name, i.e. the namespace part of :attr:`name`.
+    #: The package whose ZCML registered it, i.e. the namespace part of :attr:`name`.
     package: str
     #: The file stem, i.e. the part after the colon in :attr:`name`.
     basename: str
     #: The compiled HTML template. Always present -- a template whose ``.pt``
     #: is missing is not registered at all.
     html_path: Path
-    #: The plaintext twin, or ``None`` when the addon ships none. SPEC §4 then
-    #: has ``render()`` fall back to naive text extraction.
+    #: The plaintext twin, or ``None`` when the addon ships none; ``render()``
+    #: then falls back to naive text extraction and logs a deprecation.
     text_path: Path | None
     #: i18n msgid of the subject, from the registration.
     subject: object = None
-    #: Optional i18n msgid of the hidden inbox-preview line (SPEC §3).
+    #: Optional i18n msgid of the hidden inbox-preview line.
     preheader: object = None
 
 
-_templates = None
+_templates = {}
+#: ``package -> templates directory``; what the build tooling reads to know
+#: where compiled output lands, even for a package whose first build has not
+#: run yet (its directory holds no ``.pt`` to derive the answer from).
+_directories = {}
+
+
+def register_template(template):
+    """The single write path into the registry."""
+    _templates[template.name] = template
+
+
+def register_directory(package, templates_dir):
+    """Record where ``package``'s compiled templates live (build-tool query)."""
+    _directories[package] = Path(templates_dir)
+
+
+def registered_directories():
+    return dict(_directories)
 
 
 def get_templates():
-    """Return the cached ``name -> Template`` mapping, scanning on first use."""
-    global _templates
-    if _templates is None:
-        _templates = _scan()
-    return _templates
+    """The full ``name -> Template`` mapping, as a copy."""
+    return dict(_templates)
 
 
 def get_template(name):
@@ -70,123 +88,79 @@ def get_template(name):
 
     :raises TemplateNotFound: when nothing is registered under that name.
     """
-    templates = get_templates()
     try:
-        return templates[name]
+        return _templates[name]
     except KeyError:
-        raise TemplateNotFound(name, available=templates) from None
+        raise TemplateNotFound(name, available=dict(_templates)) from None
 
 
 def available_templates():
-    """Return every registered template name, sorted."""
-    return sorted(get_templates())
+    """Every registered template name, sorted."""
+    return sorted(_templates)
 
 
-def invalidate_cache():
-    """Drop the cached scan. For tests that add or remove a registration."""
-    global _templates
-    _templates = None
+def reset():
+    """Empty the registry. For rescans (preview) and test isolation."""
+    _templates.clear()
+    _directories.clear()
 
 
-def warm_cache(event=None):
-    """Run the scan at instance start-up.
-
-    Subscribed to ``IDatabaseOpenedWithRoot`` in ``configure.zcml``, so SPEC
-    §4's "missing ``.txt.pt`` twin -> warning at startup" happens at startup and
-    not on the first mail somebody sends three weeks later.
-    """
-    get_templates()
+def forget_package(package):
+    """Drop one package's templates and directory record."""
+    for name in [n for n, t in _templates.items() if t.package == package]:
+        del _templates[name]
+    _directories.pop(package, None)
 
 
-def _scan():
-    templates = {}
-    for entry_point in entry_points(group=ENTRY_POINT_GROUP):
-        for template in _load(entry_point):
-            templates[template.name] = template
-    logger.info(
-        "Discovered %s email template(s) from %s: %s",
-        len(templates),
-        ENTRY_POINT_GROUP,
-        ", ".join(sorted(templates)) or "(none)",
-    )
-    return templates
-
-
-def _load(entry_point):
-    """Yield the templates one entry point registers.
-
-    A broken registration is logged with its traceback and skipped rather than
-    raised: discovery runs at instance start-up, and one consumer addon with a
-    typo must not stop the instance -- nor stop the *other* addons' mails from
-    being found. ``logger.exception`` keeps it loud.
-    """
+@contextmanager
+def overlay():
+    """Snapshot the registry, restore it on exit. The test seam."""
+    saved_templates = dict(_templates)
+    saved_directories = dict(_directories)
     try:
-        registration = entry_point.load()
-        directory = _resolve_directory(entry_point, registration)
-    except Exception:
-        logger.exception(
-            "Could not load the %s registration of %r; skipping it.",
-            ENTRY_POINT_GROUP,
-            entry_point.name,
-        )
-        return
-
-    if not directory.is_dir():
-        logger.warning(
-            "%r declares its email templates in %s, which does not exist. "
-            "Nothing registered for that package -- has the Maizzle build run?",
-            entry_point.name,
-            directory,
-        )
-        return
-
-    for basename, options in (registration.get("templates") or {}).items():
-        html_path = directory / f"{basename}{HTML_SUFFIX}"
-        if not html_path.is_file():
-            logger.warning(
-                "%r registers the template %r but %s is missing; skipping it. "
-                "The compiled output is committed, so this is a build or "
-                "packaging problem, not a runtime one.",
-                entry_point.name,
-                basename,
-                html_path,
-            )
-            continue
-
-        text_path = directory / f"{basename}{TEXT_SUFFIX}"
-        if not text_path.is_file():
-            # SPEC §4: warning at startup; render() then falls back to naive
-            # text extraction and logs a deprecation of its own.
-            logger.warning(
-                "%s:%s ships no %s plaintext twin. render() will fall back to "
-                "naive text extraction, which is deprecated -- ship a twin.",
-                entry_point.name,
-                basename,
-                TEXT_SUFFIX,
-            )
-            text_path = None
-
-        yield Template(
-            name=f"{entry_point.name}:{basename}",
-            package=entry_point.name,
-            basename=basename,
-            html_path=html_path,
-            text_path=text_path,
-            subject=(options or {}).get("subject"),
-            preheader=(options or {}).get("preheader"),
-        )
+        yield
+    finally:
+        _templates.clear()
+        _templates.update(saved_templates)
+        _directories.clear()
+        _directories.update(saved_directories)
 
 
-def _resolve_directory(entry_point, registration):
-    """Resolve the registration's ``directory``, relative to its own package.
+def load_template(package, package_dir, directory, basename, subject, preheader):
+    """Resolve one registration to files on disk, or ``None`` plus a warning.
 
-    The directory is relative to the module the entry point *points at* -- the
-    right-hand side of ``imio.pm.notifications = imio.pm.notifications:emailkit``
-    -- while the lookup namespace is the entry-point *name*, the left-hand side.
-    They are the same string in every sane registration; resolving them from
-    their own side keeps the odd one honest instead of guessing.
+    Called when configuration actions execute -- at instance startup, or at the
+    end of a build-tool scan -- so every warning below lands where someone
+    deploying can see it, not in the log of whoever sends the first mail.
     """
-    module = import_module(entry_point.module)
-    package_directory = Path(module.__file__).parent
-    subdirectory = registration.get("directory") or DEFAULT_DIRECTORY
-    return (package_directory / subdirectory).resolve()
+    directory_path = (Path(package_dir) / directory).resolve()
+    html_path = directory_path / f"{basename}{HTML_SUFFIX}"
+    if not html_path.is_file():
+        logger.warning(
+            "%s registers the template %r but %s is missing; skipping it. "
+            "The compiled output is committed, so this is a build or "
+            "packaging problem, not a runtime one.",
+            package,
+            basename,
+            html_path,
+        )
+        return None
+    text_path = directory_path / f"{basename}{TEXT_SUFFIX}"
+    if not text_path.is_file():
+        logger.warning(
+            "%s:%s ships no %s plaintext twin. render() will fall back to "
+            "naive text extraction, which is deprecated -- ship a twin.",
+            package,
+            basename,
+            TEXT_SUFFIX,
+        )
+        text_path = None
+    return Template(
+        name=f"{package}:{basename}",
+        package=package,
+        basename=basename,
+        html_path=html_path,
+        text_path=text_path,
+        subject=subject,
+        preheader=preheader,
+    )
