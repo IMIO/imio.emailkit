@@ -21,9 +21,10 @@ no entry-point fallback. `imio.emailkit` remains its own first consumer, now via
 its own ZCML.
 
 Build tooling (the buildout recipe and the `bin/` scripts) discovers consumer
-packages by scanning their `.zcml` files with ElementTree — consumers may put
-the directives in any ZCML file of their package; no dedicated-file convention,
-no marker entry point.
+packages by parsing their ZCML with ElementTree, following the include graph
+from the same roots Zope loads — consumers may put the directives in any ZCML
+file reachable from `configure.zcml` or `overrides.zcml`; no dedicated-file
+convention, no marker entry point.
 
 ## 1. The directive (runtime)
 
@@ -87,27 +88,32 @@ templates through the directive.
 ## 2. Build-time discovery (recipe + bin/ scripts)
 
 `imio.recipe.emailkit.projects` replaces its `iter_entry_points` walk with an
-XML scan:
+XML scan that mirrors Zope's own loading conventions:
 
-1. For each egg in the working set, recursively glob `*.zcml` under the
-   package directory.
-2. Cheap pre-filter: skip any file whose raw text does not contain the
-   namespace URI `namespaces.imio.be/emailkit`.
-3. ElementTree-parse the survivors and collect
-   `{http://namespaces.imio.be/emailkit}templates` /
-   `{…}template` elements, recording per package: the resolved `emails/`
-   dir, the `templates/` output dir (from the `directory` attribute), and the
-   template names with their `subject`/`preheader` msgids.
+1. Cheap per-egg pre-filter: if no `.zcml` file under the package contains the
+   namespace URI `namespaces.imio.be/emailkit` as a substring, skip the egg
+   without any parsing.
+2. Otherwise, start from the roots Zope loads (`configure.zcml` and
+   `overrides.zcml` — the same files `plone.autoinclude` picks up) and
+   ElementTree-parse the include graph: follow `<include file="…"/>` and
+   intra-package `<include package=".sub"/>` edges. `<include>` of *other*
+   packages is skipped — every egg is walked from its own roots, so
+   cross-package includes would only double-count.
+3. Collect `{http://namespaces.imio.be/emailkit}templates` / `{…}template`
+   elements from the visited files, recording per package: the resolved
+   `emails/` dir, the `templates/` output dir (from the `directory`
+   attribute), and the template names with their `subject`/`preheader`
+   msgids.
 
-Because every `.zcml` file under the package is scanned, there is **no
-`<include>`-following logic at all**.
+A `.zcml` file that is never included from the roots is therefore invisible to
+the build tooling, exactly as it is to Zope.
 
 Documented limitations of the scan (build tooling only — the runtime uses real
 `zope.configuration` semantics):
 
-- a `.zcml` file that exists in the package but is never included from
-  `configure.zcml` still counts;
-- `zcml:condition` on emailkit directives is ignored.
+- `zcml:condition` is ignored, both on emailkit directives and on the
+  `<include>` edges the walk follows;
+- `<exclude>` directives are ignored.
 
 The namespace URI constant is duplicated in the recipe distribution with a
 parity test against the runtime constant, replacing today's
@@ -136,8 +142,11 @@ dict approach and gets an explicit line in SPEC §4.
   `ConfigurationConflictError`, `overrides.zcml` replacing a registration,
   msgid domain taken from `i18n_domain`.
 - Recipe tests: on-disk `.zcml` fixtures instead of entry-point fixtures;
-  one test per scan limitation (never-included file counts, condition
-  ignored); pre-filter skips non-matching files; namespace parity test.
+  include-graph tests (`<include file>` followed, subpackage include
+  followed, unreferenced file NOT counted, cross-package include skipped,
+  `overrides.zcml` root honored); one test per scan limitation (condition
+  ignored, exclude ignored); pre-filter skips non-matching eggs; namespace
+  parity test.
 - `bin/preview-emails`: a test that the scan-fed registry renders a fixture
   without a Zope instance.
 
@@ -148,8 +157,9 @@ dict approach and gets an explicit line in SPEC §4.
   becomes "Registration: ZCML directive" with the example above; the
   failure-mode paragraph gains the conflict error and the i18n caveat.
 - SPEC §5 step 1 reworded: "collects distributions exposing the
-  `imio.emailkit.templates` entry point" → "scans each egg's `.zcml` files for
-  `emailkit:` directives", with the two scan limitations noted.
+  `imio.emailkit.templates` entry point" → "walks each egg's ZCML include
+  graph from `configure.zcml`/`overrides.zcml` and collects `emailkit:`
+  directives", with the scan limitations noted.
 - README consumer instructions updated to the ZCML example, including the
   `<include package="imio.emailkit" file="meta.zcml" />` line consumers need
   (or `<include package="imio.emailkit" />` when their `configure.zcml`
