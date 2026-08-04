@@ -1,0 +1,15 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="other_addon"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <!-- fixture.includes includes this package; scanning fixture.includes must
+       not register this template. -->
+  <emailkit:templates>
+    <emailkit:template name="foreign_side" subject="[s_foreign] Foreign side" />
+  </emailkit:templates>
+
+</configure>

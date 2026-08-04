@@ -1,0 +1,13 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.conditions"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <!-- The package's only block lives in an included file, the layout addons
+       with many registrations use. -->
+  <include file="emails.zcml" />
+
+</configure>

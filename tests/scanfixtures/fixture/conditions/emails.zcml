@@ -1,0 +1,29 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.conditions"
+    >
+
+  <!-- Every template below has its .pt on disk, so whatever the scan leaves
+       out, it left out because of the condition. -->
+  <emailkit:templates>
+    <emailkit:template name="filed" subject="[s_filed] Filed" />
+    <emailkit:template
+        name="installed_yes"
+        subject="[s_yes] Yes"
+        zcml:condition="installed imio.emailkit"
+        />
+    <emailkit:template
+        name="installed_no"
+        subject="[s_no] No"
+        zcml:condition="installed no.such.package"
+        />
+    <emailkit:template
+        name="featured"
+        subject="[s_feat] Feat"
+        zcml:condition="have some-feature"
+        />
+  </emailkit:templates>
+
+</configure>

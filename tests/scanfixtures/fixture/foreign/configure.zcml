@@ -1,0 +1,24 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:browser="http://namespaces.zope.org/browser"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.foreign"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <!-- No browser meta is loaded during a scan, so this directive is unknown
+       and gets swallowed: its schema is never resolved, hence broken.py is
+       never imported. A real instance would of course execute it. -->
+  <browser:page
+      name="boom"
+      for="*"
+      class="fixture.foreign.broken.Boom"
+      permission="zope.Public"
+      />
+
+  <emailkit:templates>
+    <emailkit:template name="welcome" subject="[s] W" />
+  </emailkit:templates>
+
+</configure>

@@ -1,0 +1,23 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.includes"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <!-- Inside the scanned namespace: followed. -->
+  <include package=".sub" />
+
+  <!-- Outside it: skipped, because other_addon gets its own scan from its own
+       roots and following this would only double-count. -->
+  <include package="other_addon" />
+
+  <!-- One block per package, so both templates live here. orphan.zcml holds a
+       third one nothing includes; overrides.zcml redeclares `overridden`. -->
+  <emailkit:templates>
+    <emailkit:template name="main" subject="[s_main] Main" />
+    <emailkit:template name="overridden" subject="[s_original] Original" />
+  </emailkit:templates>
+
+</configure>

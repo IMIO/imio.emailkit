@@ -1,0 +1,14 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.includes"
+    >
+
+  <!-- Nothing includes this file. A scan that globbed *.zcml instead of
+       following the include graph would register `orphan`; the real machinery
+       must not. -->
+  <emailkit:templates>
+    <emailkit:template name="orphan" subject="[s_orphan] Orphan" />
+  </emailkit:templates>
+
+</configure>

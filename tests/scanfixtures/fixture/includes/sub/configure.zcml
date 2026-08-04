@@ -1,0 +1,13 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.includes"
+    >
+
+  <!-- A different package, so a second directory record is no conflict. The
+       relative directory points at the parent's files. -->
+  <emailkit:templates directory="../templates">
+    <emailkit:template name="subbed" subject="[s_subbed] Subbed" />
+  </emailkit:templates>
+
+</configure>

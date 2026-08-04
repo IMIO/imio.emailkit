@@ -1,0 +1,15 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.includes"
+    >
+
+  <!-- Redeclaring the block means the directory record conflicts with
+       configure.zcml's too; includeOverrides resolves that in this file's
+       favour and both records name the same directory, so only the subject
+       actually changes. -->
+  <emailkit:templates>
+    <emailkit:template name="overridden" subject="[s_overridden] Overridden" />
+  </emailkit:templates>
+
+</configure>
