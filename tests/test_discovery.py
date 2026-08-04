@@ -71,6 +71,14 @@ def test_overlay_restores_registry():
     assert discovery.available_templates() == ["pkg.a:outside"]
 
 
+def test_overlay_restores_registry_on_exception():
+    discovery.register_template(make_template("pkg.a:outside"))
+    with pytest.raises(ValueError), discovery.overlay():
+        discovery.register_template(make_template("pkg.a:inside"))
+        raise ValueError("boom")
+    assert discovery.available_templates() == ["pkg.a:outside"]
+
+
 def test_forget_package_removes_its_templates_and_directory():
     discovery.register_template(make_template("pkg.a:one"))
     discovery.register_template(make_template("pkg.b:two"))
@@ -78,6 +86,12 @@ def test_forget_package_removes_its_templates_and_directory():
     discovery.forget_package("pkg.a")
     assert discovery.available_templates() == ["pkg.b:two"]
     assert "pkg.a" not in discovery.registered_directories()
+
+
+def test_forget_unknown_package_is_a_no_op():
+    discovery.register_template(make_template("pkg.a:one"))
+    discovery.forget_package("pkg.b")
+    assert discovery.available_templates() == ["pkg.a:one"]
 
 
 def test_load_template_missing_html_returns_none(tmp_path, caplog):

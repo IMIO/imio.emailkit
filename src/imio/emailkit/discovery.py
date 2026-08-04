@@ -75,6 +75,7 @@ def register_directory(package, templates_dir):
 
 
 def registered_directories():
+    """The full ``package -> directory`` mapping, as a copy."""
     return dict(_directories)
 
 
@@ -91,7 +92,7 @@ def get_template(name):
     try:
         return _templates[name]
     except KeyError:
-        raise TemplateNotFound(name, available=dict(_templates)) from None
+        raise TemplateNotFound(name, available=_templates) from None
 
 
 def available_templates():
