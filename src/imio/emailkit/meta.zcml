@@ -1,0 +1,18 @@
+<configure xmlns:meta="http://namespaces.zope.org/meta">
+
+  <meta:directives namespace="http://namespaces.imio.be/emailkit">
+
+    <meta:complexDirective
+        name="templates"
+        schema=".zcml.ITemplatesDirective"
+        handler=".zcml.TemplatesDirective"
+        >
+      <meta:subdirective
+          name="template"
+          schema=".zcml.ITemplateDirective"
+          />
+    </meta:complexDirective>
+
+  </meta:directives>
+
+</configure>

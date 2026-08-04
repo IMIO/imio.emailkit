@@ -1,0 +1,21 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.basic"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <emailkit:templates directory="templates">
+    <emailkit:template
+        name="welcome"
+        subject="[fixture_subject_welcome] Welcome"
+        preheader="[fixture_preheader_welcome] Hello there."
+        />
+    <emailkit:template
+        name="plain"
+        subject="[fixture_subject_plain] Plain"
+        />
+  </emailkit:templates>
+
+</configure>
