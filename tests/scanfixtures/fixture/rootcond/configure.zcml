@@ -1,0 +1,21 @@
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:zcml="http://namespaces.zope.org/zcml"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.rootcond"
+    zcml:condition="have some-feature"
+    >
+
+  <!-- The condition sits on the *root* element, the shape an addon uses to
+       gate a whole file on a Plone version feature. Features read false at
+       build time, so the scan must skip this file cleanly: an addon whose
+       templates are perfectly fine on a real instance must not break the
+       build tooling. -->
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <emailkit:templates>
+    <emailkit:template name="gated" subject="[s_gated] Gated" />
+  </emailkit:templates>
+
+</configure>

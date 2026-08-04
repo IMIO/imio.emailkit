@@ -7,7 +7,10 @@ the discovery registry afterwards.
 from imio.emailkit import discovery
 from imio.emailkit import scan
 from pathlib import Path
+from zope.configuration import xmlconfig
+from zope.configuration.exceptions import ConfigurationError
 
+import imio.emailkit
 import os
 import pytest
 import subprocess
@@ -20,6 +23,32 @@ import sys
 SCANFIXTURES = Path(__file__).parent / "scanfixtures"
 if str(SCANFIXTURES) not in sys.path:
     sys.path.insert(0, str(SCANFIXTURES))
+
+import fixture.basic  # noqa: E402
+
+
+ZCML_TEMPLATE = """\
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="fixture.basic">
+  {body}
+</configure>
+"""
+
+
+def execute_permissively(body):
+    """Run ``body`` through the scan's machine as a file of ``fixture.basic``.
+
+    The same setup ``scan_package`` builds, minus the file on disk: ``package``
+    is what an ``<include package=...>`` would have set, and the directive reads
+    it to derive the template namespace.
+    """
+    machine = scan.PermissiveConfigurationMachine()
+    xmlconfig.registerCommonDirectives(machine)
+    xmlconfig.include(machine, file="meta.zcml", package=imio.emailkit)
+    machine.package = fixture.basic
+    return xmlconfig.string(ZCML_TEMPLATE.format(body=body), context=machine)
 
 
 @pytest.fixture(autouse=True)
@@ -40,6 +69,24 @@ def test_foreign_directives_swallowed_without_importing_handlers():
     scan.scan_package("fixture.foreign")
     assert "fixture.foreign:welcome" in discovery.available_templates()
     assert "fixture.foreign.broken" not in sys.modules
+
+
+def test_typoed_emailkit_directive_raises():
+    # Swallowing this would scan "successfully" into an empty registry and
+    # surface as a startup failure on the consumer's instance instead.
+    with pytest.raises(ConfigurationError):
+        execute_permissively(
+            "<emailkit:tempaltes>"
+            '  <emailkit:template name="welcome" subject="[s] W" />'
+            "</emailkit:tempaltes>"
+        )
+
+
+def test_misplaced_emailkit_template_raises():
+    # `template` is a subdirective: outside a templates block nothing knows it,
+    # so it fails as an unknown directive -- the same error an instance gives.
+    with pytest.raises(ConfigurationError):
+        execute_permissively('<emailkit:template name="welcome" subject="[s] W" />')
 
 
 def test_include_graph_followed_and_orphan_invisible():
@@ -73,6 +120,12 @@ def test_file_include_and_conditions():
     # Documented divergence: no feature provider loads at build time, so
     # `have <feature>` reads false.
     assert "fixture.conditions:featured" not in names
+
+
+def test_false_condition_on_the_root_element_skips_cleanly():
+    # The whole file is gated on a feature, which reads false at build time.
+    scan.scan_package("fixture.rootcond")
+    assert "fixture.rootcond:gated" not in discovery.available_templates()
 
 
 def test_scan_registers_same_as_runtime_execution():
