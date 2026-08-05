@@ -31,13 +31,13 @@
   <emailkit:templates directory="templates">
     <emailkit:template
         name="notification"
-        subject="[email_subject_notification] Notification"
         preheader="[email_preheader_notification] You have a new notification."
+        subject="[email_subject_notification] Notification"
         />
     <emailkit:template
         name="get_username"
-        subject="[email_subject_get_username] Your username"
         preheader="[email_preheader_get_username] Here is the username you asked for."
+        subject="[email_subject_get_username] Your username"
         />
   </emailkit:templates>
 

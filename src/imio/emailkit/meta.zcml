@@ -4,8 +4,8 @@
 
     <meta:complexDirective
         name="templates"
-        schema=".zcml.ITemplatesDirective"
         handler=".zcml.TemplatesDirective"
+        schema=".zcml.ITemplatesDirective"
         >
       <meta:subdirective
           name="template"
