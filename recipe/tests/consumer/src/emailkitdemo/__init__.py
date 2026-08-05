@@ -1,18 +1,7 @@
-"""SPEC §4's registration, in the smallest form that is still real.
+"""SPEC §4's registration lives in ``configure.zcml``, not here.
 
-Deliberately importable without Plone: the recipe's generated scripts load this
-module to read the ``directory`` key, and a build tool should not need a CMS to
-find out where to put a file. A real addon's ``__init__`` would use
-``zope.i18nmessageid.MessageFactory`` for the msgids; a plain string is enough
-here, and ``render()`` translates a plain string to itself.
+Kept deliberately empty: the recipe's buildout-time collector greps ZCML on
+disk and never imports this module, and the generated scripts' real scan
+(``imio.emailkit.scan.scan_package``) executes the ZCML directly. A real
+addon's ``__init__`` has no reason to know about templates at all any more.
 """
-
-emailkit = {
-    "directory": "templates",
-    "templates": {
-        "demo": {
-            "subject": "email_subject_demo",
-            "preheader": "email_preheader_demo",
-        },
-    },
-}

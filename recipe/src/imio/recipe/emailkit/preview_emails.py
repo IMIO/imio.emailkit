@@ -327,17 +327,27 @@ def render_all(projects, languages, output):
     """Render every registered template of ``projects`` in every language.
 
     Returns a list of ``(name, language, error)`` rows, ``error`` being ``None`` on
-    success. Discovery and the compiled-template cache are both invalidated first,
-    so a template added or rebuilt since the last pass is picked up.
+    success. Discovery is rescanned and the compiled-template cache invalidated
+    first, so a template added or rebuilt since the last pass is picked up.
     """
     from imio.emailkit import discovery
+    from imio.emailkit import scan
 
     # `imio.emailkit.__init__` rebinds the name `render` on the package to the
     # *function*, so `import imio.emailkit.render` yields the function too. The
     # module is only reachable through a `from ... import <name>`.
     from imio.emailkit.render import invalidate_cache as forget_templates
 
-    discovery.invalidate_cache()
+    # Rescan rather than trust an earlier pass: a template added or rebuilt
+    # since then must show up, and the scan is cheap. `forget_templates()` is
+    # render()'s own Chameleon compile cache -- unrelated to discovery, and
+    # still needed so a rebuilt .pt is recompiled rather than served stale.
+    discovery.reset()
+    for project in projects:
+        try:
+            scan.scan_package(project.package)
+        except Exception as exc:
+            logger.warning("rescan of %s failed: %s", project.package, exc)
     forget_templates()
 
     wanted = {project.package: project for project in projects}

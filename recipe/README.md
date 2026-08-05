@@ -19,10 +19,10 @@ eggs = ${instance:eggs}
 # node-bin = node              (resolution: PATH by default)
 ```
 
-The part resolves the eggs, collects every distribution exposing the
-`imio.emailkit.templates` entry point (§4), records each one's `emails/` and
-`templates/` directory, resolves the design kit out of the `imio.emailkit` egg (§3),
-and writes the three scripts.
+The part resolves the eggs, collects every distribution whose ZCML registers
+`<emailkit:templates>` (§4), records each one's `emails/` and `templates/`
+directory, resolves the design kit out of the `imio.emailkit` egg (§3), and
+writes the three scripts.
 
 **A plain buildout run invokes no Node, touches no `emails/` directory, and imports
 no consumer code.** That is not a happy accident, it is the point: §5's "Explicitly
@@ -147,12 +147,19 @@ config through jiti, which transpiles the ESM syntax in the kit file — a file 
 in `path` mode, lives outside any npm tree and has no `package.json` of its own to
 declare its module type.
 
-**3. Declare the entry point and run the gates in CI** (§4, §7):
+**3. Register in ZCML and run the gates in CI** (§4, §7):
 
-```python
-entry_points = {
-    "imio.emailkit.templates": ["acme.notifications = acme.notifications:emailkit"]
-}
+```xml
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="acme.notifications"
+    >
+  <include package="imio.emailkit" file="meta.zcml" />
+  <emailkit:templates>
+    <emailkit:template name="welcome" subject="[email_subject_welcome] Welcome" />
+  </emailkit:templates>
+</configure>
 ```
 
 ```

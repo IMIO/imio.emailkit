@@ -7,10 +7,10 @@
     # kit-mode = path | copy       (default: path)
     # node-bin = node
 
-What it does, per §5: resolves the part's eggs, collects the distributions that
-expose the ``imio.emailkit.templates`` entry point, records
-``(package, emails_dir, templates_dir)`` for each, resolves the design kit from the
-``imio.emailkit`` egg, and generates three scripts.
+What it does, per §5: resolves the part's eggs, collects the packages whose ZCML
+registers ``<emailkit:templates>``, records ``(package, emails_dir,
+templates_dir)`` for each, resolves the design kit from the ``imio.emailkit``
+egg, and generates three scripts.
 
 **What it does not do, and must never do by default: compile.** §5's "Explicitly
 rejected" section is unambiguous -- "compiling at buildout time by default ... would
@@ -18,8 +18,8 @@ make Node a production dependency across ~350 applications and couple deployment
 to npm availability". So ``compile-on-install`` defaults to false, and with that
 default this module imports nothing that knows Node exists, touches no ``emails/``
 directory, and runs no subprocess. It does not even *import* the consumer's code:
-discovery at install time reads ``pkg_resources`` metadata and the filesystem only,
-so a buildout run stays a buildout run.
+discovery at install time greps each dist's ZCML for the emailkit marker on the
+filesystem only, so a buildout run stays a buildout run.
 """
 
 from imio.recipe.emailkit import projects as projects_module
@@ -73,7 +73,7 @@ class Recipe:
         if not options.get("eggs", "").strip():
             raise user_error(
                 f"[{name}] needs an `eggs` option naming the distributions to "
-                f"scan for the {projects_module.ENTRY_POINT_GROUP} entry point. "
+                f"scan for `emailkit:templates` ZCML registrations. "
                 f"SPEC §5's example is `eggs = ${{instance:eggs}}`."
             )
         # Imported here rather than at module scope so that the import error, if
@@ -132,10 +132,10 @@ class Recipe:
         )
         if not found:
             logger.warning(
-                "%s: no distribution in `eggs` exposes the %s entry point, so the "
-                "generated scripts will have nothing to do. Is `eggs` right?",
+                "%s: no distribution in `eggs` registers `<emailkit:templates>` "
+                "in its ZCML, so the generated scripts will have nothing to do. "
+                "Is `eggs` right?",
                 self.name,
-                projects_module.ENTRY_POINT_GROUP,
             )
         for project in found:
             logger.info("%s:   %s", self.name, project.describe())

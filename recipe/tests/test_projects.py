@@ -5,22 +5,21 @@ from imio.recipe.emailkit import projects
 import pytest
 
 
-class TestTheEntryPointGroup:
-    def test_it_matches_the_runtime_exactly(self):
+class TestTheMarker:
+    def test_marker_matches_the_runtime(self):
         """The one string this distribution duplicates on purpose.
 
-        ``imio.emailkit.discovery`` owns it at runtime; the recipe restates it so
-        that neither buildout nor a build script has to import the Plone runtime to
+        ``imio.emailkit.scan`` owns it at runtime; the recipe restates it so that
+        neither buildout nor a build script has to import the Plone runtime to
         find out what to look for. Duplication is only safe with a test that fails
         when the two drift, which is this one. Skipped, not passed, where the
         runtime is not installed -- a skip says "unverified", a pass would lie.
         """
-        discovery = pytest.importorskip(
-            "imio.emailkit.discovery",
+        imio_emailkit_scan = pytest.importorskip(
+            "imio.emailkit.scan",
             reason="imio.emailkit is not installed in this environment",
         )
-        assert projects.ENTRY_POINT_GROUP == discovery.ENTRY_POINT_GROUP
-        assert projects.DEFAULT_DIRECTORY == discovery.DEFAULT_DIRECTORY
+        assert projects.MARKER == imio_emailkit_scan.MARKER
 
 
 class TestFindingTheMaizzleProject:
@@ -133,89 +132,193 @@ class TestSelection:
         assert "acme.notifications" in message
 
 
+def make_dist_dir(tmp_path, dotted="acme.mail", marker=True, src_layout=False):
+    """A minimal on-disk distribution: a dotted package with a ``configure.zcml``.
+
+    ``marker=False`` writes a ZCML file that mentions a *different* namespace, so
+    the marker-scan tests can prove a non-emailkit addon is left alone rather than
+    merely proving an addon with no ZCML at all is.
+    """
+    root = tmp_path / "dist"
+    base = root / "src" if src_layout else root
+    parts = dotted.split(".")
+    package_dir = base.joinpath(*parts)
+    package_dir.mkdir(parents=True)
+    for depth in range(1, len(parts)):
+        (base.joinpath(*parts[:depth]) / "__init__.py").write_text("")
+    (package_dir / "__init__.py").write_text("")
+    body = "namespaces.imio.be/emailkit" if marker else "namespaces.zope.org"
+    (package_dir / "configure.zcml").write_text(
+        f"<configure><!-- {body} --></configure>"
+    )
+    return root, package_dir
+
+
 class FakeDist:
-    def __init__(self, location, project_name="acme.notifications"):
+    """Stands in for a ``pkg_resources`` distribution.
+
+    ``top_level`` feeds :func:`projects._top_level_names`'s metadata branch;
+    omitted, the filesystem fallback is exercised instead. ``project_name`` is
+    unrelated -- it is what :func:`projects.kit_dir_from_working_set` compares
+    against, kept here so both collectors can share one fake.
+    """
+
+    def __init__(self, location, project_name="acme.notifications", top_level=()):
         self.location = str(location)
         self.project_name = project_name
+        self._top_level = list(top_level)
 
     @property
     def key(self):
         return self.project_name.lower()
 
+    def get_metadata_lines(self, name):
+        if name == "top_level.txt" and self._top_level:
+            return list(self._top_level)
+        raise KeyError(name)
 
-class FakeEntryPoint:
-    def __init__(self, name, module_name, dist):
-        self.name = name
-        self.module_name = module_name
-        self.dist = dist
-
-
-class FakeWorkingSet:
-    def __init__(self, entry_points, dists=()):
-        self._entry_points = list(entry_points)
-        self._dists = list(dists) or [ep.dist for ep in entry_points]
-
-    def iter_entry_points(self, group):
-        return iter(self._entry_points)
-
-    def __iter__(self):
-        return iter(self._dists)
+    def __str__(self):
+        return self.location
 
 
 class TestCollectingFromBuildout:
-    def test_it_resolves_a_package_off_dist_metadata_without_importing(self, consumer):
-        dist = FakeDist(consumer.parents[1])
-        working_set = FakeWorkingSet(
-            [FakeEntryPoint("acme.notifications", "acme.notifications", dist)]
-        )
-        found = projects.from_working_set(working_set)
-        assert [p.package for p in found] == ["acme.notifications"]
-        assert found[0].package_dir == consumer
+    def test_marker_package_found(self, tmp_path):
+        root, package_dir = make_dist_dir(tmp_path)
+        dist = FakeDist(root, top_level=["acme"])
+        found = projects.from_working_set([dist])
+        assert [p.package for p in found] == ["acme.mail"]
+        assert found[0].package_dir == package_dir
 
-    def test_it_finds_a_src_layout_develop_egg(self, root_layout_consumer):
+    def test_unmarked_package_ignored(self, tmp_path):
+        root, _package_dir = make_dist_dir(tmp_path, marker=False)
+        dist = FakeDist(root, top_level=["acme"])
+        assert projects.from_working_set([dist]) == []
+
+    def test_src_layout_found(self, tmp_path):
         """``dist.location`` can be the project root rather than its ``src``."""
-        checkout = root_layout_consumer.parents[2]
-        dist = FakeDist(checkout, "acme.roots")
-        working_set = FakeWorkingSet([FakeEntryPoint("acme.roots", "acme.roots", dist)])
-        found = projects.from_working_set(working_set)
-        assert found[0].package_dir == root_layout_consumer
+        root, package_dir = make_dist_dir(tmp_path, src_layout=True)
+        dist = FakeDist(root, top_level=["acme"])
+        found = projects.from_working_set([dist])
+        assert found[0].package_dir == package_dir
 
-    def test_a_shadowed_installed_copy_is_silent(self, consumer, caplog):
-        """A develop egg shadowing an installed one is the everyday case.
+    def test_no_top_level_metadata_falls_back_to_filesystem(self, tmp_path):
+        root, _package_dir = make_dist_dir(tmp_path)
+        dist = FakeDist(root)
+        found = projects.from_working_set([dist])
+        assert [p.package for p in found] == ["acme.mail"]
 
-        Both distributions answer for the name and only one has the files. Warning
-        about the other would put a permanent, meaningless warning in front of
-        every buildout run, which is how people learn to ignore warnings.
+    def test_a_marked_file_outside_a_package_directory_is_skipped(
+        self, tmp_path, caplog
+    ):
+        """A ``configure.zcml`` with no ``__init__.py`` beside it is not a package.
+
+        Cannot happen for a real Python package, but a stray ``.zcml`` under a
+        data directory should not crash the scan -- it should be logged and
+        skipped, the same way a genuinely broken registration used to be.
         """
-        good = FakeEntryPoint(
-            "acme.notifications", "acme.notifications", FakeDist(consumer.parents[1])
-        )
-        empty = FakeEntryPoint(
-            "acme.notifications", "acme.notifications", FakeDist("/nowhere")
-        )
-        found = projects.from_working_set(FakeWorkingSet([empty, good]))
-        assert [p.package for p in found] == ["acme.notifications"]
-        assert "could not be located" not in caplog.text
+        root, package_dir = make_dist_dir(tmp_path)
+        (package_dir / "__init__.py").unlink()
+        dist = FakeDist(root, top_level=["acme"])
+        assert projects.from_working_set([dist]) == []
+        assert "not a package directory" in caplog.text
 
-    def test_a_genuinely_broken_registration_warns_and_is_skipped(self, caplog):
-        broken = FakeEntryPoint("acme.gone", "acme.gone", FakeDist("/nowhere"))
-        assert projects.from_working_set(FakeWorkingSet([broken])) == []
-        assert "could not be located" in caplog.text
+    def test_two_dists_agreeing_on_a_name_deduplicate_silently(self, tmp_path):
+        """A develop egg shadowing an installed copy is the everyday case.
+
+        Both distributions genuinely have the files (unlike the old entry-point
+        world, where one could point at a module that was not there), so there is
+        nothing to warn about -- whichever dist sorts first simply wins.
+        """
+        root_a, _dir_a = make_dist_dir(tmp_path / "a")
+        root_b, _dir_b = make_dist_dir(tmp_path / "b")
+        dists = [
+            FakeDist(root_a, top_level=["acme"]),
+            FakeDist(root_b, top_level=["acme"]),
+        ]
+        found = projects.from_working_set(dists)
+        assert [p.package for p in found] == ["acme.mail"]
+
+
+class TestCollectingFromEnvironment:
+    """``from_environment`` needs a real ``imio.emailkit`` to scan against.
+
+    Skipped, not passed, in the buildout-only test environment -- the recipe's
+    own suite runs twice (``make recipe-test``), and this half of the coverage
+    is the Plone-runtime run's job.
+    """
+
+    def test_a_failed_scan_warns_and_skips_but_others_still_build(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        pytest.importorskip("imio.emailkit.scan")
+        pytest.importorskip("pkg_resources")
+        from imio.emailkit import discovery
+
+        good_root = tmp_path / "good"
+        good_pkg = good_root / "acme_good"
+        (good_pkg / "templates").mkdir(parents=True)
+        (good_pkg / "templates" / "hello.pt").write_text("<html/>", encoding="utf-8")
+        (good_pkg / "__init__.py").write_text("", encoding="utf-8")
+        (good_pkg / "configure.zcml").write_text(
+            '<configure xmlns="http://namespaces.zope.org/zope"\n'
+            '    xmlns:emailkit="http://namespaces.imio.be/emailkit"\n'
+            '    i18n_domain="acme_good">\n'
+            '  <include package="imio.emailkit" file="meta.zcml" />\n'
+            "  <emailkit:templates>\n"
+            '    <emailkit:template name="hello" subject="[s_hello] Hello" />\n'
+            "  </emailkit:templates>\n"
+            "</configure>\n",
+            encoding="utf-8",
+        )
+
+        # Missing the required `subject` -- a genuine consumer mistake, the same
+        # one a real instance would refuse to start on.
+        bad_root = tmp_path / "bad"
+        bad_pkg = bad_root / "acme_bad"
+        bad_pkg.mkdir(parents=True)
+        (bad_pkg / "__init__.py").write_text("", encoding="utf-8")
+        (bad_pkg / "configure.zcml").write_text(
+            '<configure xmlns="http://namespaces.zope.org/zope"\n'
+            '    xmlns:emailkit="http://namespaces.imio.be/emailkit"\n'
+            '    i18n_domain="acme_bad">\n'
+            '  <include package="imio.emailkit" file="meta.zcml" />\n'
+            "  <emailkit:templates>\n"
+            '    <emailkit:template name="broken" />\n'
+            "  </emailkit:templates>\n"
+            "</configure>\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.syspath_prepend(str(good_root))
+        monkeypatch.syspath_prepend(str(bad_root))
+        monkeypatch.setattr(
+            "pkg_resources.working_set",
+            [
+                FakeDist(good_root, top_level=["acme_good"]),
+                FakeDist(bad_root, top_level=["acme_bad"]),
+            ],
+        )
+
+        with discovery.overlay():
+            discovery.reset()
+            found = projects.from_environment()
+
+        assert [p.package for p in found] == ["acme_good"]
+        assert "acme_bad" in caplog.text
 
 
 class TestResolvingTheKit:
     def test_it_finds_the_kit_in_the_emailkit_egg(self, kit):
         dist = FakeDist(kit.parents[2], "imio.emailkit")
-        working_set = FakeWorkingSet([], [dist])
-        assert projects.kit_dir_from_working_set(working_set) == kit
+        assert projects.kit_dir_from_working_set([dist]) == kit
 
     def test_a_dash_spelled_project_name_still_matches(self, kit):
         dist = FakeDist(kit.parents[2], "imio-emailkit")
-        assert projects.kit_dir_from_working_set(FakeWorkingSet([], [dist])) == kit
+        assert projects.kit_dir_from_working_set([dist]) == kit
 
     def test_no_emailkit_in_the_part_fails_loud(self):
         with pytest.raises(projects.ProjectError) as raised:
-            projects.kit_dir_from_working_set(FakeWorkingSet([], []))
+            projects.kit_dir_from_working_set([])
         assert "instance:eggs" in str(raised.value)
 
     def test_an_emailkit_without_a_kit_directory_fails_loud(self, tmp_path):
@@ -223,5 +326,5 @@ class TestResolvingTheKit:
         package_dir.mkdir(parents=True)
         dist = FakeDist(tmp_path / "sp", "imio.emailkit")
         with pytest.raises(projects.ProjectError) as raised:
-            projects.kit_dir_from_working_set(FakeWorkingSet([], [dist]))
+            projects.kit_dir_from_working_set([dist])
         assert "ships no `kit/`" in str(raised.value)

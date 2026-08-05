@@ -44,10 +44,13 @@ logger = logging.getLogger("imio.emailkit.scan")
 #: does not resolve.
 NAMESPACE = "http://namespaces.imio.be/emailkit"
 
-#: Substring that marks a ZCML file as (possibly) carrying emailkit directives:
-#: the cheap textual pre-filter the build tooling runs before spending a real
-#: scan. Deliberately a substring of NAMESPACE and not NAMESPACE itself -- this
-#: one only has to be a grep, the parser matches on the URI above.
+#: Substring that marks a ZCML file as (possibly) carrying emailkit directives.
+#: The recipe's ``iter_marker_packages`` greps for this before spending a real
+#: scan on a candidate package; this module just carries the authoritative
+#: value so the two cannot drift silently (``tests/test_projects.py`` checks
+#: they still match). Deliberately a substring of NAMESPACE and not NAMESPACE
+#: itself -- this one only has to be a grep, the parser matches on the URI
+#: above.
 MARKER = "namespaces.imio.be/emailkit"
 
 
@@ -174,14 +177,3 @@ def _scope_includes(machine, root):
         scoped(xmlconfig.includeOverrides),
         namespace="*",
     )
-
-
-def has_marker(package_dir):
-    """Cheap pre-filter: does any ZCML under ``package_dir`` mention us?"""
-    for zcml in Path(package_dir).rglob("*.zcml"):
-        try:
-            if MARKER in zcml.read_text(encoding="utf-8", errors="ignore"):
-                return True
-        except OSError:
-            continue
-    return False

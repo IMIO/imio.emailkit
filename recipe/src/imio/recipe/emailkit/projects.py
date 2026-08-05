@@ -1,20 +1,21 @@
 """Which packages ship email templates, and where their directories are.
 
-SPEC §5 step 1: "Resolves all eggs, collects distributions exposing the
-``imio.emailkit.templates`` entry point, and records ``(package, emails_dir,
-templates_dir)`` tuples. It also resolves the kit directory from the
-``imio.emailkit`` egg."
+SPEC §5 step 1: "Resolves all eggs, collects distributions whose ZCML registers
+``<emailkit:templates>``, and records ``(package, emails_dir, templates_dir)``
+tuples. It also resolves the kit directory from the ``imio.emailkit`` egg."
 
 Two collectors, because the recipe runs in **two different interpreters**:
 
 * :func:`from_working_set` runs inside *buildout*, whose ``sys.path`` does not
-  contain the eggs. It therefore resolves everything off ``pkg_resources``
-  metadata and the filesystem and **imports nothing** -- not the consumer's
-  code, not ``imio.emailkit``, not Plone. That is deliberate: a buildout run must
-  stay a buildout run.
+  contain the eggs. It therefore greps each dist's ZCML for the emailkit marker
+  on disk and **imports nothing** -- not the consumer's code, not
+  ``imio.emailkit``, not Plone, not even ``zope.configuration``. That is
+  deliberate: a buildout run must stay a buildout run.
 * :func:`from_environment` runs inside the *generated scripts*, whose
-  ``sys.path`` is exactly the part's ``eggs``. It can therefore import the
-  registration module and honour a non-default ``directory`` key.
+  ``sys.path`` is exactly the part's ``eggs``. It can therefore run the real
+  permissive scan (``imio.emailkit.scan.scan_package``) and honour whatever the
+  directive actually resolved -- non-default ``directory``, conditions,
+  overrides -- instead of pattern-matching.
 
 Both funnel into :func:`make_project`, so "where does the build write" has one
 answer.
@@ -28,13 +29,15 @@ import logging
 
 logger = logging.getLogger("imio.recipe.emailkit")
 
-#: SPEC §4's entry-point group. Declared here rather than imported from
-#: ``imio.emailkit.discovery`` on purpose: importing it would pull the Plone
-#: runtime into a build-time tool, and into *buildout itself*. The string is a
-#: spec constant, not an implementation detail -- and
-#: ``tests/test_projects.py::test_entry_point_group_matches_the_runtime`` fails
-#: if the two ever drift.
-ENTRY_POINT_GROUP = "imio.emailkit.templates"
+#: Substring that marks a ZCML file as carrying emailkit directives. Duplicated
+#: from ``imio.emailkit.scan.MARKER`` on purpose: this module runs inside
+#: buildout, where importing imio.emailkit would pull the Plone runtime into
+#: the build system. ``tests/test_projects.py::test_marker_matches_the_runtime``
+#: fails if the two ever drift.
+MARKER = "namespaces.imio.be/emailkit"
+
+#: Directories never worth descending into while looking for ZCML.
+PRUNE_DIRS = {"node_modules", "__pycache__", ".git", "emails"}
 
 #: The ``directory`` key of a §4 registration, when the addon omits it.
 DEFAULT_DIRECTORY = "templates"
@@ -76,7 +79,8 @@ class Project:
     every consumer of it immediately needs.
     """
 
-    #: The §4 namespace, i.e. the entry-point name.
+    #: The §4 namespace, i.e. the package's own dotted name (the ZCML
+    #: registration's namespace, per ``iter_marker_packages``).
     package: str
     #: The importable package's own directory.
     package_dir: Path
@@ -158,7 +162,7 @@ class Project:
 def make_project(package, package_dir, directory=None):
     """Build a :class:`Project` from a package directory.
 
-    :param package: the §4 namespace (the entry-point name)
+    :param package: the §4 namespace (the ZCML registration's dotted name)
     :param package_dir: the importable package's directory
     :param directory: the registration's ``directory`` key; ``None`` means the
         caller could not read it and :data:`DEFAULT_DIRECTORY` is used
@@ -196,49 +200,81 @@ def find_emails_dir(package_dir):
 
 
 # ---------------------------------------------------------------------------
-# Collector 1: inside buildout (pkg_resources metadata, no imports)
+# Collector 1: inside buildout (filesystem marker scan, no imports)
 # ---------------------------------------------------------------------------
 
 
-def from_working_set(working_set):
-    """Collect the projects of every dist in ``working_set`` that registers.
+def iter_marker_packages(dist):
+    """``(dotted_name, package_dir)`` for each package of ``dist`` whose ZCML
+    mentions the emailkit namespace.
 
-    Imports nothing. The registration's ``directory`` key is therefore *not*
-    read; :data:`DEFAULT_DIRECTORY` is assumed, which is what §4's own example
-    and every registration in this repository use. The generated scripts resolve
-    it for real (:func:`from_environment`), so a package that overrides it still
+    Filesystem-only, import-free: safe inside buildout. The dotted name is the
+    path of the directory holding the marked ZCML file, relative to the
+    ``sys.path`` root -- which is exactly the namespace the directive gives its
+    templates at runtime (the package the ZCML file belongs to).
+    """
+    location = Path(getattr(dist, "location", "") or "")
+    for root in (location, location / "src"):
+        if not root.is_dir():
+            continue
+        for top in _top_level_names(dist, root):
+            top_dir = root / top
+            if not top_dir.is_dir():
+                continue
+            for zcml in sorted(top_dir.rglob("*.zcml")):
+                if PRUNE_DIRS.intersection(zcml.parts):
+                    continue
+                try:
+                    text = zcml.read_text(encoding="utf-8", errors="ignore")
+                except OSError:
+                    continue
+                if MARKER not in text:
+                    continue
+                package_dir = zcml.parent
+                if not (package_dir / "__init__.py").is_file():
+                    logger.warning(
+                        "%s mentions the emailkit namespace but %s is not a "
+                        "package directory; skipping it.",
+                        zcml,
+                        package_dir,
+                    )
+                    continue
+                yield ".".join(package_dir.relative_to(root).parts), package_dir
+
+
+def _top_level_names(dist, root):
+    """The distribution's top-level package names, from metadata when it has
+    any, from the filesystem when it does not (develop eggs, mainly).
+
+    Restricting the walk to the dist's own top-level packages is what keeps a
+    shared ``site-packages`` location from being rglobbed once per installed
+    distribution.
+    """
+    try:
+        names = [line for line in dist.get_metadata_lines("top_level.txt") if line]
+    except (KeyError, OSError, AttributeError):
+        names = []
+    if names:
+        return names
+    return sorted(
+        p.name for p in root.iterdir() if p.is_dir() and (p / "__init__.py").is_file()
+    )
+
+
+def from_working_set(working_set):
+    """Collect the projects of every dist whose ZCML carries the marker.
+
+    Imports nothing, executes nothing -- a buildout run stays a buildout run.
+    The directive's ``directory`` attribute is therefore *not* read;
+    :data:`DEFAULT_DIRECTORY` is assumed, which is what the spec's example and
+    every registration in this repository use. The generated scripts resolve it
+    for real (:func:`from_environment`), so a package that overrides it still
     builds correctly -- only buildout's log line would name the default.
     """
     resolved = {}
-    unresolved = {}
-    for entry_point in sorted(
-        working_set.iter_entry_points(ENTRY_POINT_GROUP),
-        key=lambda ep: ep.name,
-    ):
-        if entry_point.name in resolved:
-            continue
-        package_dir = locate_package(entry_point.dist, entry_point.module_name)
-        if package_dir is None:
-            # Two distributions can legitimately answer for one name -- a develop
-            # egg shadowing an installed copy is the everyday case -- and only one
-            # of them has the files. Remember the failure and complain only if no
-            # candidate works out, so a shadowed install is silent and a genuinely
-            # broken registration is not.
-            unresolved.setdefault(entry_point.name, entry_point)
-            continue
-        resolved[entry_point.name] = make_project(entry_point.name, package_dir)
-
-    for name, entry_point in sorted(unresolved.items()):
-        if name in resolved:
-            continue
-        logger.warning(
-            "%r registers %s but its module %r could not be located under %s; "
-            "skipping it.",
-            name,
-            ENTRY_POINT_GROUP,
-            entry_point.module_name,
-            getattr(entry_point.dist, "location", "?"),
-        )
+    for dist in sorted(working_set, key=str):
+        for dotted, package_dir in iter_marker_packages(dist):
+            resolved.setdefault(dotted, make_project(dotted, package_dir))
     return [resolved[name] for name in sorted(resolved)]
 
 
@@ -300,51 +336,46 @@ def _kit_dir(package_dir, package):
 
 
 def from_environment():
-    """Collect the projects of every registration importable from ``sys.path``.
+    """Collect the projects visible from ``sys.path``, resolved for real.
 
     Used by the generated scripts, which run with the part's ``eggs`` on their
-    path. Here the registration module *is* importable, so the ``directory`` key
-    is honoured.
+    path -- so ``imio.emailkit`` is importable and each candidate's ZCML is
+    *executed* (permissively) rather than pattern-matched: the ``directory``
+    attribute, includes, conditions and overrides all behave exactly as at
+    instance startup. Side effect, relied on by ``preview-emails``: the
+    discovery registry is populated.
     """
-    from importlib.metadata import entry_points
+    from imio.emailkit import discovery
+    from imio.emailkit import scan
+
+    import pkg_resources
 
     projects = []
-    for entry_point in sorted(
-        entry_points(group=ENTRY_POINT_GROUP), key=lambda ep: ep.name
-    ):
-        try:
-            package_dir, directory = _resolve_by_import(entry_point)
-        except Exception as exc:
-            logger.warning(
-                "Could not resolve the %s registration of %r (%s: %s); skipping it.",
-                ENTRY_POINT_GROUP,
-                entry_point.name,
-                type(exc).__name__,
-                exc,
-            )
-            continue
-        projects.append(make_project(entry_point.name, package_dir, directory))
+    seen = set()
+    for dist in sorted(pkg_resources.working_set, key=str):
+        for dotted, package_dir in iter_marker_packages(dist):
+            if dotted in seen:
+                continue
+            seen.add(dotted)
+            try:
+                scan.scan_package(dotted)
+            except Exception as exc:
+                logger.warning(
+                    "Could not scan the emailkit registration of %r (%s: %s); "
+                    "skipping it.",
+                    dotted,
+                    type(exc).__name__,
+                    exc,
+                )
+                continue
+            templates_dir = discovery.registered_directories().get(dotted)
+            if templates_dir is None:
+                # Marker present but no block survived (all conditioned away,
+                # say). Nothing to build.
+                continue
+            directory = str(templates_dir.relative_to(package_dir))
+            projects.append(make_project(dotted, package_dir, directory))
     return projects
-
-
-def _resolve_by_import(entry_point):
-    """``(package_dir, directory)`` for one entry point, by importing it.
-
-    Mirrors ``imio.emailkit.discovery._resolve_directory``: the directory is
-    relative to the module the entry point *points at*, while the namespace is
-    the entry-point *name*.
-    """
-    from importlib import import_module
-
-    module = import_module(entry_point.module)
-    package_dir = Path(module.__file__).parent
-    registration = module
-    for attribute in entry_point.attr.split("."):
-        registration = getattr(registration, attribute)
-    directory = None
-    if isinstance(registration, dict):
-        directory = registration.get("directory")
-    return package_dir, directory
 
 
 def kit_dir_from_environment(package="imio.emailkit"):

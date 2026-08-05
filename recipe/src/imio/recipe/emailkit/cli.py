@@ -49,9 +49,8 @@ def base_parser(prog, description):
         metavar="NAME",
         default=None,
         help=(
-            "act on this package only, as named by its "
-            f"`{projects_module.ENTRY_POINT_GROUP}` entry point "
-            "(SPEC §4). Default: every registered package."
+            "act on this package only, as named by its <emailkit:templates> "
+            "ZCML registration. Default: every registered package."
         ),
     )
     parser.add_argument(

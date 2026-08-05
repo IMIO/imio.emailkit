@@ -1,7 +1,7 @@
 # A minimal *external* consumer addon, used by the buildout acceptance harness.
 #
-# Its whole job is to be a second, independent distribution that registers the
-# `imio.emailkit.templates` entry point, so the recipe is exercised against
+# Its whole job is to be a second, independent distribution that registers
+# `<emailkit:templates>` in its own ZCML, so the recipe is exercised against
 # something it does not own. Two things it proves that `imio.emailkit` cannot:
 #
 #  1. SPEC §4's **in-package** layout -- `emails/` and `templates/` as siblings
@@ -23,9 +23,6 @@ requires-python = ">=3.10"
 # has to resolve anything extra to install it.
 dependencies = []
 
-[project.entry-points."imio.emailkit.templates"]
-emailkitdemo = "emailkitdemo:emailkit"
-
 [build-system]
 requires = ["setuptools>=68.2"]
 build-backend = "setuptools.build_meta"
@@ -34,4 +31,4 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-"*" = ["*.pt"]
+"*" = ["*.zcml", "*.pt"]
