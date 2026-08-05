@@ -68,8 +68,8 @@ registration must not go unnoticed just because it was found by a build tool. Ev
 outside that namespace (`browser:page`, `plone:*`, `genericsetup:*`, …) is swallowed
 without its handler or the classes it names ever being imported: an unknown directive
 never resolves its schema or handler, so a foreign directive whose target class raises on
-import cannot break the scan. `tests/test_scan.py` pins this with a fixture directive
-whose handler raises `ImportError` if imported.
+import cannot break the scan. `tests/test_scan.py` pins this with a fixture
+`browser:page` whose target class's module raises `ImportError` on import.
 
 **The i18n regression, and its fix.** `i18ndude rebuild-pot` extracts msgids from `.py`
 and `.pt` only, never from ZCML, so a `subject`/`preheader` msgid that lives solely in

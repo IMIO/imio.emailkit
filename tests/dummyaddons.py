@@ -168,12 +168,12 @@ def _drop_from_sys_path():
 def _snapshot_of_the_dummies():
     """The registry entries belonging to the dummies, as ``(templates, dirs)``.
 
-    Normally both are empty -- that is the invariant this module exists to keep --
-    and they are non-empty only when ``installed()`` blocks are nested. The gate
-    modules never do that (each calls ``installed()`` once per test, not one inside
-    another); the only place nesting actually happens is the synthetic
-    ``test_dummy_isolation.py::test_nested_installation_still_leaves_nothing``,
-    which nests it on purpose to prove the un-nesting is exact either way.
+    Normally both are empty -- that is the invariant this module exists to keep.
+    They are non-empty when the snapshot is taken inside an open ``installed()``
+    block: ``uninstalled()`` does exactly that in every ordinary gate run, and the
+    synthetic ``test_dummy_isolation.py::test_nested_installation_still_leaves_nothing``
+    nests ``installed()`` itself to prove the un-nesting is exact either way. The
+    gate modules never nest ``installed()`` (each calls it once per test).
     """
     from imio.emailkit import discovery
 
