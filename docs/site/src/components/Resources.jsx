@@ -57,7 +57,7 @@ const resources = [
     href: '/integration/shipping-templates',
     name: 'Shipping templates',
     description:
-      'Declare one entry point and your own add-on\u2019s templates become discoverable, previewable and sendable.',
+      'Declare an <emailkit:templates> ZCML registration and your own add-on\u2019s templates become discoverable, previewable and sendable.',
     icon: PackageIcon,
     pattern: { y: 22, squares: [[0, 1]] },
   },

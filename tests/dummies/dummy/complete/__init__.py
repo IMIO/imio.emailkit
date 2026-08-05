@@ -33,6 +33,12 @@ out, so it cannot disagree with reality. The msgid domain of ``subject`` and
 ``preheader`` is the file's ``i18n_domain``, which is why no ``MessageFactory``
 appears in this module.
 
+**One ``<emailkit:templates>`` block per package.** Both of this add-on's
+templates live inside the single block above; a second block declared anywhere
+else in ``dummy.complete`` would conflict with it at startup (both would try to
+record where this package's compiled output lands), so every template a package
+ships is listed together.
+
 **Note the template basename.** ``notification`` is *also* registered by
 ``dummy.minimal`` **and** by ``imio.emailkit`` itself. There is no clash, because
 every lookup is namespaced: ``dummy.complete:notification``,

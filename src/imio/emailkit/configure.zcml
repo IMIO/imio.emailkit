@@ -26,7 +26,7 @@
        Plone default mails (mail_password_template, registered_notify_template)
        are deliberately NOT here: a stock Plone view renders them, their bodies
        speak that view's dialect, and a registration would resolve to a template
-       render() can never render. get_username IS here because this package owns
+       that render() can never render. get_username IS here because this package owns
        that view and renders it through render(). See docs/DECISIONS.md. -->
   <emailkit:templates directory="templates">
     <emailkit:template

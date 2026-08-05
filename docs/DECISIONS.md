@@ -8,6 +8,85 @@ Newest entries at the top.
 
 ---
 
+## 2026-08-05 — Template registration moved from an entry point + dict to the `<emailkit:templates>` ZCML directive
+
+**Context.** §4 registration rode on a setuptools entry point pointing at a module-level
+dict, scanned once at startup and cached. It worked, but it was not the idiomatic Zope
+registration mechanism: duplicate names silently overwrote each other, there was no
+`overrides.zcml` story, and msgid domains had to be wired by hand through a
+`MessageFactory`. The runtime also carried a scan/cache/warm-up dance
+(`invalidate_cache`, `warm_cache` on `IDatabaseOpenedWithRoot`) purely to simulate what
+ZCML execution gives for free.
+
+**Decision.** Replace the entry point with a `meta:complexDirective`,
+`<emailkit:templates>`/`<emailkit:template>`, defined in `imio.emailkit`'s own
+`meta.zcml` (`src/imio/emailkit/zcml.py`). Each `<emailkit:template>` becomes a
+configuration action that resolves the `.pt`/`.txt.pt` files on disk and writes one
+entry into a plain module-level registry (`src/imio/emailkit/discovery.py`) — no scan,
+no cache, no warm-up subscriber: ZCML execution *is* the startup scan, so the
+missing-plaintext-twin warning already lands in the startup log by construction.
+
+**Why.**
+
+1. **Conflict detection for free.** Two templates registering the same name is now a
+   `ConfigurationConflictError` at startup, exactly like every other duplicate Zope
+   registration — not a silent overwrite nobody notices until the wrong body ships.
+2. **`overrides.zcml` works with no bespoke mechanism.** Replacing a registration is the
+   stock `includeOverrides` story every consumer already knows from `browser:page` and
+   friends.
+3. **The msgid domain comes from `i18n_domain`.** `subject`/`preheader` are
+   `zope.configuration.fields.MessageID`s (`"[msgid] Default text"` syntax), taking their
+   domain from the enclosing ZCML file — consumers no longer hand-build msgids in Python
+   with their own `MessageFactory`.
+4. **One registration idiom.** Every other piece of `imio.emailkit`'s own wiring
+   (adapters, views, the content-rule action, the vocabulary) is ZCML; the templates were
+   the one thing that was not, for no reason that survived scrutiny.
+5. **No scan/cache/warm-up machinery to keep correct.** The registry has exactly one
+   write path (`discovery.register_template`), called by the directive handler. Nothing
+   invalidates it because nothing caches ahead of it.
+
+**Build-time discovery.** The buildout recipe and the generated `bin/` scripts cannot
+import Plone, so they cannot execute real ZCML the way an instance does. They instead run
+a `PermissiveConfigurationMachine` (`src/imio/emailkit/scan.py`) — a
+`zope.configuration.config.ConfigurationMachine` subclass whose `factory()` swallows any
+directive outside the emailkit namespace (returning a no-op stack item) instead of raising
+`ConfigurationError`. Only `imio.emailkit`'s own `meta.zcml` is loaded for real, so
+`<emailkit:templates>` executes through the exact same handler, into the exact same
+registry, as a live instance start — `<include>`, `zcml:condition` and `overrides.zcml`
+all behave with genuine semantics, because they *are* genuine `zope.configuration`. The
+one documented divergence: `zcml:condition="have some-feature"` reads false at build time,
+since nothing loads the full instance ZCML that would provide the feature. The recipe's
+install step only does a cheap filesystem marker scan (`namespaces.imio.be/emailkit`
+substring in a package's `.zcml`) — it imports nothing, so a buildout run stays a buildout
+run; the generated scripts, which run with the instance eggs on `sys.path`, do the real
+scan.
+
+**Fail loud vs. swallow, drawn at the namespace boundary.** A malformed
+`<emailkit:template>` (bad attribute, duplicate name) raises exactly as it would at
+instance startup, in both the recipe's scan and a real boot — a broken *emailkit*
+registration must not go unnoticed just because it was found by a build tool. Everything
+outside that namespace (`browser:page`, `plone:*`, `genericsetup:*`, …) is swallowed
+without its handler or the classes it names ever being imported: an unknown directive
+never resolves its schema or handler, so a foreign directive whose target class raises on
+import cannot break the scan. `tests/test_scan.py` pins this with a fixture directive
+whose handler raises `ImportError` if imported.
+
+**The i18n regression, and its fix.** `i18ndude rebuild-pot` extracts msgids from `.py`
+and `.pt` only, never from ZCML, so a `subject`/`preheader` msgid that lives solely in
+`configure.zcml` would silently vanish from a locales rebuild. `imio.emailkit` ships
+`src/imio/emailkit/msgids.py`, a module whose only job is to call the message factory on
+each ZCML msgid so `i18ndude` sees it; `tests/test_msgids.py` fails if the shim and
+`configure.zcml` drift apart. This is a real cost versus the dict approach (which needed
+no shim) and is documented as such rather than hidden.
+
+**Clean cut.** No deprecation shim, no entry-point fallback. The entry point is deleted
+everywhere it existed, including both dummy test add-ons
+(`tests/dummies/dummy/{complete,minimal}`), which now carry a `configure.zcml` exactly
+like a real consumer. Nothing in this repository, or in any addon it is aware of, depended
+on the old mechanism surviving alongside the new one.
+
+---
+
 ## 2026-07-29 — REVERSED (my error): the content-rule action registers via plain ZCML, not GenericSetup
 
 **Context.** §8.3 adds a "Send styled email" content-rule action. §8.2 level 3 makes `:base` the opt-out
@@ -1394,7 +1473,7 @@ not repeated. Registration happens at first release, not now.
 
 **Context.** The git remote was `github.com/IMIO/imio.mailkit`, but `SPEC.md` names the
 distribution `imio.emailkit` throughout (§2 artifacts table, §3 kit path
-`imio/emailkit/kit/`, §4 entry-point group `imio.emailkit.templates`, §5 recipe
+`imio/emailkit/kit/`, §4 registration namespace `http://namespaces.imio.be/emailkit`, §5 recipe
 `imio.recipe.emailkit`, §8 profiles `imio.emailkit:base`/`:default`, registry records
 `imio.emailkit.theme.*`).
 

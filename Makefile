@@ -69,8 +69,8 @@ TWINS_FOLDER=$(BACKEND_FOLDER)/emails/twins
 
 # Where the committed build output lives. Two destinations because the two kinds
 # of artifact are addressed differently at runtime: templates are looked up by
-# name through the entry point (§4), overrides by the dotted path of the file
-# they shadow (§8.1).
+# name through the <emailkit:templates> registry (§4), overrides by the dotted
+# path of the file they shadow (§8.1).
 #
 # `emails/maizzle.config.js` writes here directly -- `output.path` for templates,
 # `useOutputPath()` + `emailkit.overridesPath` for the two jbot overrides -- and
@@ -388,7 +388,7 @@ recipe-test: $(RECIPE_VENV) $(VENV_FOLDER) ## Run imio.recipe.emailkit's own tes
 	#  1. recipe/.venv has zc.buildout and zc.recipe.egg, so the recipe class is
 	#     exercised against the real pkg_resources types. It has no Plone, so the
 	#     two tests that need the runtime skip there.
-	#  2. .venv has the runtime, so those two run: the entry-point-group drift
+	#  2. .venv has the runtime, so those two run: the MARKER-string drift
 	#     check (the one string this distribution duplicates on purpose) and the
 	#     theme-token check. test_recipe.py skips there for lack of buildout.
 	#

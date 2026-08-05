@@ -66,9 +66,10 @@
       <aside>
         <h2>Templates</h2>
         <p tal:condition="not:view/template_rows" class="hint warn">
-          Nothing is registered in the <code>imio.emailkit.templates</code> entry
-          point group. Note that SPEC §8's two Plone default mails are
-          deliberately not registered -- a stock view renders them.
+          No add-on has registered a template with
+          <code>&lt;emailkit:templates&gt;</code>. Note that SPEC §8's two Plone
+          default mails are deliberately not registered -- a stock view renders
+          them.
         </p>
         <ul>
           <li tal:repeat="row view/template_rows" tal:attributes="class row/css">

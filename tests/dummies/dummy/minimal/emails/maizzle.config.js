@@ -44,7 +44,7 @@ export default defineConfig({
     ...kit.output,
     /**
      * SPEC §4's consumer layout: build output is committed to `<package>/templates/`
-     * and is what the entry-point registration's `directory` key names.
+     * and is what the ZCML registration's `directory` attribute names.
      */
     path: resolve(here, '..', 'templates'),
   },

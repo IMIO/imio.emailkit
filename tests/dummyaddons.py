@@ -169,8 +169,11 @@ def _snapshot_of_the_dummies():
     """The registry entries belonging to the dummies, as ``(templates, dirs)``.
 
     Normally both are empty -- that is the invariant this module exists to keep --
-    and they are non-empty exactly when ``installed()`` blocks are nested, which
-    the gate modules do.
+    and they are non-empty only when ``installed()`` blocks are nested. The gate
+    modules never do that (each calls ``installed()`` once per test, not one inside
+    another); the only place nesting actually happens is the synthetic
+    ``test_dummy_isolation.py::test_nested_installation_still_leaves_nothing``,
+    which nests it on purpose to prove the un-nesting is exact either way.
     """
     from imio.emailkit import discovery
 
@@ -228,10 +231,17 @@ def installed():
     in a module that never heard of the dummies.
 
     Subtracting exactly what was added has no such coupling to when anything else
-    registers. The dummies' own prior entries are restored, so nesting behaves
-    (the gate modules install per test *and* call this directly), and
-    ``sys.path`` is cleared unconditionally rather than incrementally -- so
-    "registered inside, gone outside" holds however the block was entered.
+    registers. The dummies' own prior entries are restored, so registry nesting
+    behaves (the gate modules install per test *and* call this directly).
+
+    That guarantee is narrower than it looks, and it covers the registry only.
+    ``sys.path`` is cleared **unconditionally** in ``finally`` rather than
+    restored to what it held on entry, so an inner ``installed()`` exiting
+    would evict the path out from under a still-open outer block, if anything
+    ever nested that way -- nothing in this module does. The one test that
+    nests, ``test_nested_installation_still_leaves_nothing`` in
+    ``test_dummy_isolation.py``, only asserts on the registry for exactly this
+    reason.
     """
     from imio.emailkit import scan
 
@@ -260,6 +270,11 @@ def uninstalled():
     The mirror image of :func:`installed`, and subtractive for the same reason:
     only the dummies' entries are touched, so nothing else that registers while
     the block is open can be lost by putting a whole-registry snapshot back.
+
+    Deliberately touches only the registry -- unlike :func:`installed`, there is
+    no ``sys.path`` handling here. Its only job is to take a registration away
+    again, not to make anything importable, so there is nothing on ``sys.path``
+    for it to manage.
     """
     saved = _snapshot_of_the_dummies()
     _forget_the_dummies()

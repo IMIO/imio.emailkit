@@ -136,43 +136,70 @@ src/imio/pm/notifications/
 
 `MANIFEST.in`: `recursive-include ... templates *.pt`, `prune ... emails`.
 
-### Registration: entry point
+### Registration: ZCML directive
 
-Consumers declare one entry point in `setup.py`:
+Consumers declare their templates with the `<emailkit:templates>` directive, in
+their own `configure.zcml`:
 
-```python
-entry_points={
-    "imio.emailkit.templates": [
-        "imio.pm.notifications = imio.pm.notifications:emailkit",
-    ],
-}
-```
+```xml
+<!-- imio/pm/notifications/configure.zcml -->
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="imio.pm.notifications"
+    >
 
-pointing at a module-level dict:
+  <include package="imio.emailkit" file="meta.zcml" />
 
-```python
-# imio/pm/notifications/__init__.py
-emailkit = {
-    "directory": "templates",          # relative to package
-    "templates": {
-        "item_published": {
-            "subject": _("email_subject_item_published"),        # i18n msgid
-            "preheader": _("email_preheader_item_published"),    # optional
-        },
-        "meeting_convocation": {
-            "subject": _("email_subject_meeting_convocation"),
-        },
-    },
-}
+  <emailkit:templates directory="templates">
+    <emailkit:template
+        name="item_published"
+        subject="[email_subject_item_published] An item was published"
+        preheader="[email_preheader_item_published] ..."
+        />
+    <emailkit:template
+        name="meeting_convocation"
+        subject="[email_subject_meeting_convocation] Convocation"
+        />
+  </emailkit:templates>
+
+</configure>
 ```
 
 - Template names are namespaced at lookup: `imio.pm.notifications:item_published`.
-- The **subject lives in the registration** as an i18n msgid, translated per recipient language at send time. No metadata sidecar, no front-matter round-trip.
-- **`preheader`** is an optional msgid per template — the hidden inbox-preview line next to the subject, rendered into the layout's hidden `<div>` (§3). The highest-visibility email feature that everyone forgets; every inbox shows it. Omitted → the div collapses to nothing.
-- `imio.emailkit` scans the entry-point group once at startup (and caches); lookup resolves package → directory → `<name>.pt` / `<name>.txt.pt`. `imio.emailkit` registers its own templates through the same mechanism (it is its own first consumer).
-- **Overrides:** `z3c.jbot` works on the resolved `.pt` files (per-site or per-client overlays), no additional mechanism.
+  The package half of the name is **derived from the ZCML file's own package** —
+  the consumer never spells it out, so it cannot disagree with reality.
+- **`subject` and `preheader` are `MessageID`s** in the enclosing `i18n_domain`,
+  written `[msgid] Default text` to pick the msgid explicitly — the default is
+  what reaches the inbox until a catalog translates it. The subject **lives in
+  the registration**, translated per recipient language at send time; no
+  metadata sidecar, no front-matter round-trip. `preheader` stays optional — the
+  hidden inbox-preview line next to the subject, rendered into the layout's
+  hidden `<div>` (§3), the highest-visibility email feature that everyone
+  forgets. Omitted → the div collapses to nothing.
+- **One `<emailkit:templates>` block per package.** It is a `zope.configuration`
+  grouping directive, so every template a package ships is declared inside a
+  single block; a second block in the same package conflicts with the first —
+  deliberate, since both would try to answer "where does this package's
+  compiled output land" and there can only be one answer.
+- **Duplicate template name → `ConfigurationConflictError`** at startup, not a
+  silent overwrite — the same mechanism every other Zope registration gets.
+- `directory` may point outside the package's own directory via relative
+  traversal (`../templates`, say, for a subpackage sharing its parent's
+  compiled output); an absolute path is refused.
+- **`overrides.zcml` replaces a registration** the same way it replaces any
+  other ZCML-registered component — no bespoke override plumbing.
+- **i18n caveat:** `i18ndude` extracts msgids from `.py` and `.pt`, never from
+  ZCML, so a `subject`/`preheader` msgid that lives only in `configure.zcml`
+  would silently drop out of the `.pot` on a locales rebuild. Consumers that
+  want automated extraction restate the same msgids in a small Python module
+  (e.g. `msgids.py`) that does nothing but call the message factory on each one
+  — exactly what `imio.emailkit` does for its own templates (see
+  `src/imio/emailkit/msgids.py`).
+- **Overrides (markup):** `z3c.jbot` works on the resolved `.pt` files (per-site
+  or per-client overlays), no additional mechanism.
 
-Failure modes are explicit: unknown template name → `TemplateNotFound(name, available=[...])`; missing `.txt.pt` twin → warning at startup, `render()` falls back to a naive text extraction with a logged deprecation.
+Failure modes are otherwise unchanged: unknown template name → `TemplateNotFound(name, available=[...])`; missing `.txt.pt` twin → warning at startup, `render()` falls back to a naive text extraction with a logged deprecation; missing `.pt` → warning at startup, the template is skipped.
 
 ---
 
@@ -196,7 +223,7 @@ eggs = ${instance:eggs}
 
 The recipe **does not compile during buildout** by default. It:
 
-1. Resolves all eggs, collects distributions exposing the `imio.emailkit.templates` entry point, and records `(package, emails_dir, templates_dir)` tuples. It also resolves the kit directory from the `imio.emailkit` egg.
+1. Resolves all eggs, collects the packages whose ZCML mentions the emailkit namespace — a filesystem marker scan at install time; buildout imports nothing — and records `(package, emails_dir, templates_dir)` tuples. It also resolves the kit directory from the `imio.emailkit` egg. The generated scripts re-resolve at run time by *executing* each candidate's ZCML through a permissive configuration machine (only the emailkit directives are live; unknown directives are swallowed unimported), so `directory`, includes, conditions and `overrides.zcml` behave exactly as at instance startup. Known divergence: feature-flag conditions (`have x`) read false at build time, since nothing loads the ZCML that would provide the feature.
 2. Generates three scripts:
 
 **`bin/compile-emails [--package NAME] [--watch] [--new NAME]`**
@@ -344,7 +371,7 @@ Deferring the npm kit simplifies the critical path: `imio.emailkit` is its own f
 | **1 — Better defaults** | `render()` + locale helpers, built-in kit (`Main.vue` + core components + tokens; a11y defaults, `lang`, preheader slot), restyled password-reset & registration mails, `:base`/`:default` profiles | Installed on one production site; stock mails restyled; opt-out and layer-override both verified |
 | **2 — API** | `Email` builder, recipient adapters, attachments, per-language send, preview view + send-test | First real notification sent through the builder end-to-end |
 | **3 — Shell for existing mails** | `render_shell(subject, body_html)`; existing PloneMeeting notification bodies dropped into the slot | All PloneMeeting notifications sent styled, zero template redesign |
-| **4 — Consumer mechanics** | `imio.recipe.emailkit` (kit wiring, `compile-emails` + `--new` scaffolding, `check-emails` + authoring lint, `preview-emails`), entry-point discovery for external addons, golden-test base class, `emailkit` Agent Skill | One pilot consumer addon green in CI, including staleness and lint gates |
+| **4 — Consumer mechanics** | `imio.recipe.emailkit` (kit wiring, `compile-emails` + `--new` scaffolding, `check-emails` + authoring lint, `preview-emails`), ZCML-directive discovery for external addons, golden-test base class, `emailkit` Agent Skill | One pilot consumer addon green in CI, including staleness and lint gates |
 | **5 — Adoption** | Content-rule action; migrate remaining notifications to purpose-built templates; second consumer addon | Two independent addons shipping templates |
 
 Phase 0 remains the load-bearing one, but it shrank: the Maizzle-output-vs-Chameleon interaction is now the only unvalidated assumption on the critical path (discovery/recipe validation moved to Phase 4).

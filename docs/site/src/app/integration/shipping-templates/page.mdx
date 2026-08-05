@@ -1,59 +1,75 @@
 export const metadata = {
   title: 'Shipping templates',
   description:
-    'Declare one entry point and your own add-on’s templates become discoverable, previewable, testable and sendable.',
+    'Declare an <emailkit:templates> ZCML registration and your own add-on’s templates become discoverable, previewable, testable and sendable.',
 }
 
 # Shipping templates from your add-on
 
-One entry point pointing at one dict. That is the whole registration mechanism — `imio.emailkit` uses exactly the same one for its own templates, so it is its own first consumer. {{ className: 'lead' }}
+One `<emailkit:templates>` ZCML block. That is the whole registration mechanism — `imio.emailkit` uses exactly the same directive for its own templates, so it is its own first consumer. {{ className: 'lead' }}
 
-## Declare the entry point
+## Declare the registration
 
-```python
-entry_points = {
-    "imio.emailkit.templates": [
-        "imio.pm.notifications = imio.pm.notifications:emailkit",
-    ],
-}
-```
+```xml
+<!-- imio/pm/notifications/configure.zcml -->
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="imio.pm.notifications"
+    >
 
-## Point it at a dict
+  <include package="imio.emailkit" file="meta.zcml" />
 
-```python
-# imio/pm/notifications/__init__.py
-emailkit = {
-    "directory": "templates",          # relative to the package
-    "templates": {
-        "item_published": {
-            "subject": _("email_subject_item_published"),
-            "preheader": _("email_preheader_item_published"),  # optional
-        },
-        "meeting_convocation": {
-            "subject": _("email_subject_meeting_convocation"),
-        },
-    },
-}
+  <emailkit:templates directory="templates">
+    <emailkit:template
+        name="item_published"
+        subject="[email_subject_item_published] An item was published"
+        preheader="[email_preheader_item_published] ..."
+        />
+    <emailkit:template
+        name="meeting_convocation"
+        subject="[email_subject_meeting_convocation] Convocation"
+        />
+  </emailkit:templates>
+
+</configure>
 ```
 
 <Properties>
   <Property name="directory" type="str, default 'templates'">
-    Where the compiled `.pt` files live, relative to your package.
+    Where the compiled `.pt` files live, relative to the package the ZCML file
+    belongs to.
   </Property>
-  <Property name="subject" type="i18n msgid">
+  <Property name="subject" type="MessageID, '[msgid] Default text'">
     Lives **in the registration**, translated per recipient language at send
-    time. There is no metadata sidecar and no front-matter round-trip.
+    time. The msgid comes from the bracketed prefix, its domain from the
+    enclosing `i18n_domain`; there is no metadata sidecar and no front-matter
+    round-trip.
   </Property>
-  <Property name="preheader" type="i18n msgid, optional">
+  <Property name="preheader" type="MessageID, optional">
     The hidden inbox-preview line next to the subject — the highest-visibility
     email feature everyone forgets, and every inbox shows it. Omitted, the div
     collapses to nothing.
   </Property>
 </Properties>
 
-Names are namespaced at lookup: `imio.pm.notifications:item_published`. An unknown name raises `TemplateNotFound` carrying the list of names that _are_ registered.
+Names are namespaced at lookup: `imio.pm.notifications:item_published`. The package half of that name is derived from the ZCML file's own package — you never spell it out, so it cannot disagree with reality. An unknown name raises `TemplateNotFound` carrying the list of names that _are_ registered.
 
-The entry-point group is scanned once at start-up and cached.
+<Note>
+  **One `<emailkit:templates>` block per package**, and **duplicate template
+  names are a startup error.** A second block in the same package, or two
+  templates sharing a `name`, raises `ConfigurationConflictError` when ZCML
+  loads — not a silent overwrite. `overrides.zcml` can replace a registration
+  the same way it replaces any other ZCML-registered component.
+</Note>
+
+<Note>
+  **i18n caveat.** `i18ndude` extracts msgids from `.py` and `.pt`, never from
+  ZCML. If your add-on rebuilds its `.pot` with it, restate the same msgids in
+  a small `msgids.py` module whose only job is calling the message factory on
+  each one — exactly what `imio.emailkit` does for its own templates
+  (`src/imio/emailkit/msgids.py`).
+</Note>
 
 ## Lay the package out
 
@@ -98,7 +114,7 @@ eggs = ${instance:eggs}
 # node-bin = node
 ```
 
-The recipe resolves the part's eggs, collects every distribution exposing the `imio.emailkit.templates` entry point, resolves the design kit from the `imio.emailkit` egg, and generates three scripts:
+The recipe resolves the part's eggs, collects every package whose ZCML registers `<emailkit:templates>` (a filesystem marker scan — buildout imports nothing), resolves the design kit from the `imio.emailkit` egg, and generates three scripts:
 
 <Properties>
   <Property name="bin/compile-emails [--package NAME] [--watch] [--new NAME]">

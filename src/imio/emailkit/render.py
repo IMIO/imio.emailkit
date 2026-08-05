@@ -66,7 +66,7 @@ logger = logging.getLogger("imio.emailkit.render")
 #: SPEC §9 phase 3's shell -- the kit layout (§3) with no authored content, whose
 #: whole body is the ``body_html`` :func:`render_shell` injects.
 #:
-#: Resolved by **path**, not through §4's entry-point discovery, because
+#: Resolved by **path**, not through §4's registry, because
 #: ``render_shell(subject, body_html)`` takes no template name: there is nothing
 #: to look up, and registering it would put a template nobody can call by name in
 #: ``TemplateNotFound.available`` and in the §6.3 preview list. This does not bend

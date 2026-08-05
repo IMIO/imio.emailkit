@@ -1,6 +1,6 @@
 ---
 name: emailkit
-description: Author, test and ship transactional email templates with imio.emailkit (Maizzle 6 + Chameleon, Plone). Use whenever you touch a .vue email template, a compiled .pt under templates/, an emails/ Maizzle project, a KitMain/KitButton/KitPanel/KitDataTable component, an imio.emailkit.templates entry point, a tests/fixtures/*.py or tests/golden/* snapshot, render()/render_shell()/Email(), or theme tokens (logo_url, primary_color, footer_html). Also use when an email renders wrong, ships raw ${...} placeholders, loses its CSS, or fails to parse at runtime.
+description: Author, test and ship transactional email templates with imio.emailkit (Maizzle 6 + Chameleon, Plone). Use whenever you touch a .vue email template, a compiled .pt under templates/, an emails/ Maizzle project, a KitMain/KitButton/KitPanel/KitDataTable component, an <emailkit:templates> ZCML registration, a tests/fixtures/*.py or tests/golden/* snapshot, render()/render_shell()/Email(), or theme tokens (logo_url, primary_color, footer_html). Also use when an email renders wrong, ships raw ${...} placeholders, loses its CSS, or fails to parse at runtime.
 ---
 
 # imio.emailkit — authoring emails
@@ -302,40 +302,47 @@ The shell defines them; read them as `${primary_color}` inside `bgcolor` or
 
 ## Registration (SPEC §4)
 
-One entry point per add-on, pointing at a module-level dict:
+One `<emailkit:templates>` block per add-on, in its own `configure.zcml`:
 
-```toml
-# pyproject.toml
-[project.entry-points."imio.emailkit.templates"]
-"my.addon" = "my.addon:emailkit"
+```xml
+<!-- my/addon/configure.zcml -->
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="my.addon"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <emailkit:templates directory="templates">
+    <!-- `[msgid] Default text` picks the msgid explicitly; the domain comes
+         from this file's `i18n_domain`, so no MessageFactory is needed. -->
+    <emailkit:template
+        name="item_published"
+        subject="[email_subject_item_published] Item published"
+        preheader="[email_preheader_item_published] …"
+        />
+  </emailkit:templates>
+
+</configure>
 ```
 
-```python
-# my/addon/__init__.py
-from zope.i18nmessageid import MessageFactory
-
-_ = MessageFactory("my.addon")
-
-emailkit = {
-    "directory": "templates",  # relative to this package; this is the default
-    "templates": {
-        "item_published": {
-            "subject": _("email_subject_item_published", default="Item published"),
-            "preheader": _("email_preheader_item_published", default="…"),  # optional
-        },
-    },
-}
-```
-
-- Lookups are namespaced: `my.addon:item_published`. The bare basename resolves to
+- Lookups are namespaced: `my.addon:item_published`. The package half of the name
+  is derived from the ZCML file's own package — the bare basename resolves to
   nothing, on purpose — two add-ons will eventually both ship `item_published`.
 - **The subject lives in the registration**, as a msgid, translated per recipient
   language at send time. Not in the template, not in a sidecar.
-- **Always pass `default=`.** Without it an untranslated subject reaches the inbox
-  as the bare msgid.
+- **Always give a default text.** Without it an untranslated subject reaches the
+  inbox as the bare msgid.
 - `preheader` is the hidden inbox-preview line, the highest-visibility email
   feature everyone forgets. Every inbox shows it; omitted, the client fills it with
   whatever body copy comes first. Keep it under ~100 characters.
+- **One block per package; duplicate template names conflict.** A second
+  `<emailkit:templates>` in the same package, or two templates with the same
+  `name`, is a `ConfigurationConflictError` at startup — not a silent overwrite.
+- **i18n caveat:** `i18ndude` never extracts from ZCML. If the add-on rebuilds its
+  `.pot` with it, restate the same msgids in a small `msgids.py` (see
+  `src/imio/emailkit/msgids.py` for the pattern this package uses on itself).
 - `MANIFEST.in`: `recursive-include …/templates *.pt` **and** `prune …/emails`.
 
 Overrides need no new mechanism: `z3c.jbot` works on the resolved `.pt`. A site

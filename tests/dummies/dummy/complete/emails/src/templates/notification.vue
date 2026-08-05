@@ -4,7 +4,7 @@
  *
  * Same basename as `dummy.minimal:notification` and as
  * `imio.emailkit:notification`, and there is no clash: SPEC §4 namespaces every
- * lookup by the entry-point name.
+ * lookup by the package the ZCML registration belongs to.
  *
  * Context keys (see `tests/fixtures/notification.py`):
  *   title     -- heading

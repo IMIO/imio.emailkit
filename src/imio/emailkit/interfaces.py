@@ -109,8 +109,8 @@ class TemplateNotFound(EmailkitError):
     """No template is registered under the requested name.
 
     SPEC §4 requires the available names to travel with the error: the mistake
-    is nearly always a typo or a forgotten entry point, and both are obvious
-    once the list is in front of you.
+    is nearly always a typo or a template whose ZCML never registered, and both
+    are obvious once the list is in front of you.
     """
 
     def __init__(self, name, available=()):

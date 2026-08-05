@@ -162,10 +162,10 @@ class GoldenTemplateTests:
     worth overriding is :meth:`render_parts`.
     """
 
-    #: Entry-point namespace of the add-on whose templates these are -- the
-    #: left-hand side of the ``imio.emailkit.templates`` registration. Lookup
-    #: names are ``<package>:<template>`` (SPEC §4), and the harness namespaces
-    #: :attr:`templates` with it.
+    #: Namespace of the add-on whose templates these are -- the package part of
+    #: the ``<package>:<template>`` lookup name its ``<emailkit:templates>`` ZCML
+    #: registration gives them (SPEC §4). The harness namespaces :attr:`templates`
+    #: with it.
     package = None
 
     #: Template basenames, *unqualified*.
@@ -230,7 +230,7 @@ class GoldenTemplateTests:
         assert cls.package, (
             f"{cls.__name__} sets no `package`. SPEC §4 namespaces template names "
             "as <package>:<template>, so the harness cannot look anything up "
-            "without the entry-point name of the add-on that registered them."
+            "without the package name the add-on's ZCML registered them under."
         )
         return f"{cls.package}:{template}"
 

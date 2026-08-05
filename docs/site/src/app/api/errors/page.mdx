@@ -27,8 +27,8 @@ from imio.emailkit.interfaces import (
   <Property name="TemplateNotFound" type="EmailkitError">
     No template is registered under the requested name. **Carries the list of
     names that are registered** — the mistake is nearly always a typo or a
-    forgotten entry point, and both are obvious once the list is in front of
-    you.
+    template whose ZCML never registered, and both are obvious once the list
+    is in front of you.
   </Property>
   <Property name="RecipientError" type="EmailkitError">
     One or more recipients could not be resolved. Raised at `.send()`, listing
