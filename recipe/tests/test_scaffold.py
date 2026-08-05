@@ -146,3 +146,12 @@ class TestTheNextStepsMessage:
         assert "update-golden" in message
         assert "<emailkit:templates>" in message
         assert "`emailkit` dict" not in message
+
+    def test_the_registration_stub_names_the_namespace_declaration(self, project):
+        # Without `xmlns:emailkit=<the URI>` on the consumer's <configure>
+        # root, the pasted block does not parse -- and the marker grep the
+        # recipe discovers packages with matches exactly that URI, so the
+        # package would not even be found. The stub must say so.
+        stub = scaffold.registration_stub(project, "convocation")
+        assert "xmlns:emailkit" in stub
+        assert projects.MARKER in stub

@@ -105,8 +105,15 @@ REGISTRATION_TEMPLATE = """\
 # hidden inbox-preview line every mail client shows next to the subject. Omit
 # it and the layout's preview div collapses to nothing.
 #
-# No `<emailkit:templates>` block in {package} yet? Add the whole thing,
-# plus the one-time meta include every consumer needs:
+# No `<emailkit:templates>` block in {package} yet? Add the whole thing:
+# declare the namespace on your `<configure>` root (without it the file does
+# not parse, and build tooling does not even discover the package), plus the
+# one-time meta include every consumer needs:
+#
+#     <configure
+#         xmlns="http://namespaces.zope.org/zope"
+#         xmlns:emailkit="http://namespaces.imio.be/emailkit"
+#         ...>
 #
 #     <include package="imio.emailkit" file="meta.zcml" />
 #     <emailkit:templates>
