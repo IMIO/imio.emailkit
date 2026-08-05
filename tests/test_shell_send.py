@@ -70,7 +70,7 @@ class TestTheObviousBuilderPath:
             "Email.send() renders from a template name and has no way to accept a "
             "pre-rendered (html, text) pair, so no frozen-surface call sends shell "
             "output today. Fixing it is a maintainer decision -- register the shell "
-            "(one entry in the registration dict, and the subject would then come "
+            "(one <emailkit:template> entry, and the subject would then come "
             "from .subject()) or document a recipe that assembles the message "
             "directly. TestTheFrozenSurfaceStillCarriesShellOutput proves the "
             "mechanism either way."

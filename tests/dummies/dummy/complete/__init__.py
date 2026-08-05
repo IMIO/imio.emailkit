@@ -1,65 +1,49 @@
-"""``dummy.complete`` -- a consumer add-on using every §4 feature.
+"""``dummy.complete`` -- a consumer add-on using every registration feature.
 
 The ceiling, where ``dummy.minimal`` is the floor: two templates, a ``preheader``
 on each, an explicit ``directory``, a hand-authored ``.txt.pt`` twin per template,
 and a template (``convocation``) that exercises the whole kit component catalog
 plus ``tal:repeat`` and a locale helper.
 
-Its entry point, in ``pyproject.toml``::
+There is no Python registration to read here: the templates are declared in
+``configure.zcml`` beside this module, and Zope's autoinclude executes it when the
+add-on is installed. That file is the thing to read::
 
-    [project.entry-points."imio.emailkit.templates"]
-    "dummy.complete" = "dummy.complete:emailkit"
+    <configure
+        xmlns="http://namespaces.zope.org/zope"
+        xmlns:emailkit="http://namespaces.imio.be/emailkit"
+        i18n_domain="dummy.complete"
+        >
+
+      <include package="imio.emailkit" file="meta.zcml" />
+
+      <emailkit:templates directory="templates">
+        <emailkit:template
+            name="convocation"
+            subject="[email_subject_convocation] Convocation to the municipal council"
+            preheader="[email_preheader_convocation] Agenda and documents ..."
+            />
+      </emailkit:templates>
+
+    </configure>
+
+The package the ZCML file belongs to is the **lookup namespace** -- templates here
+are reached as ``dummy.complete:convocation`` -- and the consumer never spells it
+out, so it cannot disagree with reality. The msgid domain of ``subject`` and
+``preheader`` is the file's ``i18n_domain``, which is why no ``MessageFactory``
+appears in this module.
 
 **Note the template basename.** ``notification`` is *also* registered by
 ``dummy.minimal`` **and** by ``imio.emailkit`` itself. There is no clash, because
-§4 namespaces every lookup: ``dummy.complete:notification``,
+every lookup is namespaced: ``dummy.complete:notification``,
 ``dummy.minimal:notification`` and ``imio.emailkit:notification`` are three
 different templates in three different files. The bare name ``notification``
 resolves to none of them, on purpose -- accepting it would make which one you get
-depend on entry-point scan order.
+depend on the order the three packages' ZCML happens to execute in.
 
-Packaging, for a real add-on (SPEC §4): the compiled output is committed and must
-ship in the sdist, while the Maizzle project must not::
+Packaging, for a real add-on: the compiled output is committed and must ship in the
+sdist, while the Maizzle project must not::
 
     recursive-include src/dummy/complete/templates *.pt
     prune src/dummy/complete/emails
 """
-
-from zope.i18nmessageid import MessageFactory
-
-
-_ = MessageFactory("dummy.complete")
-
-
-emailkit = {
-    # Stated explicitly here, though ``templates`` is also the default. State it
-    # when you want the reader of the registration to see where the build output
-    # lands without going to look at the Maizzle config.
-    "directory": "templates",
-    "templates": {
-        "convocation": {
-            "subject": _(
-                "email_subject_convocation",
-                default="Convocation to the municipal council",
-            ),
-            # SPEC §4: the hidden inbox-preview line next to the subject. The
-            # highest-visibility email feature that everyone forgets -- every
-            # inbox shows it, and left out the client fills it with whatever body
-            # copy comes first. Keep it short: clients cut around 100 characters.
-            "preheader": _(
-                "email_preheader_convocation",
-                default="Agenda and documents for the session of 12 August.",
-            ),
-        },
-        "notification": {
-            "subject": _(
-                "email_subject_notification",
-                default="An update on your file",
-            ),
-            "preheader": _(
-                "email_preheader_notification",
-                default="One of your files has moved forward.",
-            ),
-        },
-    },
-}

@@ -64,10 +64,11 @@ def require_node():
 class TestTheContractIsWiredUp:
     """Every artifact §7's two gates consume, present for every registered template.
 
-    Driven off the add-on's own registration dict, so a template added to an add-on
-    without its fixture, its snapshot or its `.vue` source fails here -- rather than
-    being quietly absent from both gates, which is how a template stops being
-    tested without anybody noticing.
+    Driven off the templates the add-on declares, so one added without its fixture,
+    its snapshot or its `.vue` source fails here -- rather than being quietly absent
+    from both gates, which is how a template stops being tested without anybody
+    noticing. ``tests/test_discovery_dummies.py`` pins that declared list to what
+    each add-on's `configure.zcml` actually registers, so the two cannot drift.
     """
 
     def test_the_addon_ships_maizzle_sources(self, addon):
@@ -77,7 +78,7 @@ class TestTheContractIsWiredUp:
         expected = sorted(f"{name}.vue" for name in addon.templates)
 
         assert sources == expected, (
-            f"{addon.package}: `emails/src/templates/` holds {sources}, but the "
+            f"{addon.package}: `emails/src/templates/` holds {sources}, but its "
             f"registration declares {list(addon.templates)}"
         )
 

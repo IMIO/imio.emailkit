@@ -8,7 +8,7 @@ cannot rot into a stale README.
 | | `dummy.minimal` | `dummy.complete` |
 |---|---|---|
 | templates | 1 | 2 |
-| `directory` key | omitted (defaults to `templates`) | stated |
+| `directory` attribute | omitted (defaults to `templates`) | stated |
 | `preheader` msgid | none | on both templates |
 | `.txt.pt` twin | none — uses §4's fallback | hand-authored, both templates |
 | golden languages | `fr` | `fr` + `en` |
@@ -23,7 +23,7 @@ template in the repository on purpose.
 
 ```
 dummy/complete/
-├── __init__.py                       # the `emailkit` registration dict (§4)
+├── configure.zcml                    # the registration: one <emailkit:templates> block
 ├── emails/                           # Maizzle project; dev only, pruned from the sdist
 │   ├── maizzle.config.js             #   two settings long, whatever the add-on's size
 │   ├── src/templates/*.vue           #   what you author
@@ -37,15 +37,36 @@ dummy/complete/
     └── golden/convocation.fr.html    # snapshots (§7)
 ```
 
-plus one entry point in `pyproject.toml`:
+where `configure.zcml` is the whole registration:
 
-```toml
-[project.entry-points."imio.emailkit.templates"]
-"dummy.complete" = "dummy.complete:emailkit"
+```xml
+<configure
+    xmlns="http://namespaces.zope.org/zope"
+    xmlns:emailkit="http://namespaces.imio.be/emailkit"
+    i18n_domain="dummy.complete"
+    >
+
+  <include package="imio.emailkit" file="meta.zcml" />
+
+  <emailkit:templates directory="templates">
+    <emailkit:template
+        name="convocation"
+        subject="[email_subject_convocation] Convocation to the municipal council"
+        preheader="[email_preheader_convocation] Agenda and documents ..."
+        />
+  </emailkit:templates>
+
+</configure>
 ```
 
-and two `MANIFEST.in` lines, because the compiled output must ship and the Maizzle
-project must not:
+Nothing in `__init__.py`, and no `MessageFactory`: the msgid domain of `subject` and
+`preheader` is the file's `i18n_domain`, and the lookup namespace is the package the
+file belongs to, so neither can disagree with reality. A real add-on's ZCML is
+executed by Zope's autoinclude at startup, which is also where the "missing
+plaintext twin" warnings land.
+
+Two `MANIFEST.in` lines are needed as well, because the compiled output must ship and
+the Maizzle project must not:
 
 ```
 recursive-include src/dummy/complete/templates *.pt
@@ -55,8 +76,8 @@ prune src/dummy/complete/emails
 ## The same template basename in three distributions
 
 `notification` is registered by `dummy.minimal`, by `dummy.complete` **and** by
-`imio.emailkit` itself. There is no clash, because §4 namespaces every lookup by
-the entry-point name:
+`imio.emailkit` itself. There is no clash, because §4 namespaces every lookup by the
+registering package:
 
 ```python
 render("dummy.minimal:notification", context=…)     # three different files,
@@ -65,26 +86,30 @@ render("imio.emailkit:notification", context=…)
 render("notification", context=…)                   # TemplateNotFound, on purpose
 ```
 
-The bare name resolving to nothing is deliberate: accepting it would make the
-answer depend on entry-point scan order. `tests/test_discovery_dummies.py` asserts
-all four of those lines.
+The bare name resolving to nothing is deliberate: accepting it would make the answer
+depend on the order the three packages' ZCML happens to execute in.
+`tests/test_discovery_dummies.py` asserts all four of those lines.
 
-## How they are discovered without being installed
+## Registering through ZCML, without being installed
 
-`imio.emailkit.discovery` reads `importlib.metadata.entry_points(group=…)`, which
-enumerates `*.dist-info` directories found on `sys.path`. So the two committed
-`*-1.0.dist-info/` directories here, plus `tests/dummies/` on `sys.path`, make
-these two "installed" as far as the entry-point machinery is concerned — and
-`entry_points.txt` is byte-for-byte what `pip` writes from the `pyproject.toml`
-block above.
+The registration itself is not special-cased for the tests: each dummy carries the
+`configure.zcml` shown above, exactly as a real consumer does. What a real consumer
+gets for free is *execution* — it is pip-installed, and Zope's autoinclude runs its
+ZCML at startup.
 
-Nothing is monkeypatched and no private API is used: the code under test runs the
-same `entry_points()` call production runs, over real metadata. The wiring is in
-`tests/dummyaddons.py` and is scoped to a fixture, so the rest of the suite sees
-only `imio.emailkit`'s own templates.
+These two live inside another package's test tree, so `tests/dummyaddons.py` runs
+their ZCML on purpose, through `imio.emailkit.scan.scan_package()` — the same
+permissive-machine scan the build tooling uses on a real consumer, over the same
+directive handler and into the same registry as an instance start. Nothing is
+monkeypatched and no private API is used.
 
-A real add-on needs none of this. It is pip-installed, and its entry point is
-simply there.
+It is scoped to a fixture, so the rest of the suite sees only `imio.emailkit`'s own
+templates; `tests/test_dummy_isolation.py` is the guard on that. Teardown removes the
+two add-ons' registrations rather than restoring a whole-registry snapshot, because
+the Plone test layer loads the *host's* ZCML lazily and can do so from inside such a
+block — see `installed()` for the measurement.
+
+A real add-on needs none of this. It is pip-installed, and its ZCML is simply run.
 
 ## Running their CI contract
 

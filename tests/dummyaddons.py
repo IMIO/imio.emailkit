@@ -6,26 +6,21 @@ pip-installed, and how the two CI gates §7 requires of every consumer add-on ar
 reproduced against them.
 
 ----------------------------------------------------------------------------
-Faking an entry point, and why it is not really faking
+Registering through ZCML, and why the scan is the real code path
 ----------------------------------------------------------------------------
 
-``imio.emailkit.discovery`` reads ``importlib.metadata.entry_points(group=...)``,
-which enumerates the ``*.dist-info`` / ``*.egg-info`` directories found on
-``sys.path``. So a distribution is "installed", as far as the entry-point machinery
-is concerned, when a directory named ``<name>-<version>.dist-info`` containing
-``METADATA`` and ``entry_points.txt`` sits next to the importable package on a
-``sys.path`` entry. That is what ``tests/dummies/`` is, and the ``entry_points.txt``
-files there are byte-for-byte what ``pip`` writes from a ``pyproject.toml``
-``[project.entry-points."imio.emailkit.templates"]`` block.
+Each dummy carries a ``configure.zcml`` with one ``<emailkit:templates>`` block,
+exactly as a real consumer add-on does; nothing about the registration itself is
+special-cased for the tests. What a real add-on gets for free is *execution*: it is
+pip-installed, Zope's autoinclude finds its ZCML at startup and the directive runs.
+These two live in another package's test tree, so :func:`installed` runs their ZCML
+on purpose -- through ``imio.emailkit.scan.scan_package``, which is the code path
+the build tooling already uses on a real consumer, over the same directive handler
+and into the same registry as an instance start.
 
-Nothing is monkeypatched and no private API is touched: the code under test runs
-the same ``entry_points()`` call it runs in production, over real metadata. The
-only difference from a real add-on is *who wrote the ``.dist-info``*.
-
-``.dist-info`` directories are gitignored by nothing (only ``*.egg-info`` is), so
-they are committed, readable and reviewable -- which matters, because §7 says these
-add-ons double as documentation and the registration is half of what a reader came
-for.
+Nothing is monkeypatched and no private API is touched. The ZCML is committed,
+readable and reviewable, which matters: these add-ons double as documentation and
+the registration is half of what a reader came for.
 
 ----------------------------------------------------------------------------
 Why installation is scoped to a fixture rather than global
@@ -38,8 +33,12 @@ start demanding ``tests/fixtures/convocation.py``. Scoping it also gives the gat
 tests a *negative* control for free: outside the fixture the dummy templates must
 not resolve.
 
-``discovery.invalidate_cache()`` exists for exactly this ("For tests that add or
-remove a registration"), so this is the sanctioned seam rather than a workaround.
+:func:`installed` therefore adds the two registrations on the way in and removes
+exactly those two on the way out -- see its docstring for why "remove what I added"
+beats "put the whole registry back the way I found it" here, which is a measured
+difference and not a taste. ``sys.path`` is handled separately, because the packages
+also have to be *importable*: the scan resolves them by dotted name and their
+fixtures are loaded from beside them.
 """
 
 from contextlib import contextmanager
@@ -47,7 +46,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import importlib
-import importlib.metadata
 import os
 import shutil
 import subprocess
@@ -69,7 +67,7 @@ class DummyAddon:
     """One dummy consumer add-on, described the way §5's recipe describes a real
     one: ``(package, emails_dir, templates_dir)`` plus what it registers."""
 
-    #: Entry-point name == lookup namespace == importable package (§4).
+    #: Importable package == the ZCML file's package == lookup namespace.
     package: str
     #: Basenames of the templates it registers, sorted.
     templates: tuple
@@ -107,15 +105,12 @@ class DummyAddon:
         return self.suite_dir / "golden"
 
     @property
-    def dist_info(self):
-        return DUMMIES_DIR / f"{self.package.replace('.', '_')}-1.0.dist-info"
+    def zcml(self):
+        """The registration itself: one ``<emailkit:templates>`` block."""
+        return self.root / "configure.zcml"
 
     def qualified(self, template):
         return f"{self.package}:{template}"
-
-    def registration(self):
-        """The ``emailkit`` dict the entry point points at."""
-        return importlib.import_module(self.package).emailkit
 
 
 MINIMAL = DummyAddon(
@@ -146,20 +141,6 @@ def all_qualified_names():
 # ---------------------------------------------------------------------------
 
 
-def _refresh_metadata_caches():
-    """Make ``importlib.metadata`` and discovery see the current ``sys.path``.
-
-    ``importlib.metadata`` caches its per-directory listings, and
-    ``imio.emailkit.discovery`` caches the whole scan (deliberately: §4 has it scan
-    "once at startup"). Both have to be dropped whenever the set of visible
-    distributions changes.
-    """
-    importlib.invalidate_caches()
-    from imio.emailkit import discovery
-
-    discovery.invalidate_cache()
-
-
 def _drop_from_sys_path():
     """Remove **every** occurrence of ``tests/dummies`` from ``sys.path``.
 
@@ -184,40 +165,108 @@ def _drop_from_sys_path():
         sys.path.remove(root)
 
 
+def _snapshot_of_the_dummies():
+    """The registry entries belonging to the dummies, as ``(templates, dirs)``.
+
+    Normally both are empty -- that is the invariant this module exists to keep --
+    and they are non-empty exactly when ``installed()`` blocks are nested, which
+    the gate modules do.
+    """
+    from imio.emailkit import discovery
+
+    packages = {addon.package for addon in ADDONS}
+    templates = {
+        name: template
+        for name, template in discovery.get_templates().items()
+        if template.package in packages
+    }
+    directories = {
+        package: directory
+        for package, directory in discovery.registered_directories().items()
+        if package in packages
+    }
+    return templates, directories
+
+
+def _restore(templates, directories):
+    """Put a :func:`_snapshot_of_the_dummies` result back."""
+    from imio.emailkit import discovery
+
+    for template in templates.values():
+        discovery.register_template(template)
+    for package, directory in directories.items():
+        discovery.register_directory(package, directory)
+
+
+def _forget_the_dummies():
+    from imio.emailkit import discovery
+
+    for addon in ADDONS:
+        discovery.forget_package(addon.package)
+
+
 @contextmanager
 def installed():
-    """Make both dummy add-ons discoverable for the duration of the block, only.
+    """Register both dummy add-ons for the duration of the block, only.
 
-    Idempotent and re-entrant-safe by being absolute rather than incremental: the
-    block starts by normalising ``sys.path`` and ends by clearing the entry
-    unconditionally. "Discoverable inside, invisible outside" is then true however
-    the block was entered.
+    ``sys.path`` gains ``tests/dummies`` -- the packages have to be importable,
+    since the scan resolves them by dotted name and their fixtures are loaded from
+    beside them -- and the registration itself runs through
+    ``imio.emailkit.scan``, i.e. the exact code path the build tooling uses on a
+    real consumer.
+
+    **Teardown removes the dummies rather than restoring a snapshot of the whole
+    registry**, and that is not a stylistic choice. ``discovery.overlay()`` is the
+    obvious seam and was the first implementation, but the Plone test layer loads
+    ``imio.emailkit``'s ZCML *lazily*: the golden harness pulls its layer fixture
+    in with ``request.getfixturevalue()``, so the layer's ``setUpZope`` can run
+    **inside** this block -- measured: with the dummies' own suites first in the
+    session, the registry is empty at every block entry, because the host's own
+    templates are registered inside the block every time. Putting a snapshot back
+    then deletes ``imio.emailkit:notification`` and ``imio.emailkit:get_username``
+    on the way out, and the damage surfaces much later as a ``TemplateNotFound``
+    in a module that never heard of the dummies.
+
+    Subtracting exactly what was added has no such coupling to when anything else
+    registers. The dummies' own prior entries are restored, so nesting behaves
+    (the gate modules install per test *and* call this directly), and
+    ``sys.path`` is cleared unconditionally rather than incrementally -- so
+    "registered inside, gone outside" holds however the block was entered.
     """
+    from imio.emailkit import scan
+
     _drop_from_sys_path()
     sys.path.insert(0, str(DUMMIES_DIR))
-    _refresh_metadata_caches()
+    importlib.invalidate_caches()
+    saved = _snapshot_of_the_dummies()
     try:
+        for addon in ADDONS:
+            scan.scan_package(addon.package)
         yield ADDONS
     finally:
+        _forget_the_dummies()
+        _restore(*saved)
         _drop_from_sys_path()
-        _refresh_metadata_caches()
 
 
 @contextmanager
 def uninstalled():
     """Take them away again inside a block that has them installed.
 
-    The negative control for every discovery assertion: without it, "the dummy
+    The negative control for every registration assertion: without it, "the dummy
     templates are found" could be true for a reason that has nothing to do with
-    the entry point.
+    the registration.
+
+    The mirror image of :func:`installed`, and subtractive for the same reason:
+    only the dummies' entries are touched, so nothing else that registers while
+    the block is open can be lost by putting a whole-registry snapshot back.
     """
-    _drop_from_sys_path()
-    _refresh_metadata_caches()
+    saved = _snapshot_of_the_dummies()
+    _forget_the_dummies()
     try:
         yield
     finally:
-        sys.path.insert(0, str(DUMMIES_DIR))
-        _refresh_metadata_caches()
+        _restore(*saved)
 
 
 # ---------------------------------------------------------------------------
@@ -226,7 +275,7 @@ def uninstalled():
 #
 # SPEC §5's `bin/check-emails` is the shipped implementation of this gate and lives
 # in `imio.recipe.emailkit`. It cannot be pointed at these dummies: it resolves
-# packages from the buildout working set, and a `.dist-info` directory dropped on
+# packages from the buildout working set, and a package directory dropped on
 # `sys.path` by a test fixture is not in anybody's working set. So the gate's
 # *logic* is reproduced here -- snapshot, rebuild, diff, restore -- which is also
 # what makes it testable in both directions (green and red) without Node in the

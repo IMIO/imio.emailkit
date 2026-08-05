@@ -443,9 +443,9 @@ class TestTheVocabularyComesFromDiscovery:
         )
 
     def test_it_is_not_cached_behind_discovery(self, vocabulary):
-        """A second cache here would survive ``discovery.invalidate_cache()`` and
-        make this the one place in the package that still believes in a template
-        nobody registers any more."""
+        """A cache here would outlive the registration it copied and make this the
+        one place in the package that still believes in a template nobody registers
+        any more -- an add-on uninstalled, or a template dropped from its ZCML."""
         with dummyaddons.installed():
             assert (
                 dummyaddons.COMPLETE.qualified("convocation") in vocabulary().by_token

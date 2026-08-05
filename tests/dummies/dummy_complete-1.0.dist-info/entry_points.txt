@@ -1,2 +1,0 @@
-[imio.emailkit.templates]
-dummy.complete = dummy.complete:emailkit
