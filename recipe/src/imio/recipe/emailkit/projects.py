@@ -25,6 +25,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import logging
+import os
 
 
 logger = logging.getLogger("imio.recipe.emailkit")
@@ -204,7 +205,7 @@ def find_emails_dir(package_dir):
 # ---------------------------------------------------------------------------
 
 
-def iter_marker_packages(dist):
+def iter_marker_packages(dist, cache=None):
     """``(dotted_name, package_dir)`` for each package of ``dist`` whose ZCML
     mentions the emailkit namespace.
 
@@ -212,7 +213,19 @@ def iter_marker_packages(dist):
     path of the directory holding the marked ZCML file, relative to the
     ``sys.path`` root -- which is exactly the namespace the directive gives its
     templates at runtime (the package the ZCML file belongs to).
+
+    ``cache``, when given, memoizes the walk of a top-level directory across
+    every dist of one collection call, keyed by its resolved path. This is
+    what actually keeps a shared namespace directory from being rglobbed once
+    per distribution that declares it: restricting the walk to the dist's own
+    top-level names (:func:`_top_level_names`) does not help when several
+    dists share the same top-level name, which every ``imio.*`` dist's
+    ``top_level.txt`` does (PEP 420). :func:`from_working_set` and
+    :func:`from_environment` each build one dict and pass it through their
+    whole loop; leave it ``None`` when scanning a single dist in isolation.
     """
+    if cache is None:
+        cache = {}
     location = Path(getattr(dist, "location", "") or "")
     for root in (location, location / "src"):
         if not root.is_dir():
@@ -221,38 +234,71 @@ def iter_marker_packages(dist):
             top_dir = root / top
             if not top_dir.is_dir():
                 continue
-            for zcml in sorted(top_dir.rglob("*.zcml")):
-                if PRUNE_DIRS.intersection(zcml.parts):
-                    continue
-                try:
-                    text = zcml.read_text(encoding="utf-8", errors="ignore")
-                except OSError:
-                    continue
-                if MARKER not in text:
-                    continue
-                package_dir = zcml.parent
-                if not (package_dir / "__init__.py").is_file():
-                    logger.warning(
-                        "%s mentions the emailkit namespace but %s is not a "
-                        "package directory; skipping it.",
-                        zcml,
-                        package_dir,
-                    )
-                    continue
-                yield ".".join(package_dir.relative_to(root).parts), package_dir
+            key = top_dir.resolve()
+            if key not in cache:
+                cache[key] = _scan_top_dir(top_dir)
+            yield from cache[key]
+
+
+def _scan_top_dir(top_dir):
+    """The ``rglob`` walk of one top-level package directory, memoized by its
+    caller (:func:`iter_marker_packages`'s ``cache``).
+
+    Split out on purpose: the cache has to hold the actual list of matches,
+    not the generator that used to produce them, or a second consumer of the
+    same cache entry would find the generator already exhausted.
+    """
+    root = top_dir.parent
+    found = []
+    for zcml in sorted(top_dir.rglob("*.zcml")):
+        # Relative to `top_dir`, not absolute. An absolute `zcml.parts` also
+        # matches a PRUNE_DIRS name carried by an *ancestor* of the checkout
+        # -- a clone under `~/work/emails/dist/...`, say -- which would hide
+        # the whole distribution for a reason that has nothing to do with its
+        # own layout.
+        if PRUNE_DIRS.intersection(zcml.relative_to(top_dir).parts):
+            continue
+        try:
+            text = zcml.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if MARKER not in text:
+            continue
+        package_dir = zcml.parent
+        if not (package_dir / "__init__.py").is_file():
+            logger.warning(
+                "%s mentions the emailkit namespace but %s is not a "
+                "package directory; skipping it.",
+                zcml,
+                package_dir,
+            )
+            continue
+        found.append((".".join(package_dir.relative_to(root).parts), package_dir))
+    return found
 
 
 def _top_level_names(dist, root):
     """The distribution's top-level package names, from metadata when it has
     any, from the filesystem when it does not (develop eggs, mainly).
 
-    Restricting the walk to the dist's own top-level packages is what keeps a
-    shared ``site-packages`` location from being rglobbed once per installed
-    distribution.
+    Restricting the walk to the dist's own top-level packages keeps an
+    unrelated sibling directory out of the rglob; it does *not*, by itself,
+    stop a *shared* top-level directory from being walked once per
+    distribution that declares it -- every ``imio.*`` dist's ``top_level.txt``
+    names the same ``imio`` (PEP 420 namespace packages share it by design).
+    :func:`iter_marker_packages`'s ``cache`` is what collapses that back down
+    to one walk per directory.
+
+    The filesystem fallback below cannot see a namespace package's top-level
+    name: a PEP 420 namespace has no ``__init__.py``, so it would never match
+    the ``(p / "__init__.py").is_file()`` check. Accepted rather than worked
+    around -- the fallback only exists for a develop egg with no metadata at
+    all, and every real installer, ``pip install -e`` included, writes
+    ``top_level.txt`` even for a namespace package.
     """
     try:
         names = [line for line in dist.get_metadata_lines("top_level.txt") if line]
-    except (KeyError, OSError, AttributeError):
+    except (OSError, AttributeError):
         names = []
     if names:
         return names
@@ -272,8 +318,9 @@ def from_working_set(working_set):
     builds correctly -- only buildout's log line would name the default.
     """
     resolved = {}
+    cache = {}
     for dist in sorted(working_set, key=str):
-        for dotted, package_dir in iter_marker_packages(dist):
+        for dotted, package_dir in iter_marker_packages(dist, cache):
             resolved.setdefault(dotted, make_project(dotted, package_dir))
     return [resolved[name] for name in sorted(resolved)]
 
@@ -347,18 +394,46 @@ def from_environment():
     """
     from imio.emailkit import discovery
     from imio.emailkit import scan
+    from importlib import import_module
 
     import pkg_resources
 
     projects = []
     seen = set()
+    cache = {}
     for dist in sorted(pkg_resources.working_set, key=str):
-        for dotted, package_dir in iter_marker_packages(dist):
+        for dotted, package_dir in iter_marker_packages(dist, cache):
             if dotted in seen:
                 continue
             seen.add(dotted)
+            # The whole body -- scan, re-derive, append -- is guarded together:
+            # an unexpected failure anywhere in it should skip this one
+            # package, not abort the collection for every package after it.
             try:
                 scan.scan_package(dotted)
+                # The marker walk's `package_dir` is a filesystem guess: the
+                # directory holding the marked ZCML file. `scan_package` just
+                # imported `dotted` for real, and that import can resolve to a
+                # *different* directory -- a develop egg shadowing an
+                # installed copy on `sys.path`, say. Re-derive from the module
+                # Python actually imported: that is the truth the scan just
+                # executed against, not the guess.
+                package_dir = Path(import_module(dotted).__file__).parent
+                templates_dir = discovery.registered_directories().get(dotted)
+                if templates_dir is None:
+                    # Marker present but no block survived (all conditioned
+                    # away, say). Nothing to build.
+                    continue
+                # `os.path.relpath`, not `Path.relative_to`: a subpackage's
+                # `directory="../templates"` is legal (`zcml.py`'s own
+                # docstring says a block may point at its parent's files) and
+                # produces a `templates_dir` that is a *sibling* of
+                # `package_dir`, not a descendant -- `relative_to` cannot
+                # express that `..` and raises, `relpath` can, and
+                # `make_project` resolves it right back
+                # (`(package_dir / directory).resolve()`).
+                directory = os.path.relpath(templates_dir, package_dir)
+                projects.append(make_project(dotted, package_dir, directory))
             except Exception as exc:
                 logger.warning(
                     "Could not scan the emailkit registration of %r (%s: %s); "
@@ -368,13 +443,6 @@ def from_environment():
                     exc,
                 )
                 continue
-            templates_dir = discovery.registered_directories().get(dotted)
-            if templates_dir is None:
-                # Marker present but no block survived (all conditioned away,
-                # say). Nothing to build.
-                continue
-            directory = str(templates_dir.relative_to(package_dir))
-            projects.append(make_project(dotted, package_dir, directory))
     return projects
 
 

@@ -91,23 +91,37 @@ failure mode §7 exists to prevent.
 """
 
 REGISTRATION_TEMPLATE = """\
-# Paste into {package}'s module-level `emailkit` dict (SPEC §4), inside
-# "templates". The subject is an i18n msgid, translated per recipient language at
-# send time; `preheader` is the optional hidden inbox-preview line every mail
-# client shows next to the subject. Omit it and the div collapses to nothing.
+# Paste into {package}'s ZCML (SPEC §4), inside its existing
+# `<emailkit:templates>` block:
 #
-# `_` is the package's MessageFactory: `_ = MessageFactory("{package}")`.
+#     <emailkit:template
+#         name="{name}"
+#         subject="[email_subject_{name}] TODO subject"
+#         preheader="[email_preheader_{name}] TODO preheader"
+#         />
+#
+# `subject` and `preheader` are `[msgid] Default text` -- the msgid is
+# translated per recipient language at send time; `preheader` is the optional
+# hidden inbox-preview line every mail client shows next to the subject. Omit
+# it and the layout's preview div collapses to nothing.
+#
+# No `<emailkit:templates>` block in {package} yet? Add the whole thing,
+# plus the one-time meta include every consumer needs:
+#
+#     <include package="imio.emailkit" file="meta.zcml" />
+#     <emailkit:templates>
+#       <emailkit:template
+#           name="{name}"
+#           subject="[email_subject_{name}] TODO subject"
+#           preheader="[email_preheader_{name}] TODO preheader"
+#           />
+#     </emailkit:templates>
 
-        "{name}": {{
-            "subject": _(
-                "email_subject_{name}",
-                default="TODO subject",
-            ),
-            "preheader": _(
-                "email_preheader_{name}",
-                default="TODO preheader",
-            ),
-        }},
+    <emailkit:template
+        name="{name}"
+        subject="[email_subject_{name}] TODO subject"
+        preheader="[email_preheader_{name}] TODO preheader"
+        />
 """
 
 
@@ -172,7 +186,8 @@ def next_steps(project, name, paths):
         f"\nScaffolded {project.package}:{name}:\n"
         + "".join(f"  {path}\n" for path in paths)
         + "\nNext, in this order:\n"
-        f"  1. paste the registration stub into {project.package}'s `emailkit` dict\n"
+        f"  1. paste the registration stub into {project.package}'s ZCML, inside "
+        "its `<emailkit:templates>` block\n"
         f"  2. write the real markup in {source} and real data in the fixture\n"
         f"  3. `bin/preview-emails --package {project.package}` to look at it\n"
         f"  4. `make update-golden` once it is right, then commit the `.pt` too\n"

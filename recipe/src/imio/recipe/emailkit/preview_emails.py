@@ -342,6 +342,13 @@ def render_all(projects, languages, output):
     # since then must show up, and the scan is cheap. `forget_templates()` is
     # render()'s own Chameleon compile cache -- unrelated to discovery, and
     # still needed so a rebuilt .pt is recompiled rather than served stale.
+    #
+    # The global `discovery.reset()` followed by a rescan scoped to `projects`
+    # is only safe because templates are self-contained: nothing a template
+    # renders ever looks up another package's registration mid-render. If a
+    # future feature needs cross-package template lookups, this reset has to
+    # be revisited -- it would blow away another package's registrations for
+    # the duration of this pass.
     discovery.reset()
     for project in projects:
         try:

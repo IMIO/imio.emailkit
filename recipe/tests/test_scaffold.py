@@ -51,6 +51,18 @@ class TestTheFourFiles:
         assert "email_subject_convocation" in stub
         assert project.package in stub
 
+    def test_the_registration_stub_is_zcml_not_the_old_dict_form(self, project):
+        """SPEC's registration moved from a Python dict to a ZCML directive;
+        the scaffold must teach the current form, not the old one."""
+        stub = scaffold.registration_stub(project, "convocation")
+        assert "<emailkit:template" in stub
+        assert 'name="convocation"' in stub
+        assert "email_preheader_convocation" in stub
+        # The old form this replaces, so a regression is caught rather than
+        # merely un-asserted.
+        assert "emailkit` dict" not in stub
+        assert "MessageFactory" not in stub
+
 
 class TestTheSkeletonEncodesTheAuthoringRules:
     """The point of scaffolding: start on the right side of every §3 rule."""
@@ -132,3 +144,5 @@ class TestTheNextStepsMessage:
         assert "convocation.vue" in message
         assert "preview-emails --package acme.notifications" in message
         assert "update-golden" in message
+        assert "<emailkit:templates>" in message
+        assert "`emailkit` dict" not in message

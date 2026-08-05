@@ -175,7 +175,11 @@ class FakeDist:
     def get_metadata_lines(self, name):
         if name == "top_level.txt" and self._top_level:
             return list(self._top_level)
-        raise KeyError(name)
+        # Real `pkg_resources` providers raise this (`NullProvider.get_metadata`
+        # opens the file straight off disk) when the metadata directory exists
+        # but the specific file does not, not `KeyError` -- so the fake raises
+        # it too, to keep `_top_level_names`'s except clause honest.
+        raise FileNotFoundError(name)
 
     def __str__(self):
         return self.location
@@ -237,6 +241,54 @@ class TestCollectingFromBuildout:
         ]
         found = projects.from_working_set(dists)
         assert [p.package for p in found] == ["acme.mail"]
+
+    def test_an_ancestor_named_like_a_pruned_dir_does_not_hide_the_dist(self, tmp_path):
+        """PRUNE_DIRS must match the walked subtree, not the absolute path.
+
+        A checkout parked under `.../emails/dist/...` (or under `node_modules`,
+        `.git`, `__pycache__` -- any ancestor happening to share a name with
+        :data:`projects.PRUNE_DIRS`) is a perfectly ordinary thing to have on
+        disk. Only the directories *inside* the dist's own top-level package
+        are supposed to be pruned from the ZCML walk.
+        """
+        outer = tmp_path / "emails"
+        root, package_dir = make_dist_dir(outer, src_layout=True)
+        dist = FakeDist(root, top_level=["acme"])
+        found = projects.from_working_set([dist])
+        assert [p.package for p in found] == ["acme.mail"]
+        assert found[0].package_dir == package_dir
+
+
+class TestTheWalkCache:
+    def test_a_shared_top_level_directory_is_walked_once_per_collection(
+        self, tmp_path, monkeypatch
+    ):
+        """N dists sharing one namespace top-level should cost one walk, not N.
+
+        ``top_level.txt`` says ``imio`` for every ``imio.*`` dist, so without
+        memoization each of them would re-rglob the whole shared
+        ``site-packages/imio/`` subtree.
+        """
+        root, _package_dir = make_dist_dir(tmp_path, dotted="imio.mail")
+        calls = []
+        original = projects._scan_top_dir
+
+        def counting(top_dir):
+            calls.append(top_dir)
+            return original(top_dir)
+
+        monkeypatch.setattr(projects, "_scan_top_dir", counting)
+
+        dist_a = FakeDist(root, project_name="imio.mail", top_level=["imio"])
+        dist_b = FakeDist(root, project_name="imio.other", top_level=["imio"])
+        cache = {}
+        assert [p for p, _d in projects.iter_marker_packages(dist_a, cache)] == [
+            "imio.mail"
+        ]
+        assert [p for p, _d in projects.iter_marker_packages(dist_b, cache)] == [
+            "imio.mail"
+        ]
+        assert len(calls) == 1
 
 
 class TestCollectingFromEnvironment:
@@ -305,6 +357,110 @@ class TestCollectingFromEnvironment:
 
         assert [p.package for p in found] == ["acme_good"]
         assert "acme_bad" in caplog.text
+
+    def test_a_subpackages_parent_relative_directory_is_found_not_crashed(
+        self, tmp_path, monkeypatch, caplog
+    ):
+        """``directory="../templates"`` is legal (``zcml.py``'s own docstring:
+        "a subpackage's block may point at its parent's files with
+        `../templates`") and used to crash the whole collection:
+        ``templates_dir.relative_to(package_dir)`` cannot express a `..`
+        segment and raised, uncaught, past the per-package guard.
+        """
+        pytest.importorskip("imio.emailkit.scan")
+        pytest.importorskip("pkg_resources")
+        from imio.emailkit import discovery
+
+        root = tmp_path / "root"
+        top_pkg = root / "acme_sub"
+        sub_pkg = top_pkg / "sub"
+        (top_pkg / "templates").mkdir(parents=True)
+        sub_pkg.mkdir(parents=True)
+        (top_pkg / "__init__.py").write_text("", encoding="utf-8")
+        (sub_pkg / "__init__.py").write_text("", encoding="utf-8")
+        (sub_pkg / "configure.zcml").write_text(
+            '<configure xmlns="http://namespaces.zope.org/zope"\n'
+            '    xmlns:emailkit="http://namespaces.imio.be/emailkit"\n'
+            '    i18n_domain="acme_sub.sub">\n'
+            '  <include package="imio.emailkit" file="meta.zcml" />\n'
+            '  <emailkit:templates directory="../templates">\n'
+            '    <emailkit:template name="hello" subject="[s_hello] Hello" />\n'
+            "  </emailkit:templates>\n"
+            "</configure>\n",
+            encoding="utf-8",
+        )
+
+        monkeypatch.syspath_prepend(str(root))
+        monkeypatch.setattr(
+            "pkg_resources.working_set",
+            [FakeDist(root, top_level=["acme_sub"])],
+        )
+
+        with discovery.overlay():
+            discovery.reset()
+            found = projects.from_environment()
+
+        assert [p.package for p in found] == ["acme_sub.sub"]
+        assert found[0].templates_dir == (top_pkg / "templates").resolve()
+        assert "Could not scan" not in caplog.text
+
+    def test_a_shadowed_dist_resolves_to_the_importable_copy(
+        self, tmp_path, monkeypatch
+    ):
+        """Two on-disk copies of one package; only one is on ``sys.path``.
+
+        The marker walk finds ZCML on disk regardless of ``sys.path`` -- it
+        never imports anything -- so it can name a directory that Python will
+        never actually import from once a develop egg shadows an installed
+        copy. ``scan.scan_package`` imports the dotted name for real and
+        always executes against whichever copy ``sys.path`` resolves; trusting
+        the marker walk's guess instead used to crash outright, because the
+        two copies do not even share a prefix to be `..`-relative about.
+        """
+        pytest.importorskip("imio.emailkit.scan")
+        pytest.importorskip("pkg_resources")
+        from imio.emailkit import discovery
+
+        def write_copy(root):
+            package_dir = root / "acme_shadow"
+            (package_dir / "templates").mkdir(parents=True)
+            (package_dir / "__init__.py").write_text("", encoding="utf-8")
+            (package_dir / "configure.zcml").write_text(
+                '<configure xmlns="http://namespaces.zope.org/zope"\n'
+                '    xmlns:emailkit="http://namespaces.imio.be/emailkit"\n'
+                '    i18n_domain="acme_shadow">\n'
+                '  <include package="imio.emailkit" file="meta.zcml" />\n'
+                "  <emailkit:templates>\n"
+                '    <emailkit:template name="hello" subject="[s_hello] Hello" />\n'
+                "  </emailkit:templates>\n"
+                "</configure>\n",
+                encoding="utf-8",
+            )
+            return package_dir
+
+        # Sorts before `importable_root` by `str()`, so it is the copy
+        # `from_environment`'s dedup picks first -- the everyday shadowing case.
+        not_importable_root = tmp_path / "a_installed"
+        importable_root = tmp_path / "z_develop"
+        write_copy(not_importable_root)
+        importable_pkg = write_copy(importable_root)
+
+        monkeypatch.syspath_prepend(str(importable_root))
+        monkeypatch.setattr(
+            "pkg_resources.working_set",
+            [
+                FakeDist(not_importable_root, top_level=["acme_shadow"]),
+                FakeDist(importable_root, top_level=["acme_shadow"]),
+            ],
+        )
+
+        with discovery.overlay():
+            discovery.reset()
+            found = projects.from_environment()
+
+        assert [p.package for p in found] == ["acme_shadow"]
+        assert found[0].package_dir == importable_pkg.resolve()
+        assert found[0].templates_dir == (importable_pkg / "templates").resolve()
 
 
 class TestResolvingTheKit:
