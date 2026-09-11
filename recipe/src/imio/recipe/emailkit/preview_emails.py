@@ -628,7 +628,8 @@ def _handler_class(directory, state):
 
     class PreviewHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):
-            if self.path.split("?")[0] == VERSION_PATH:
+            path = self.path.split("?")[0]
+            if path == VERSION_PATH:
                 body = str(state["generation"]).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "text/plain")
@@ -637,11 +638,31 @@ def _handler_class(directory, state):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            if path == "/favicon.ico":
+                # Every browser asks for it on every page load and the preview
+                # directory holds rendered mails, nothing else. Answering 204
+                # rather than letting it 404 keeps a dev tool's console free of
+                # an error that means nothing.
+                self.send_response(204)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
             super().do_GET()
 
         def log_message(self, format, *args):  # noqa: A002 - stdlib signature
-            if VERSION_PATH not in (args[0] if args else ""):
-                super().log_message(format, *args)
+            """Quieten the live-reload poll, and nothing else.
+
+            ``args[0]`` is the request line for an access log, but ``log_error``
+            routes through here too and passes an ``HTTPStatus`` -- so the
+            membership test has to check the type first. Without the guard a
+            plain 404 raises ``TypeError: argument of type 'HTTPStatus' is not
+            iterable`` inside the handler thread and prints a traceback far more
+            alarming than the missing file that caused it.
+            """
+            first = args[0] if args else ""
+            if isinstance(first, str) and VERSION_PATH in first:
+                return
+            super().log_message(format, *args)
 
     return functools.partial(PreviewHandler, directory=str(directory))
 
