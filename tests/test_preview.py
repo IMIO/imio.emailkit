@@ -169,21 +169,26 @@ class TestItListsTheRegisteredTemplates:
 
         assert missing == [], f"registered templates absent from the preview: {missing}"
 
-    def test_the_jbot_only_default_mails_are_not_listed(self, preview):
-        """They are not registered and ``render()`` cannot render them
-        (``docs/DECISIONS.md``), so listing them would offer a link that raises.
-        The reverse of ``test_golden.py``'s
-        ``test_the_default_mails_are_not_registered_for_discovery``."""
+    def test_the_default_mails_are_listed_too(self, preview):
+        """§6.3 shows every mail the package sends, the two Plone defaults included.
+
+        They were absent for as long as they were jbot overrides: unregistered, so
+        the preview could not offer them, so the one mail a commune is most likely
+        to want in its own colours was the one nobody could look at. Owning their
+        views (``browser/default_mails.py``) is what fixed it. The reverse of
+        ``test_golden.py``'s
+        ``test_every_shipped_template_is_registered_for_discovery``.
+        """
         page = preview()
-        leaked = [
+        missing = [
             name
             for name in support.DEFAULT_MAIL_TEMPLATES
-            if support.qualified(name) in page
+            if support.qualified(name) not in page
         ]
 
-        assert leaked == [], (
-            f"{leaked} are offered in the preview but cannot be rendered by "
-            "render(); see docs/DECISIONS.md"
+        assert missing == [], (
+            f"{missing} are not offered in the preview, although the package "
+            "renders them through render() like every other template"
         )
 
 

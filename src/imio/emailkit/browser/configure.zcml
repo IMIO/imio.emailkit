@@ -4,15 +4,20 @@
     i18n_domain="imio.emailkit"
     >
 
-  <!-- Set overrides folder for Just-a-Bunch-Of-Templates product.
+  <!-- z3c.jbot, for SPEC 4's promise that a site can override the `.pt` files
+       THIS package resolves. No `browser:jbot` directive any more, since this
+       package overrides no stock Plone template now that `default_mails.py` has
+       taken the two views over; but the include is still load-bearing, and in
+       the less obvious direction.
 
        The WHOLE package, never `file="meta.zcml"` (Phase 0 caveat D1).
        `meta.zcml` registers only the `browser:jbot` directive; the
-       `ViewPageTemplateFile.__get__` monkeypatches that make an override
-       effective live in `z3c.jbot/configure.zcml`
-       (`<include package="z3c.jbot.patches" />`). With `meta.zcml` alone the
-       directive parses, the TemplateManager is built with the CORRECT path
-       mapping, and the stock template still renders: no error, no warning.
+       `ViewPageTemplateFile.__get__` monkeypatches live in
+       `z3c.jbot/configure.zcml`. Those patches are what `render()._page_template`
+       invokes by hand so a consumer's override of one of our templates is picked
+       up, and what keeps stock Plone's `login_help.pt` overridable where
+       `login_help.py` reuses it by absolute path. Without them there is no error
+       and no warning; overrides are simply ignored.
 
        CMFPlone does not include z3c.jbot itself. In a real instance
        z3c.autoinclude pulls it in, but PLONE_FIXTURE disables autoinclude, so
@@ -20,17 +25,41 @@
   -->
   <include package="z3c.jbot" />
 
-  <!-- SPEC §8.1/§8.2: bound to IEmailkitLayer, which only the `:default`
-       profile installs. That binding IS the opt-out mechanism: with `:base`
-       installed the directory below is registered but unreachable, so stock
-       Plone mails stay untouched. -->
-  <browser:jbot
-      directory="overrides"
+  <!-- SPEC 8.1's two remaining Plone default mails, as owned views.
+
+       They were `z3c.jbot` overrides of stock Plone's page templates until
+       `browser/default_mails.py` took the views over. jbot could reach them, so
+       it was used; the cost was that a stock view rendered them, which meant a
+       foreign dialect, no locale helpers, no `render()` and therefore no
+       discovery, no preview and no golden files. Owning the view makes them
+       ordinary templates, exactly as it already did for `get_username` below.
+
+       Same `name`, same `for` and same `permission` as the stock registrations
+       in `Products/CMFPlone/browser/login/configure.zcml`, differing only by
+       layer. No `template=`: the classes render a registered template through
+       `render()` and return the RFC822 document `RegistrationTool` expects.
+
+       On IEmailkitLayer, which only the `:default` profile installs. That
+       binding IS SPEC 8.2's opt-out: a `:base` site keeps stock Plone's views
+       and stock Plone's mails. -->
+  <browser:page
+      name="mail_password_template"
+      for="*"
+      class=".default_mails.MailPasswordView"
+      permission="zope.Public"
       layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
-  <!-- The THIRD restyled Plone default mail, and the one that is not a jbot
-       override: the username reminder from the login-help form.
+  <browser:page
+      name="registered_notify_template"
+      for="*"
+      class=".default_mails.RegisteredNotifyView"
+      permission="zope.Public"
+      layer="imio.emailkit.interfaces.IEmailkitLayer"
+      />
+
+  <!-- The third restyled Plone default mail: the username reminder from the
+       login-help form.
 
        Stock Plone has no template for it. It is `SEND_USERNAME_TEMPLATE`, a
        module-level i18n string in `Products.CMFPlone.browser.login.login_help`,
@@ -44,7 +73,7 @@
        login_help.pt by absolute path, so the form markup is not forked and stays
        jbot-overridable.
 
-       On IEmailkitLayer, exactly like the jbot directory above, so the opt-out
+       On IEmailkitLayer, exactly like the two views above, so the opt-out
        covers this mail too: a `:base` site gets stock Plone's view and stock
        Plone's plaintext mail. -->
   <browser:page
@@ -55,9 +84,11 @@
       layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
-  <!-- The kit layout's last resort for the theme tokens, used by the two
-       jbot-overridden Plone default mails: a stock CMFPlone view renders them,
-       so neither `theme` nor `options/theme` is in scope there. Registered on
+  <!-- The kit layout's last resort for the theme tokens, for a consumer whose
+       template is rendered by a stock view rather than by `render()`: neither
+       `theme` nor `options/theme` is in scope there. No template this package
+       ships needs it any more, now that it renders all three of its default
+       mails itself, but the layout keeps the fallback. Registered on
        IDefaultBrowserLayer rather than IEmailkitLayer so a `:base` consumer
        rendering its own templates through a stock view has the same escape.
 
@@ -79,8 +110,8 @@
        templates against arbitrary committed fixture data and has a button that
        puts mail on the wire. Anonymous and ordinary members get Unauthorized.
 
-       On IEmailkitLayer, so the preview only exists where the jbot overrides do:
-       a preview that showed unoverridden markup would be lying about the very
+       On IEmailkitLayer, so the preview only exists where the restyled mails do:
+       a preview that showed stock Plone's markup would be lying about the very
        thing it exists to show. Consequence, and it is deliberate: a site that
        installed `:base` for SPEC §8.2's opt-out has no preview view. That is the
        opposite call from `emailkit_theme` above, which a `:base` site genuinely
@@ -100,7 +131,7 @@
 
        Including it here is idempotent (zope.configuration skips an already
        processed file), so this only ever moves the declaration earlier. Same
-       reasoning, and the same placement, as the z3c.jbot include above: the
+       reasoning, and the same placement, as the z3c.jbot include at the top: the
        include sits next to the directive that needs it, where the mistake would
        otherwise be made. -->
   <include

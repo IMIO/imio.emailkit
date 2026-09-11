@@ -22,12 +22,12 @@
   <include package=".contentrules" />
 
   <!-- imio.emailkit is its own first consumer: its templates register through
-       exactly the directive external addons use. Two of the three restyled
-       Plone default mails (mail_password_template, registered_notify_template)
-       are deliberately NOT here: a stock Plone view renders them, their bodies
-       speak that view's dialect, and a registration would resolve to a template
-       that render() can never render. get_username IS here because this package owns
-       that view and renders it through render(). See docs/DECISIONS.md. -->
+       exactly the directive external addons use, and ALL of them do. The three
+       restyled Plone default mails are here alongside `notification` because
+       this package owns the view that renders each one (`browser/login_help.py`
+       for get_username, `browser/default_mails.py` for the other two), so every
+       one of them goes through render() and is discovered, previewable and
+       golden tested like any consumer template. See docs/DECISIONS.md. -->
   <emailkit:templates directory="templates">
     <emailkit:template
         name="notification"
@@ -38,6 +38,16 @@
         name="get_username"
         preheader="[email_preheader_get_username] Here is the username you asked for."
         subject="[email_subject_get_username] Your username"
+        />
+    <emailkit:template
+        name="mail_password_template"
+        preheader="[email_preheader_mail_password_template] Follow the link to choose a new password."
+        subject="[email_subject_mail_password_template] Password reset request"
+        />
+    <emailkit:template
+        name="registered_notify_template"
+        preheader="[email_preheader_registered_notify_template] Follow the link to activate your account."
+        subject="[email_subject_registered_notify_template] An account has been created for you"
         />
   </emailkit:templates>
 

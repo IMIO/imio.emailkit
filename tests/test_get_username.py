@@ -105,7 +105,8 @@ class TestTheTemplateIsRenderable:
     The two jbot mails are deliberately *not* discovered, and
     ``test_golden.py::test_the_default_mails_are_not_registered_for_discovery``
     keeps them that way. This one is the opposite case and is asserted as such, so
-    a future reader does not "tidy" it into ``DEFAULT_MAIL_TEMPLATES``.
+    a future reader does not "tidy" it into ``DEFAULT_MAIL_TEMPLATES``, which is
+    now only about the stock *calling convention* the other two still go through.
     """
 
     def test_it_is_registered_for_discovery(self, integration):
@@ -334,10 +335,7 @@ class TestClientAddressSemantics:
         package = pathlib.Path(imio.emailkit.__file__).parent
         files = [
             package / "templates" / f"{TEMPLATE}.pt",
-            package
-            / "browser"
-            / "overrides"
-            / support.JBOT_OVERRIDE_FILENAMES[support.MAIL_PASSWORD],
+            package / "templates" / f"{support.MAIL_PASSWORD}.pt",
         ]
 
         for path in files:

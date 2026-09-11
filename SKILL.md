@@ -476,22 +476,30 @@ Email("my.addon:item_published").to(member).to("greffe@commune.be").cc(
   defines that slot for every template, and that route keeps the registration's
   subject, the preheader and the hand-authored twin.
 
-## Templates a stock Plone view renders (jbot overrides)
+## The Plone default mails are ordinary templates
 
-The restyled password-reset and registration mails are the documented exception.
-They are rendered by a stock view, so:
+`mail_password_template`, `registered_notify_template` and `get_username` restyle
+mails stock Plone sends, and there is **nothing special about authoring them**.
+This package registers its own views for all three (`browser/default_mails.py`,
+`browser/login_help.py`), each of which builds a flat context and calls
+`render()`, so they are registered, discovered, previewable and golden-tested
+like any consumer template. Same `${...}`, same `i18n:domain`, same locale
+helpers, same twins.
 
-- view kwargs land in **`options`**, not at top level: `${options/member}`;
-- `MemberData` is **not path-traversable at all** — `${member/email}` raises, use
-  `${python: member.getProperty('email')}`;
-- there are **no locale helpers** and no `theme` in that namespace (the shell reaches
-  the registry through `@@emailkit_theme` instead);
-- the subject is emitted by the template as its own `Subject:` header, and needs
-  `tal:omit-tag=""` on the `i18n:translate` span, or the header ships as
-  `Subject: <span>Reset your password</span>`.
+Two used to be `z3c.jbot` overrides rendered by a stock CMFPlone view, and that
+forced a second dialect — `${options/member}`, `${python: member.getProperty('email')}`,
+no locale helpers, no `theme`, and a hand-written `Subject:` header emitted from
+`useDoctype()`. If you find markup like that in a `.vue`, it is pre-2026-09-11 and
+wants converting; `docs/DECISIONS.md` has the entry.
 
-These cannot go through `render()` and are not registered for discovery. Do not copy
-their dialect into an ordinary template.
+What stays in Python, in the view, is the only part that cannot be a template:
+`RegistrationTool` parses `Subject`/`To`/`From` back out of the returned string, so
+`DefaultMailView.header_block` builds an RFC822 preamble. The subject it uses is the
+template's registration msgid — so **set the subject in ZCML**, like everywhere else,
+never in the template.
+
+If you add a context key, add it to `build_context` *and* to the fixture; the golden
+test is what tells you when you forgot.
 
 ## Checklist before you commit
 

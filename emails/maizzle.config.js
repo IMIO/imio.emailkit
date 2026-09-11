@@ -4,7 +4,7 @@
  * `imio.emailkit` is its own first consumer (SPEC §4), so this file is also the
  * worked example every consumer addon copies: spread the kit's base config,
  * then set only the two things a base config cannot know -- where the compiled
- * `.pt` goes, and where the jbot overrides go.
+ * `.pt` goes.
  *
  * Note that `package.json` deliberately has no `"type": "module"`. Without it
  * Maizzle loads this file through jiti, which transpiles ESM syntax wherever it
@@ -47,10 +47,5 @@ export default defineConfig({
      * committed CSS.
      */
     cssEntry: resolve(here, 'tailwind.css'),
-    /**
-     * z3c.jbot resolves overrides by dotted filename, so the two Plone-default
-     * mails cannot use `output.path`; they call `useOutputPath()` with this.
-     */
-    overridesPath: resolve(pkg, 'browser', 'overrides'),
   },
 })

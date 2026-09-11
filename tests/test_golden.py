@@ -118,49 +118,28 @@ class TestFixtureCoverage:
             f"{own}* templates with no tests/fixtures/<name>.py: {without}"
         )
 
-    def test_the_default_mails_are_shipped_as_committed_jbot_overrides(self):
-        """The two default mails are **jbot-only** and not golden-tested.
+    def test_every_shipped_template_is_registered_for_discovery(self, integration):
+        """The inverse of the guard this replaced, and the point of §8.
 
-        ``docs/DECISIONS.md`` ("Default-mail templates are built once and copied
-        to the jbot overrides dir") amends §8: they are rendered by a *stock Plone
-        view*, so their bodies must use ``options/...`` and
-        ``python:member.getProperty(...)`` (Phase 0, caveat D2 -- ``MemberData`` is
-        not path-traversable at all), which ``render()``'s flat context can never
-        satisfy wherever the files sit. So no ``render()``, no fixture, no
-        snapshot.
+        There used to be a test here asserting that the two Plone default mails
+        were **not** registered: a stock view rendered them, their bodies spoke
+        that view's dialect, and a registration would have resolved to something
+        ``render()`` could never render. ``browser/default_mails.py`` owns those
+        views now, so the exception is gone and the assertion flips: every
+        template this package ships is discovered, exactly like a consumer's.
 
-        What is checked instead is that the artifacts *exist and are committed*:
-        the build writes them, nothing else in this suite would notice if a build
-        stopped producing one, and the staleness gate only compares files it finds
-        on both sides. Their rendered output is asserted in
-        ``tests/test_default_mails.py`` through the stock view.
-        """
-        missing = [
-            support.JBOT_OVERRIDE_FILENAMES[name]
-            for name in support.DEFAULT_MAIL_TEMPLATES
-            if not support.override_path(name).exists()
-        ]
-
-        assert missing == [], f"jbot override files not committed: {missing}"
-
-    def test_the_default_mails_are_not_registered_for_discovery(self, integration):
-        """The other half of the same decision, asserted so it cannot drift back.
-
-        Registering them would make them look ``render()``-able to the golden
-        harness, to ``make preview-emails`` and to ``@@emailkit-preview`` -- all
-        three of which would then fail at render time with a namespace error that
-        says nothing about why. If a future change genuinely makes them
-        renderable, this test is the place that says the decision changed.
+        If a future change reintroduces a template that cannot go through
+        ``render()``, this is the test that will say so.
         """
         from imio.emailkit.discovery import get_templates
 
         registered = {name.split(":", 1)[-1] for name in get_templates()}
-        leaked = sorted(set(support.DEFAULT_MAIL_TEMPLATES) & registered)
+        unregistered = sorted(set(support.RENDERABLE_TEMPLATES) - registered)
 
-        assert leaked == [], (
-            f"{leaked} are registered for discovery, but their bodies use the "
-            "stock view's options/... dialect and cannot be rendered by render(). "
-            "See docs/DECISIONS.md."
+        assert unregistered == [], (
+            f"{unregistered} are shipped but not registered for discovery, so "
+            "they are invisible to the golden harness, to bin/preview-emails and "
+            "to @@emailkit-preview"
         )
 
     def test_no_orphan_fixtures(self):

@@ -60,24 +60,59 @@ def rendered(portal, marked_request, template, member):
     return support.call_stock_mail(portal, marked_request, template, member)
 
 
-class TestJbotResolvesOurFile:
-    def test_the_override_wins_at_lookup(self, view, template):
-        resolved = support.resolved_template(view)
-        expected = support.JBOT_OVERRIDE_FILENAMES[template]
+class TestWeOwnTheStockViews:
+    """The stock view *names* must resolve to our classes, on our layer.
 
-        assert resolved.filename.endswith(expected), (
-            f"jbot resolved {resolved.filename!r}, expected a file named {expected!r}"
+    ``RegistrationTool`` looks these up by name on ``portal_registration``; if our
+    registration does not win, everything below this class would still pass while
+    stock Plone's mail went out.
+    """
+
+    def test_the_view_is_ours(self, view):
+        from imio.emailkit.browser.default_mails import DefaultMailView
+
+        assert isinstance(view, DefaultMailView), (
+            f"{type(view).__module__}.{type(view).__name__} rendered the mail, "
+            "so our registration did not win the lookup"
         )
-        assert support.PACKAGE_NAME.replace(".", "/") in resolved.filename.replace(
-            "\\", "/"
-        ), f"the winning file is not ours: {resolved.filename!r}"
 
-    def test_the_shadowed_original_is_the_stock_file(self, view, template):
-        """jbot stashes what it displaced. If this is not the CMFPlone file, the
-        override is shadowing something else entirely."""
-        resolved = support.resolved_template(view)
+    def test_it_renders_a_registered_template(self, view):
+        """The whole point of owning the view: these go through §4 discovery and
+        §6.1 ``render()`` like any consumer template, rather than through a
+        dialect only these two speak."""
+        from imio.emailkit.discovery import get_template
 
-        assert resolved._filename.endswith(support.STOCK_TEMPLATE_TAILS[template])
+        assert get_template(view.template_name) is not None
+
+    @pytest.mark.parametrize(
+        ("method", "expected"),
+        [
+            ("mailPassword", ("member", "reset")),
+            ("registeredNotify", ("member", "reset")),
+        ],
+    )
+    def test_stock_kwargs_are_what_we_build_from(self, method, expected):
+        """Drift guard on the one piece of stock Plone we cannot inherit.
+
+        ``build_context`` reads ``member`` and ``reset`` out of the kwargs the
+        tool passes. Those names are stock's, not ours, so a Plone upgrade that
+        renames or drops one would silently hand us ``None`` and send a mail with
+        an empty link. The same guard ``login_help.py`` carries for its fork of
+        ``update()``; when it trips, re-read the call site and update
+        ``build_context``. Do not weaken it.
+        """
+        import inspect
+
+        from Products.CMFPlone.RegistrationTool import RegistrationTool
+
+        source = inspect.getsource(getattr(RegistrationTool, method))
+        call = source[source.index("_template(") :]
+        missing = [name for name in expected if f"{name}=" not in call]
+
+        assert missing == [], (
+            f"RegistrationTool.{method} no longer passes {missing} to its mail "
+            "view; imio.emailkit.browser.default_mails.build_context reads them"
+        )
 
 
 class TestRenderedOutputIsOurs:
@@ -133,7 +168,7 @@ class TestRenderedOutputIsOurs:
         )
 
 
-class TestThemeTokensReachTheJbotPath:
+class TestThemeTokensReachTheDefaultMails:
     """§8.2 level 2 has to work on *these* two mails above all others.
 
     "Adjust branding only: theme tokens via ``plone.app.registry`` -- covers the
@@ -163,14 +198,14 @@ class TestThemeTokensReachTheJbotPath:
         registry[record] = self.PROBE_COLOR
         return self.PROBE_COLOR
 
-    def test_the_primary_color_reaches_the_stock_view_render(
+    def test_the_primary_color_reaches_the_default_mail_render(
         self, portal, marked_request, template, member, with_probe_color
     ):
         rendered = support.call_stock_mail(portal, marked_request, template, member)
 
         assert with_probe_color in rendered, (
-            "the theme token did not reach a jbot-hosted render: §8.2 level 2 "
-            "does not apply to the two mails §8.1 ships"
+            "the theme token did not reach the render: §8.2 level 2 does not "
+            "apply to the two mails §8.1 ships"
         )
 
 
@@ -187,31 +222,31 @@ class TestTheResultIsStillAParsableMail:
         assert message["From"]
         assert message["Subject"]
 
-    def test_the_subject_is_our_msgid_translated(
+    def test_the_subject_is_our_registered_msgid_translated(
         self, rendered, template, marked_request
     ):
         """§8.1: "subjects are re-registered as i18n msgids in the
         ``imio.emailkit`` domain".
 
-        ``docs/DECISIONS.md`` settled the route: the override template emits its
-        own ``Subject:`` header, because the stock subjects are Python-side
-        methods on ``PasswordResetToolView`` that jbot cannot reach.
+        They now live in the template's §4 ``<emailkit:templates>`` registration,
+        exactly like every other subject in the package, and
+        ``DefaultMailView.header_block`` translates that msgid into the
+        recipient's language. Before the views were ours the msgid had to be
+        emitted by the template itself, on a hand-written ``Subject:`` line with
+        ``tal:omit-tag=""`` on the span; one forgotten attribute shipped
+        ``Subject: <span>Password reset request</span>``.
 
-        Compared against the *translation of the registered msgid* rather than
-        against a list of stock subject strings. A text blacklist cannot work
-        here: the registration's msgid default is allowed to read the same as
-        Plone's -- ``"Password reset request"`` is simply what that mail is called
-        -- so identical text proves nothing either way. What does prove it is that
-        the header equals what our own domain returns for our own msgid.
+        Compared against the translation of the registered msgid rather than
+        against a blacklist of stock subject strings: our msgid's English default
+        is allowed to read the same as Plone's, so identical text proves nothing.
+        What proves it is that the header equals what our own domain returns for
+        our own msgid.
         """
         from zope.i18n import translate
 
-        msgid = support.override_subject_message(template)
+        msgid = support.registered_subject(template)
 
-        assert msgid, (
-            f"{support.override_path(template).name} emits no i18n:translate on "
-            "its Subject: line, so the subject is not an imio.emailkit msgid"
-        )
+        assert msgid, f"{template} declares no subject in its §4 registration"
         expected = translate(msgid, context=marked_request)
         message = message_from_string(rendered.strip())
 

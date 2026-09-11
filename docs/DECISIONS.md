@@ -8,6 +8,82 @@ Newest entries at the top.
 
 ---
 
+## 2026-09-11 — SUPERSEDES "Default-mail templates are built once and copied to the jbot overrides dir": `imio.emailkit` owns the two stock views
+
+**Context.** `mail_password_template` and `registered_notify_template` were `z3c.jbot`
+overrides of stock CMFPlone page templates. jbot could reach them, so jbot was used, and
+§8's "no new mechanism" pointed the same way. The earlier entry recorded the consequence
+honestly and moved on: they are rendered by a stock view, so their bodies use
+`options/…` and `python:member.getProperty(…)`, `render()` can never render them, and
+§8's claim that the default mails are "authored, compiled, discovered, tested and shipped
+exactly like consumer templates" was true for every verb except *discovered*.
+
+**What that cost, concretely.** Not discovered means not previewable. The password-reset
+mail — the single most likely thing a commune wants in its own colours — was the one mail
+nobody could open in `bin/preview-emails` or `@@emailkit-preview`. It had no fixture and
+no golden files, so its rendered output was only ever asserted through the stock view. And
+an author touching it had to learn a dialect used by exactly two files in the package:
+kwargs in `options`, a `MemberData` that is not path-traversable at all, no locale helpers,
+no `theme`, plus a hand-written `Subject:` header in a Maizzle `useDoctype()` block where a
+forgotten `tal:omit-tag=""` ships `Subject: <span>Password reset request</span>`.
+
+**Choice.** Own the views. `browser/default_mails.py` registers `mail_password_template`
+and `registered_notify_template` under the same `name`, `for` and `permission` as stock,
+differing only by layer, subclassing `PasswordResetToolView` so `encoded_mail_sender`,
+`construct_url`, `expiration_timeout` and `portal_state` stay stock's. Each builds a flat
+context and renders a registered template through `render()`.
+
+**Why this is not a new mechanism.** It is the *existing* one.
+`browser/login_help.py` has owned the `login-help` view since the beginning, because stock
+Plone has no template for the username reminder and jbot had nothing to key on. Its
+docstring already said what the pay-off was: "because we own the view, the template speaks
+the flat dialect, renders through `render()` and goes out through the `Email` builder. It
+is therefore genuinely discovered, golden-tested and previewable." The only reason the
+other two were different is that jbot *could* reach them, which turned out to be a reason
+to use jbot rather than a reason it was right.
+
+**What could not move.** `RegistrationTool` does not send what the view returns: it runs
+`message_from_string()` on it and pulls `Subject`/`To`/`From`/`Content-Type` back out, then
+hands the whole string to `MailHost`. So the return value must still be an RFC822 document.
+That block is now built in Python from data, which is the single biggest gain: the subject
+is a msgid in the §4 registration like every other subject in the package, translated per
+recipient by the same code path, instead of markup in a template.
+
+**Consequences, all verified.**
+
+- Four registered templates, one dialect, one preview list: `bin/preview-emails` goes from
+  6 previews to 12.
+- `registered_notify_template` formats its expiry through the kit's `format_datetime`,
+  bound to the *recipient's* language. Stock used `context.toLocalizedTime`, which follows
+  the request — a Dutch member got a French date whenever a French visitor triggered it.
+- A site layer now overrides `imio.emailkit.templates.mail_password_template.pt` rather
+  than the CMFPlone file. §8.2 level 1 is unchanged in mechanism and simpler in
+  description: one filename convention for every template the package ships.
+- No `browser:jbot` directory is registered any more. `<include package="z3c.jbot" />`
+  **stays**, and the comment above it now says why: the `ViewPageTemplateFile.__get__`
+  patches are what `render()._page_template` invokes so a consumer can override *our*
+  resolved `.pt` (§4's last bullet), and what keeps stock's `login_help.pt` overridable
+  where `login_help.py` reuses it by path. Removing it is silent — no error, no warning,
+  overrides simply ignored.
+- `tests/test_golden.py::test_the_default_mails_are_not_registered_for_discovery` is
+  inverted into `test_every_shipped_template_is_registered_for_discovery`, and
+  `tests/test_preview.py`'s matching negative becomes
+  `test_the_default_mails_are_listed_too`. If a future template genuinely cannot go
+  through `render()`, those are the tests that will say the decision changed back.
+
+**Cost accepted.** We own a stock calling convention: the kwargs `mailPassword` and
+`registeredNotify` pass. `tests/test_default_mails.py::test_stock_kwargs_are_what_we_build_from`
+pins them against the upstream source, the same drift guard `login_help.py` carries for its
+fork of `update()`. This is not new coupling — the jbot templates read `options['member']`
+and `options['reset']` and would have broken on the same upgrade, less visibly.
+
+**Not done.** The mails stay single-part `text/html`, exactly as stock sends them. A
+`multipart/alternative` would be ours to assemble and `RegistrationTool`'s to mishandle.
+The plaintext twins exist and are rendered, for the preview and for completeness; the
+hosting tool discards that half today.
+
+---
+
 ## 2026-08-05 — Template registration moved from an entry point + dict to the `<emailkit:templates>` ZCML directive
 
 **Context.** §4 registration rode on a setuptools entry point pointing at a module-level

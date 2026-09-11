@@ -17,6 +17,14 @@ the docs must keep saying so.
 
 Only ``mail_password_template`` is covered. The mechanism is per-layer, not
 per-template -- a second identical case would cost a fixture and buy nothing.
+
+**What the site package overrides.** Our own compiled template,
+``imio.emailkit.templates.mail_password_template.pt``, not a stock CMFPlone
+file. This package overrides no stock template any more: it owns the view
+(``browser/default_mails.py``) and renders its own template through
+``render()``. That is what makes §4's last bullet -- "z3c.jbot works on the
+resolved ``.pt``" -- the single override story for every template the package
+ships, rather than one story for consumers and another for these two.
 """
 
 import support
@@ -25,7 +33,6 @@ import support
 support.require_runtime()
 
 SITE_MARKER = "data-sitelayer-override=mail_password_template"
-SITE_SUBJECT = "SITE LAYER WINS"
 TEMPLATE = support.MAIL_PASSWORD
 
 
@@ -48,16 +55,31 @@ class TestTheSiteLayerExtendsOurs:
         assert IEmailkitLayer in layers_of(site_portal)
 
 
+def _site_layer():
+    from sitelayer.interfaces import ISiteLayer
+
+    return ISiteLayer
+
+
 class TestTheSiteLayerWins:
     def _view(self, portal, request):
-        from sitelayer.interfaces import ISiteLayer
-
-        support.mark_request(request, ISiteLayer)
+        support.mark_request(request, _site_layer())
         return support.stock_mail_view(portal, request, TEMPLATE)
 
     def test_the_site_file_wins_at_lookup(self, site_portal, site_request):
-        view = self._view(site_portal, site_request)
-        resolved = support.resolved_template(view)
+        """Resolved through ``render()``'s loader, which is where the jbot
+        descriptor is invoked for our own templates (``render._page_template``).
+
+        Never assert on this alone -- see the module docstring of
+        ``tests/test_jbot_wiring.py``; the render assertions below are what prove
+        the swap had an effect.
+        """
+        from imio.emailkit.render import _page_template
+        from imio.emailkit.discovery import get_template
+
+        support.mark_request(site_request, _site_layer())
+        template = get_template(support.qualified(TEMPLATE))
+        resolved = _page_template(template.html_path)
         path = resolved.filename.replace("\\", "/")
 
         assert "/sitelayer/overrides/" in path, (
@@ -79,10 +101,11 @@ class TestTheSiteLayerWins:
         )
 
         assert SITE_MARKER in rendered
-        assert SITE_SUBJECT in rendered
-        # The site template reads the member through the hosting view's dialect,
-        # so this also proves it was really executed rather than resolved.
-        assert member.getProperty("email") in rendered
+        # The site template reads `site_name` out of the flat render() context,
+        # so this also proves it was really executed rather than resolved. The
+        # subject is no longer the site file's business: it comes from our §4
+        # registration, and `DefaultMailView` emits the header.
+        assert "Site name :" in rendered
 
     def test_our_markup_does_not_render(self, site_portal, site_request, make_member):
         """The negative half: ours lost, rather than both being concatenated or
