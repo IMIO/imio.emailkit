@@ -1,0 +1,15 @@
+<tal:body
+  ><span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_registered_notify_greeting">Hello <span i18n:name="fullname" tal:omit-tag="" tal:content="fullname">Fullname</span>,</span>
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_registered_notify_created">Your account has been created. Your username is <span i18n:name="username" tal:omit-tag="" tal:content="username">username</span>. Activate it by choosing a password.</span>
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_registered_notify_cta">Activate my account</span> : <span tal:omit-tag="" tal:content="activation_url" />
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_registered_notify_expiry">Activate your account before <span i18n:name="expiration_date" tal:omit-tag="" tal:content="python: format_datetime(expires)">date</span>.</span>
+
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_regards">Kind regards,</span>
+<span tal:omit-tag="" tal:content="email_from_name" />
+
+--
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_footer_default">This message was sent automatically. Please do not reply to it.</span>
+</tal:body>

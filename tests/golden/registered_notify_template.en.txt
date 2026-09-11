@@ -1,0 +1,14 @@
+Hello Jeanne Dupont,
+
+Your account has been created. Your username is jdupont. Activate it by choosing a password.
+
+Activate my account : https://sambreville.example.be/passwordreset/8f3c1a9e2b?userid=jdupont
+
+Activate your account before September 18, 2026 5:30 PM.
+
+Kind regards,
+Délibérations.be
+
+--
+This message was sent automatically. Please do not reply to it.
+

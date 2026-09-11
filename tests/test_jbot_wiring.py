@@ -49,11 +49,24 @@ class TestJbotPatchesAreLoaded:
     The add-on's own ``configure.zcml`` must include the whole ``z3c.jbot``
     package -- the test layer deliberately does not load it, so a regression to
     ``file="meta.zcml"`` fails here instead of silently disabling every override.
+
+    There is deliberately no ``TemplateManager`` assertion any more. This package
+    registers no ``browser:jbot`` directory since ``browser/default_mails.py``
+    took the two stock views over, so there is no directory of ours to wire. The
+    include is still required, and in the less obvious direction: the patches
+    below are what ``render()._page_template`` invokes so that a *consumer* can
+    override one of our resolved ``.pt`` files (§4's last bullet), which is what
+    ``tests/test_layer_override.py`` exercises end to end.
     """
 
     def test_five_view_page_template_file_is_patched(self, portal):
-        """The class behind ``browser:page template=...``, i.e. the two stock
-        Plone mail views (§8.1)."""
+        """The class behind ``browser:page template=...``.
+
+        Still load-bearing: ``login_help.py`` reuses stock Plone's own
+        ``login_help.pt`` by absolute path through a ``ViewPageTemplateFile``
+        precisely so the form stays overridable by a site that already overrides
+        it.
+        """
         from Products.Five.browser.pagetemplatefile import ViewPageTemplateFile
 
         patched = vars(ViewPageTemplateFile).get("__get__")
@@ -78,17 +91,3 @@ class TestJbotPatchesAreLoaded:
 
         assert patched is not None
         assert patched.__module__ == "z3c.jbot.patches"
-
-    def test_a_template_manager_is_registered_for_our_layer(self, portal):
-        """The ``browser:jbot`` directive ran for ``IEmailkitLayer`` (§8.1)."""
-        from imio.emailkit.interfaces import IEmailkitLayer
-        from z3c.jbot.interfaces import ITemplateManager
-        from zope.component import getGlobalSiteManager
-
-        gsm = getGlobalSiteManager()
-        managers = list(gsm.adapters.lookupAll((IEmailkitLayer,), ITemplateManager))
-
-        assert managers, (
-            "no jbot TemplateManager for IEmailkitLayer: the browser:jbot "
-            "directive did not run"
-        )

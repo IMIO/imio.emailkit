@@ -58,37 +58,32 @@ GOLDEN_DIR = HERE / "golden"
 MAIL_PASSWORD = "mail_password_template"  # noqa: S105
 REGISTERED_NOTIFY = "registered_notify_template"
 
-#: The two Plone default mails ``imio.emailkit:default`` restyles (§8.1).
+#: The two Plone default mails whose *views* this package owns
+#: (``imio.emailkit.browser.default_mails``), §8.1.
 #:
-#: **These are jbot-only: not discovered, not renderable through ``render()``.**
-#: The reason is dialect, not file location. They are rendered by a *stock Plone
-#: view*, whose keyword arguments land in ``options`` and whose ``member`` is a
-#: ``MemberData`` that cannot be path-traversed at all (Phase 0, caveat D2) -- so
-#: their bodies must use ``options/...`` and ``python:member.getProperty(...)``.
-#: ``render()`` supplies a flat context, so it could never render them wherever
-#: the files sat. Recorded in ``docs/DECISIONS.md`` ("Default-mail templates are
-#: built once and copied to the jbot overrides dir"), which amends §8's claim that
-#: they are "discovered ... exactly like consumer templates".
-#:
-#: Consequence for this suite: they are covered through the stock view
-#: (``test_default_mails.py``, ``test_optout.py``, ``test_layer_override.py``) and
-#: never through ``render()``.
+#: They were jbot overrides once, and the cost of that was a foreign dialect and
+#: no discovery. Owning the view makes them ordinary registered templates, so they
+#: appear in :data:`RENDERABLE_TEMPLATES` below as well; this tuple is what the
+#: tests that go through the *stock calling convention* parametrise on
+#: (``test_default_mails.py``, ``test_optout.py``).
 DEFAULT_MAIL_TEMPLATES = (MAIL_PASSWORD, REGISTERED_NOTIFY)
 
-#: Templates that go through ``render()`` -- the flat-context dialect §3 teaches
-#: and the one every consumer addon will use. Driven off discovery in the tests
-#: that can; this tuple is for parametrisation, which needs values at import time.
-#: ``get_username`` is here and **not** in :data:`DEFAULT_MAIL_TEMPLATES` above,
-#: even though it too restyles a stock Plone mail. Stock Plone has no template for
-#: it (it is a hardcoded plaintext string in ``login_help.py``), so jbot cannot
-#: reach it, so this package overrides the *view* -- and owning the view means the
-#: template speaks the flat dialect and really is ``render()``-able. Adding it to
-#: ``DEFAULT_MAIL_TEMPLATES`` instead would trip
-#: ``test_the_default_mails_are_not_registered_for_discovery``, which exists to
-#: protect the other two and should keep doing exactly that.
+#: Every template this package registers: the §3 flat-context dialect, one set of
+#: authoring rules, one preview list. Driven off discovery in the tests that can;
+#: this tuple is for parametrisation, which needs values at import time.
+#:
+#: All four are here, which is the point of owning the views. ``get_username`` was
+#: the first (stock Plone has no template for it, so jbot could not reach it and
+#: the view was the only seam); the two default mails followed, because reaching
+#: them with jbot was possible but made them second-class.
 NOTIFICATION = "notification"
 GET_USERNAME = "get_username"
-RENDERABLE_TEMPLATES = (NOTIFICATION, GET_USERNAME)
+RENDERABLE_TEMPLATES = (
+    NOTIFICATION,
+    GET_USERNAME,
+    MAIL_PASSWORD,
+    REGISTERED_NOTIFY,
+)
 
 
 def qualified(name):
@@ -97,47 +92,23 @@ def qualified(name):
 
 
 # ---------------------------------------------------------------------------
-# The stock CMFPlone mail views and their jbot override filenames
+# The stock CMFPlone mails these two replace
 # ---------------------------------------------------------------------------
 
-#: Both views are registered with ``browser:page template=...``, which becomes a
-#: ``Products.Five.browser.pagetemplatefile.ViewPageTemplateFile`` -- the class
-#: z3c.jbot patches. The required override filename is the dotted module path of
-#: the shadowed file (Phase 0 report, section (d)).
-JBOT_OVERRIDE_FILENAMES = {
-    MAIL_PASSWORD: (
-        "Products.CMFPlone.browser.login.templates.mail_password_template.pt"
-    ),
-    REGISTERED_NOTIFY: (
-        "Products.CMFPlone.browser.login.templates.registered_notify_template.pt"
-    ),
-}
-
-#: Path fragment of the *stock* file each override shadows, for negative controls.
+#: Path fragment of the stock file each of our two views replaces. A ``:base``
+#: site gets stock Plone's view, and therefore stock Plone's template; this is
+#: what asserts that.
 STOCK_TEMPLATE_TAILS = {
     MAIL_PASSWORD: os.path.join(
-        "Products",
-        "CMFPlone",
-        "browser",
-        "login",
-        "templates",
+        "Products", "CMFPlone", "browser", "login", "templates",
         "mail_password_template.pt",
     ),
     REGISTERED_NOTIFY: os.path.join(
-        "Products",
-        "CMFPlone",
-        "browser",
-        "login",
-        "templates",
+        "Products", "CMFPlone", "browser", "login", "templates",
         "registered_notify_template.pt",
     ),
 }
 
-#: Body text that exists **only** in the stock templates. Deliberately the
-#: English default text rather than the msgid: ``i18n:translate`` replaces the
-#: msgid with its translation, so asserting on msgids would pass even when the
-#: stock template rendered -- a negative control that can never fail is worse
-#: than none.
 STOCK_BODY_MARKERS = {
     MAIL_PASSWORD: (
         "The following link will take you to a page where you can reset your password"
@@ -332,6 +303,11 @@ def resolved_template(view):
     This is the object z3c.jbot patches, and ``.filename`` is what it resolved
     to. Never assert on this *alone* -- see the module docstring of
     ``tests/test_jbot_wiring.py``.
+
+    Only for views that *have* an ``index``: stock Plone's own mail views (which
+    is what a ``:base`` site gets) and the login-help form. This package's own
+    default-mail views render through ``render()`` and have none; the equivalent
+    lookup for those goes through ``imio.emailkit.render._page_template``.
     """
     return view.index.__func__
 
@@ -341,54 +317,20 @@ MEMBER_FULLNAME = "Zoé Testeuse"
 MEMBER_EMAIL = "zoe.testeuse@example.be"
 
 
-#: The ``Subject:`` header a jbot override emits: its ``i18n:translate`` msgid and
-#: the element text that is the msgid's default.
-_SUBJECT_MSGID = re.compile(
-    r"^Subject:[^\n]*?i18n:translate=\"([^\"]+)\"[^\n]*?>([^<\n]*)<",
-    re.MULTILINE,
-)
+def registered_subject(template):
+    """The ``subject`` msgid a template's §4 registration declares.
 
-
-def override_path(template):
-    """The committed jbot override file for one of the two default mails."""
-    import imio.emailkit
-
-    return (
-        Path(imio.emailkit.__file__).parent
-        / "browser"
-        / "overrides"
-        / JBOT_OVERRIDE_FILENAMES[template]
-    )
-
-
-def override_subject_message(template):
-    """The msgid the committed override declares on its ``Subject:`` line.
-
-    Read out of the build artifact rather than hardcoded here. ``docs/DECISIONS``
-    routes these subjects through a template-emitted header because the stock ones
-    are Python-side methods jbot cannot reach, so the msgid lives in the compiled
-    ``.pt`` and nowhere else -- and comparing the rendered header against *that*
-    msgid's translation is what proves the header came from our domain rather than
-    from ``PasswordResetToolView``. A hardcoded list of stock subject strings
-    cannot do it: our msgid's English default is allowed to read exactly like
-    Plone's, because it is the same mail.
-
-    Returned as a ``Message`` carrying the element's own text as its ``default``,
-    which is what Chameleon's ``i18n:translate`` uses when the catalog has no
-    entry. Without the default, the comparison would be "translated subject vs.
-    bare msgid" and would fail for a template that is perfectly correct but not
-    yet translated -- reporting an i18n gap as an override bug.
+    The subject of a default mail is now a msgid in ``configure.zcml`` like every
+    other subject in the package, not markup in a hand-emitted ``Subject:`` line.
+    Comparing a rendered header against the translation of *this* is what proves
+    the header came from our registration rather than from
+    ``PasswordResetToolView``'s own ``mail_password_subject()``. A blacklist of
+    stock subject strings could not do it: our msgid's English default is allowed
+    to read exactly like Plone's, because it is the same mail.
     """
-    path = override_path(template)
-    if not path.exists():
-        return None
-    match = _SUBJECT_MSGID.search(path.read_text(encoding="utf-8"))
-    if match is None:
-        return None
-    from zope.i18nmessageid import Message
+    from imio.emailkit.discovery import get_template
 
-    msgid, default = match.group(1), match.group(2).strip()
-    return Message(msgid, domain=PACKAGE_NAME, default=default or None)
+    return get_template(qualified(template)).subject
 
 
 def stock_mail_view(portal, request, template):
