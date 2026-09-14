@@ -107,18 +107,53 @@ class TestTheContractIsWiredUp:
 
         assert missing == [], f"{addon.package}: no §7 fixture for {missing}"
 
-    def test_every_registered_template_has_a_snapshot_per_language_and_part(
-        self, addon
-    ):
+    def test_every_snapshotted_template_has_a_complete_set(self, addon):
+        """Whatever is snapshotted is snapshotted completely.
+
+        Not "every registered template has a snapshot", which is what this used
+        to assert. A snapshot set is a *choice* now -- this package snapshots one
+        of its four templates and ``dummy.complete`` one of its two, because a
+        byte comparison per template per language stopped paying for the diffs it
+        produced (see ``tests/test_golden.py``). Requiring full coverage here
+        would make that choice unavailable to a consumer while the base class
+        happily supports it.
+
+        What still has to hold is that a set is not half-generated: a template
+        with a French snapshot and no English one, or an html with no txt, means
+        an interrupted ``EMAILKIT_UPDATE_GOLDEN=1`` run and a gate that silently
+        checks less than it looks like it does.
+        """
+        snapshotted = {
+            path.name.split(".")[0] for path in addon.golden_dir.glob("*.*.*")
+        }
         missing = [
             f"{name}.{language}.{suffix}"
-            for name in addon.templates
+            for name in sorted(snapshotted)
             for language in addon.languages
             for suffix in ("html", "txt")
             if not (addon.golden_dir / f"{name}.{language}.{suffix}").is_file()
         ]
 
-        assert missing == [], f"{addon.package}: no §7 snapshot for {missing}"
+        assert missing == [], (
+            f"{addon.package}: incomplete §7 snapshot set, missing {missing}. "
+            "Re-run EMAILKIT_UPDATE_GOLDEN=1, or delete the partial set."
+        )
+
+    def test_no_snapshot_outlives_its_template(self, addon):
+        """The other half: a snapshot for a template that is no longer registered.
+
+        Dead weight that no test reads and no target regenerates, which is what
+        the old full-coverage assertion made impossible by construction and what
+        replaces it now that coverage is a choice.
+        """
+        snapshotted = {
+            path.name.split(".")[0] for path in addon.golden_dir.glob("*.*.*")
+        }
+        orphans = sorted(snapshotted - set(addon.templates))
+
+        assert orphans == [], (
+            f"{addon.package}: snapshots for unregistered templates: {orphans}"
+        )
 
     def test_the_addon_has_its_own_test_suite_using_the_shipped_base_class(self, addon):
         """Gate 9's artifact, asserted as part of the contract.

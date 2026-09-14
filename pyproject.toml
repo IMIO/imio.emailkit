@@ -132,11 +132,10 @@ fix = true
 # `.claude/` holds agent definitions whose fenced examples are illustrative, not
 # runnable.
 #
-# `SPEC.md` and `docs/` are excluded because ruff's preview formatter rewrites
-# fenced Python blocks in markdown: it already collapsed the builder's fluent
-# chain onto one line, which is a change to the approved source of truth that no
-# formatter is entitled to make. The spec is an input, not a source file.
-exclude = [".claude", "SPEC.md", "docs"]
+# `docs/` is excluded because ruff's preview formatter rewrites fenced Python
+# blocks in markdown: it once collapsed the builder's fluent chain onto one line,
+# which is a change to prose that no formatter is entitled to make.
+exclude = [".claude", "docs"]
 lint.select = [
     "YTT", "S", "B", "A", "C4", "T10", "SIM", "C90",
     "E", "W", "F", "PGH", "UP", "RUF",

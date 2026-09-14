@@ -8,6 +8,58 @@ Newest entries at the top.
 
 ---
 
+## 2026-09-14 — the golden gate snapshots one template, and `SPEC.md` leaves the repository
+
+**Context.** Two maintainer decisions taken together, because the second is why the
+first became answerable.
+
+**The golden gate covered everything and had stopped paying for it.** Twenty snapshot
+files: four templates plus the shell, two languages, both parts, and the dummies on top.
+A byte comparison of a whole rendered mail fails for two very different reasons and
+cannot tell them apart. A purged Tailwind class or a `${...}` that stopped resolving is
+one, and is the reason the gate exists. Any edit to a shared layout is the other — and
+so is a Plone point release that reflows the markup, which is exactly what
+`6.2-latest` did to this branch while `6.2.1` stayed green. Both arrive as every
+snapshot failing at once, all of which have to be regenerated and none of which anybody
+reads. A gate people stop reading no longer catches the first kind.
+
+**Choice.** One template (`notification`), one language, both parts. `dummy.complete`
+drops to one template but *keeps* both languages, because its English snapshot is the
+only thing in the suite that pins the locale helper (`12 août 2026` against
+`August 12, 2026`) — a `language=` that stopped being honoured would make the two
+snapshots identical and fail there and nowhere else. `dummy.minimal` was already
+one-and-one. Twenty files to eight.
+
+**What carries the load instead, and always did.** `assert_render_is_clean` runs on
+every body the suite renders, and `test_render.py`, `test_i18n.py`,
+`test_theme_tokens.py` and `test_preview.py` render all four templates between them —
+that is the check that catches an unresolved placeholder, and it is unaffected.
+`make check-emails` still compares the committed build against a fresh one byte for
+byte. The snapshot is a smoke test of the rendering pipeline, not the only thing
+between the kit and a broken mail.
+
+**Two assertions changed meaning rather than being deleted.**
+`test_no_orphan_fixtures` now measures fixtures against *registered templates*, not
+against the snapshot set: a fixture feeds the preview and `bin/preview-emails` too, so
+narrowing the gate must not turn three live fixtures into orphans. And
+`test_every_registered_template_has_a_snapshot_per_language_and_part` became
+`test_every_snapshotted_template_has_a_complete_set` plus
+`test_no_snapshot_outlives_its_template` — full coverage was the thing being dropped,
+but a half-generated set and a snapshot for a deleted template are still real, and are
+what those two catch now.
+
+**`SPEC.md` is deleted.** Along with `docs/plans/` and `docs/superpowers/`. The spec
+was the input the package was built against and the phase plans were the scaffolding;
+both are finished. `DECISIONS.md` is the surviving record and is the one that gets
+updated. The cost, recorded honestly because it is not small: comments throughout the
+codebase cite the spec by section number, and those citations now point at a file that
+is not there. They are kept rather than swept, as stable names for the contracts they
+refer to — a hundred-odd comment edits to rename §6.2 to something else would be a much
+larger diff than the one that deleted the file, and would lose the thread back through
+this log, where every one of those sections is discussed by number.
+
+---
+
 ## 2026-09-14 — the footer's attribution line is removed, and `email_footer_powered_by` retired
 
 **Context.** The v2 mockups end every model on three blocks: the sender's contact details,

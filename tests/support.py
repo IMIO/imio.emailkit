@@ -272,7 +272,26 @@ def available_fixtures():
 #: ``make update-golden`` sets this; so does ``EMAILKIT_UPDATE_GOLDEN=1 pytest``.
 UPDATE_GOLDEN_ENV = "EMAILKIT_UPDATE_GOLDEN"
 
-GOLDEN_LANGUAGES = ("fr", "en")
+#: The one template the snapshot gate covers, and the one language it covers it
+#: in. Not every template in every language, which is what this was.
+#:
+#: A byte-comparison of a whole rendered mail fails for two very different
+#: reasons, and it had stopped distinguishing them. A real regression -- a purged
+#: Tailwind class, a `${...}` that stopped resolving -- is one. The other is any
+#: change at all to a shared layout, or a Plone point release that reflows the
+#: markup a little, and that one arrived as eighteen failing files that all had
+#: to be regenerated and read. Eighteen diffs nobody reads are worth less than
+#: one diff somebody does.
+#:
+#: What still catches the first reason everywhere: `assert_render_is_clean` runs
+#: on every rendered body in the suite (`test_render.py`, `test_i18n.py`,
+#: `test_theme_tokens.py`, `test_preview.py` all render all four templates), and
+#: `make check-emails` still compares the committed build byte for byte against a
+#: fresh one. The snapshot is a smoke test for the rendering pipeline, not the
+#: only thing standing between the kit and a broken mail.
+GOLDEN_TEMPLATES = (NOTIFICATION,)
+
+GOLDEN_LANGUAGES = ("fr",)
 
 
 def updating_golden():
