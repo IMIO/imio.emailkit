@@ -37,9 +37,11 @@ Nothing regenerates as a side effect of a failing comparison; a snapshot that
 repairs itself when it breaks is not a snapshot.
 """
 
+from contextlib import contextmanager
 from pathlib import Path
 
 import difflib
+import importlib
 import importlib.util
 import inspect
 import os
@@ -236,15 +238,73 @@ class GoldenTemplateTests:
 
     # -- the one seam a consumer would override ----------------------------
 
+    #: Host every snapshot is rendered against, whatever host the test server is
+    #: actually listening on. See :meth:`stable_host`.
+    snapshot_host = "http://nohost"
+
     def render_parts(self, template, language):
         """Return ``(html, text)`` for one template in one language."""
         from imio.emailkit import render
 
-        return render(
-            self.qualified(template),
-            context=load_fixture(self.fixture_path(template)),
-            language=language,
-        )
+        with self.stable_host():
+            return render(
+                self.qualified(template),
+                context=load_fixture(self.fixture_path(template)),
+                language=language,
+            )
+
+    @contextmanager
+    def stable_host(self):
+        """Pin the host in ``portal_url`` for the duration of a snapshot render.
+
+        A snapshot has to be reproducible, and without this one it is not. The kit
+        builds ``asset_base`` from ``portal_url``, which is ``getSite()
+        .absolute_url()``, which is whatever host the test request happens to
+        carry -- so every image ``src``, every ``background`` attribute and the
+        web-font stylesheet land in the committed file with that host baked in.
+
+        For years that host was ``nohost`` and the problem was invisible. It stops
+        being invisible the moment a test layer serves on a real socket: Plone
+        6.2's newer ``plone.app.testing`` does, so the same templates rendered
+        ``http://localhost:37267/...`` and every snapshot in the suite failed at
+        once, on a port that is different again next run. Regenerating was not a
+        fix -- the regenerated files fail on the following run.
+
+        Only the scheme and the authority are replaced. The portal's own path
+        survives, so a consumer whose test site is not called ``plone`` still gets
+        its own path in the snapshot; only the part that was never theirs to begin
+        with is normalised.
+        """
+        from urllib.parse import urlsplit
+        from urllib.parse import urlunsplit
+
+        # `import imio.emailkit.render` yields the render FUNCTION, because
+        # `imio/emailkit/__init__.py` rebinds the name to it -- that is the public
+        # API §6.1 documents. The module itself is only reachable this way, and
+        # patching the function object instead is the mistake that made
+        # `bin/preview-emails` silently drop every image once already.
+        module = importlib.import_module("imio.emailkit.render")
+        original = module.portal_url
+
+        def pinned():
+            real = original()
+            if not real:
+                return real
+            host = urlsplit(self.snapshot_host)
+            parts = urlsplit(real)
+            return urlunsplit((
+                host.scheme or parts.scheme,
+                host.netloc or parts.netloc,
+                parts.path,
+                parts.query,
+                parts.fragment,
+            ))
+
+        module.portal_url = pinned
+        try:
+            yield
+        finally:
+            module.portal_url = original
 
     def assert_clean(self, rendered, label):
         """Overridable so a suite can tighten the audit; see the module docs."""
