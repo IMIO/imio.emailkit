@@ -622,32 +622,15 @@ const hiddenPreheader =
                         </p>
                       </td>
                     </tr>
-                    <!-- The footer's second line: who runs the service.
-
-                         The v2 mockups end every model with three blocks, not
-                         one: the sender's own contact details, then this line,
-                         then the mark. `footer_html` is the first block and is
-                         site-specific; this one is the kit's own signature and is
-                         the same sentence for every consumer, so it is a msgid
-                         rather than a fourth registry token nobody would fill in.
-
-                         Smaller and dimmer than the block above it (11 px on
-                         #d2d2d2, 5.9:1 on #1c1c1c) because it is attribution, not
-                         a message from the sender. The mockups' own note records
-                         that #d2d2d2 replaces the #cccccc of the Brevo templates,
-                         which was set on white. -->
-                    <tr>
-                      <td align="center" class="pt-4 text-center text-[11px] leading-[18px] text-imio-grey-light">
-                        <p i18n:translate="email_footer_powered_by" class="m-0 text-[11px] leading-[18px] text-imio-grey-light">
-                          Service provided by
-                          <a
-                            href="https://www.imio.be"
-                            i18n:name="imio"
-                            class="text-imio-grey-light underline"
-                          >iMio</a>.
-                        </p>
-                      </td>
-                    </tr>
+                    <!-- The mark, and no attribution line above it. The v2
+                         mockups ended every model on three blocks (the sender's
+                         contact details, a "Service provided by iMio" signature,
+                         then the mark) and the signature is gone: `footer_html`
+                         is the sender's own block, and the logo already says who
+                         runs the service, so that sentence was the one part of a
+                         transactional mail speaking for a third party in the
+                         middle of somebody else's message. Its msgid,
+                         `email_footer_powered_by`, is retired with it. -->
                     <tr tal:condition="asset_base">
                       <td align="center" class="pt-[18px] text-[0px] leading-[0]">
                         <img
