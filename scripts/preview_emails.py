@@ -87,8 +87,10 @@ def main():
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     rows = []
 
-    for name in sorted(get_templates()):
+    templates = get_templates()
+    for name in sorted(templates):
         short = name.split(":", 1)[-1]
+        write_source(short, templates[name])
         fixture_path = support.fixture_path(short)
         if not fixture_path.exists():
             rows.append((name, None, f"no fixture at tests/fixtures/{short}.py"))
@@ -113,6 +115,31 @@ def main():
         serve()
 
 
+def write_source(short, template):
+    """Copy the committed ``.pt`` in beside the rendered previews.
+
+    The one artifact here that needs no fixture, because it is the file itself:
+    a template being authored before its fixture exists -- or one whose fixture
+    is broken, which is when you most want to look at the markup -- is otherwise
+    the one template this loop cannot show you at all. Nothing is substituted,
+    so ``${item/title}`` stands where its value would be and every
+    ``tal:condition`` branch shows at once. That answers "what does this layout
+    look like", never "does this template render"; the rendered previews beside
+    it are what answer the second question.
+
+    Written through ``resolved_path`` so a jbot-overridden template gives the
+    override -- the file ``render()`` compiles, which is the one worth looking at.
+    """
+    from imio.emailkit.render import resolved_path
+
+    path = resolved_path(template.html_path)
+    try:
+        markup = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        markup = f"<pre>Could not read {path}: {exc}</pre>"
+    (PREVIEW_DIR / f"{short}.pt.html").write_text(markup, encoding="utf-8")
+
+
 def write_index(rows):
     """A language switcher and a link per part -- §5's "and a language switcher"."""
     templates = {}
@@ -126,7 +153,9 @@ def write_index(rows):
         "<p class='hint'>Rendered from the <em>committed</em> "
         "<code>.pt</code> files with the committed fixtures. Run "
         "<code>make build-emails</code> then re-run "
-        "<code>make preview-emails</code> after editing a source.</p></header>",
+        "<code>make preview-emails</code> after editing a source. The "
+        "<code>.pt</code> link is the committed file itself, unrendered -- no "
+        "fixture needed, and nothing substituted.</p></header>",
         "<main><table>",
     ]
     for short, entries in sorted(templates.items()):
@@ -142,6 +171,9 @@ def write_index(rows):
                     f"<a href='{short}.{language}.html'>{language} html</a> / "
                     f"<a href='{short}.{language}.txt'>txt</a>"
                 )
+        # Always offered, and last: it is the fallback when every cell above
+        # it is a cross.
+        cells.append(f"<a href='{short}.pt.html'>.pt</a>")
         body.append(
             f"<tr><th>{html_module.escape(short)}</th>"
             f"<td>{' &nbsp;|&nbsp; '.join(cells)}</td></tr>"

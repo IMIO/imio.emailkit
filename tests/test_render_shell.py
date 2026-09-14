@@ -64,6 +64,7 @@ BODY_SENTINEL = "CORPS-SENTINELLE-8c21"
 PROBE_COLOR = "#7f00ff"
 OTHER_COLOR = "#00ff7f"
 PROBE_LOGO = "https://probe.example.be/logo-probe.png"
+OTHER_LOGO = "https://probe.example.be/logo-other.png"
 PROBE_FOOTER = "<span>Pied de page sonde &mdash; probe-footer-marker</span>"
 
 #: A hidden element whose content is not a comment -- i.e. a preheader. The kit
@@ -457,33 +458,53 @@ class TestThemeTokens:
     migrated PloneMeeting mails, or the shell is the one mail flow where a commune
     cannot be branded."""
 
-    def test_changing_primary_color_changes_the_shell(self, shell, set_record):
-        set_record("primary_color", PROBE_COLOR)
+    def test_changing_the_logo_token_changes_the_shell(self, shell, set_record):
+        set_record("logo_url", PROBE_LOGO)
         first, _ = shell()
 
-        set_record("primary_color", OTHER_COLOR)
+        set_record("logo_url", OTHER_LOGO)
         second, _ = shell()
 
-        assert PROBE_COLOR in first, (
-            f"{PROBE_COLOR} never reached the shell: the theme token is not "
+        assert PROBE_LOGO in first, (
+            f"{PROBE_LOGO} never reached the shell: the theme token is not "
             "rendered (Phase 0 caveat A1 -- it must arrive via tal:attributes)"
         )
-        assert OTHER_COLOR in second
-        assert PROBE_COLOR not in second, "the render cached the old token value"
+        assert OTHER_LOGO in second
+        assert PROBE_LOGO not in second, "the render cached the old token value"
 
-    def test_the_token_lands_in_a_closed_attribute(self, shell, set_record):
-        """Caveat A1's broken form put the token in the output too, as
-        ``style="background-color:${theme/primary_color"`` -- present and
-        useless."""
+    def test_primary_color_has_no_surface_left_in_the_shell(
+        self, shell, set_record
+    ):
+        """The v3 design took the flat colour out of the title band.
+
+        It was the one place the shell painted `primary_color`: a magenta band
+        holding the subject in white. v3 makes that band #f8f8f8 with ink type
+        under the head artwork, and the token moved to `KitCard`'s rail and
+        `KitButton`'s fill -- neither of which a shell around a legacy body has.
+
+        So the token reaches every other template and no longer reaches this one,
+        and that asymmetry is worth pinning: it is the visible cost of the
+        redesign for the PloneMeeting migration path, not an accident, and if a
+        later change gives the shell a coloured surface again this test is where
+        the decision gets revisited. `tests/test_theme_tokens.py` keeps caveat
+        A1's guard on the four templates that do paint with it.
+        """
         set_record("primary_color", PROBE_COLOR)
 
         html, _text = shell(body=f"<p>{BODY_SENTINEL}</p>")
 
-        attribute = re.compile(
-            r'[a-zA-Z-]+="[^"]*' + re.escape(PROBE_COLOR) + r'[^"]*"'
-        )
+        assert PROBE_COLOR not in html
+
+    def test_the_token_lands_in_a_closed_attribute(self, shell, set_record):
+        """Caveat A1's broken form put the token in the output too, as
+        ``style="background-image:${theme/logo_url"`` -- present and useless."""
+        set_record("logo_url", PROBE_LOGO)
+
+        html, _text = shell(body=f"<p>{BODY_SENTINEL}</p>")
+
+        attribute = re.compile(r'[a-zA-Z-]+="[^"]*' + re.escape(PROBE_LOGO) + r'[^"]*"')
         assert attribute.findall(html), (
-            f"{PROBE_COLOR} is in the shell but not inside a closed attribute"
+            f"{PROBE_LOGO} is in the shell but not inside a closed attribute"
         )
 
     def test_the_logo_token_reaches_the_shell(self, shell, set_record):
@@ -509,19 +530,19 @@ class TestThemeTokens:
     def test_tokens_do_not_disturb_the_legacy_body(self, shell, set_record):
         """The point of gate 3: tokens apply *around* the body, not to it."""
         body = f'<p style="color: #123456;">{BODY_SENTINEL}</p>'
-        set_record("primary_color", PROBE_COLOR)
+        set_record("logo_url", PROBE_LOGO)
         set_record("footer_html", PROBE_FOOTER)
 
         html, _text = shell(body=body)
 
         assert body in html
         assert html.count(BODY_SENTINEL) == 1
-        assert PROBE_COLOR in html
+        assert PROBE_LOGO in html
 
     def test_inlining_still_works_with_a_token_and_a_body(self, shell, set_record):
         """Caveat A1's other half: the bad token form did not only break the
         token, it killed inlining for the whole document with the build green."""
-        set_record("primary_color", PROBE_COLOR)
+        set_record("logo_url", PROBE_LOGO)
 
         html, _text = shell(body=f"<p>{BODY_SENTINEL}</p>")
 

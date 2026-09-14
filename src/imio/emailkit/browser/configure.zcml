@@ -4,6 +4,45 @@
     i18n_domain="imio.emailkit"
     >
 
+  <!-- The raster assets the kit shell and `KitPill` reference by absolute URL:
+       the two v3 brand cuts (`art-head.png` with its `art-head-tail.png`, and
+       `art-hero.png`), the four pill icons, the two iMio logos and the Quicksand
+       weights `fonts.css` serves.
+
+       The brand cuts are crops of the design's own SVG sources, converted to PNG
+       and kept transparent so the card shows through them and an image-blocking
+       client is left with a clean flat rather than a hole. They are the one place
+       a consumer can rebrand the top of the mail: `primary_color` drives
+       `KitCard`'s rail and `KitButton`'s fill but cannot recolour a raster, so a
+       site that needs its own artwork replaces these three files and touches no
+       markup.
+
+       Mail clients fetch every image over HTTP, so a kit image cannot be a file
+       inside the egg the way a `.pt` is; it has to be a URL the recipient's
+       client can reach while reading the message, days later, logged out. A
+       browser resource directory is the one thing in Plone that is exactly that:
+       a stable, anonymously readable, cacheable URL under the portal.
+
+       Registered on IDefaultBrowserLayer rather than IEmailkitLayer. A `:base`
+       site (SPEC 8.2's opt-out) keeps stock Plone's default mails but still
+       renders its OWN templates through the kit shell, and those reference the
+       same assets; binding the directory to the layer would give that site a
+       footer logo that 404s.
+
+       PNG and not SVG, at twice the rendered size. Mail clients do not display
+       SVG reliably, and the 2x source is what keeps the 14 px pills and the
+       68 px footer logo sharp on a retina screen.
+
+       The shell composes the URL as `${portal_url}/++resource++imio.emailkit/...`
+       and skips the image entirely when `portal_url` is empty, which is what a
+       render outside a request (a golden file, a unit test) produces. A relative
+       `/++resource++...` in an inbox is a broken image icon, so degrading to no
+       image is the deliberate choice. -->
+  <browser:resourceDirectory
+      name="imio.emailkit"
+      directory="static"
+      />
+
   <!-- z3c.jbot, for SPEC 4's promise that a site can override the `.pt` files
        THIS package resolves. No `browser:jbot` directive any more, since this
        package overrides no stock Plone template now that `default_mails.py` has

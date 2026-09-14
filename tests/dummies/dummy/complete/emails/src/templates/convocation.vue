@@ -40,8 +40,6 @@
 
 <template>
   <KitMain>
-    <h1 class="m-0 mb-3 font-display text-lg font-bold leading-7 text-imio-black">${title}</h1>
-
     <p
       class="m-0 mb-4 text-sm leading-6 text-imio-black"
       i18n:domain="dummy.complete"
@@ -63,8 +61,49 @@
       </tr>
     </KitDataTable>
 
+    <!--
+      The label/value pair list, three rows deep, which is what exercises the
+      separator: `KitDataList`'s rule is a `tr + tr` selector, so a single-row
+      list renders identically with the rule and without it. This is the only
+      place in the repository where a wrong one would show up in a golden file.
+    -->
+    <KitCard>
+      <template #overline>
+        <span i18n:domain="dummy.complete" i18n:translate="email_convocation_card">Session</span>
+      </template>
+      <template #title>${place}</template>
+      <KitDataList>
+        <KitDataRow label-width="120">
+          <template #label>Date</template>
+          ${python: format_date(when)}
+        </KitDataRow>
+        <KitDataRow label-width="120">
+          <template #label>Place</template>
+          ${place}
+        </KitDataRow>
+        <KitDataRow label-width="120">
+          <template #label>Points</template>
+          ${python: len(rows)}
+        </KitDataRow>
+      </KitDataList>
+    </KitCard>
+
+    <!--
+      Two actions on one row. `inline` drops each button's own top margin, which
+      the group supplies once for the pair; without it the row would carry 20 px
+      of margin on the outside and 20 more inside each cell.
+    -->
     <div tal:condition="cta_url | nothing">
-      <KitButton href="${cta_url}" align="center">${cta_label}</KitButton>
+      <KitButtonGroup align="center">
+        <template #primary>
+          <KitButton href="${cta_url}" inline>${cta_label}</KitButton>
+        </template>
+        <template #secondary>
+          <KitButton href="${cta_url}" variant="outline" inline>
+            <span i18n:domain="dummy.complete" i18n:translate="email_convocation_decline">Decline</span>
+          </KitButton>
+        </template>
+      </KitButtonGroup>
     </div>
   </KitMain>
 </template>

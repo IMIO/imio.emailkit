@@ -6,7 +6,7 @@ export const metadata = {
 
 # Preview & send-test
 
-Two ways to look at a template: a make target that serves the rendered mails locally, and a view inside a running site. Both render through [`render()`](/api/render) with the committed fixtures, so what you see is what a recipient gets. {{ className: 'lead' }}
+Two ways to look at a template: a make target that serves the rendered mails locally, and a view inside a running site. Both render through [`render()`](/api/render) with the committed fixtures, so what you see is what a recipient gets — and both can also show you the committed `.pt` itself, which needs no fixture at all. {{ className: 'lead' }}
 
 ## The authoring loop
 
@@ -15,6 +15,10 @@ make build-emails      # compile emails/ into the package; commit the .pt files
 make check-emails      # the lint and the staleness gate CI runs
 make preview-emails    # render the committed templates with the committed fixtures
 ```
+
+The index `make preview-emails` writes carries a `.pt` link per template alongside the
+per-language `html` / `txt` ones. It is written for every registered template whether its
+fixture resolved or not — the one artifact there that cannot fail for lack of one.
 
 <Note>
   `make preview-emails` is deliberately **not** Maizzle's `--watch`. Maizzle's
@@ -26,7 +30,7 @@ make preview-emails    # render the committed templates with the committed fixtu
 
 ## `@@emailkit-preview`
 
-Manager-only. Lists every registered template, renders each one in an iframe against its committed fixture, with a language switcher and a theme-token panel.
+Manager-only. Lists every registered template, renders each one in an iframe against its committed fixture, with a language switcher, a mode switcher and a theme-token panel.
 
 It is two views rather than one:
 
@@ -42,6 +46,39 @@ It is two views rather than one:
 
 **Why two.** A transactional email carries a full stylesheet written for mail clients — `body { }` rules, table resets, `!important` utilities. Inlining that markup into the chrome would let it restyle the Plone UI and let the Plone UI flatter it, so the one thing this view exists to show would be the one thing it shows wrongly. An iframe is the boring browser-level answer and costs one extra registration.
 
+## The three modes
+
+`render()` returns two things, and the preview shows both. A third mode shows the committed `.pt` itself.
+
+<Properties>
+  <Property name="html">
+    `render()`'s HTML part, with the committed fixture. The default.
+  </Property>
+  <Property name="text">
+    `render()`'s plaintext part, with the same fixture. Half the output, and the half nobody
+    looks at until a client shows it.
+  </Property>
+  <Property name=".pt">
+    The committed `.pt` served to the same iframe as `text/html`, with **no `render()` pass
+    and no fixture**. Nothing is substituted: `${item/title}` stands where its value would
+    be, and every `tal:condition` branch shows at once.
+  </Property>
+</Properties>
+
+The `.pt` mode is the only one that works without a fixture, which is what it is for: a
+template compiled and committed before anyone has written `tests/fixtures/<name>.py`, or one
+installed from an egg with no source tree. In both cases it is otherwise the one template you
+cannot look at.
+
+<Note>
+  It answers *what does this layout look like*, never *does this template render* — the two
+  modes beside it answer that, and the `.pt` mode is never substituted for them
+  automatically. A preview that silently showed you `${item/title}` where you expected a
+  value would be precisely the failure the [authoring rules](/authoring/rules) are about.
+</Note>
+
+The file shown is the one `render()` would compile, `z3c.jbot` overrides included.
+
 ## Send test
 
 A button that mails the currently previewed template, fixture and language to the logged-in user's own address.
@@ -52,7 +89,7 @@ A button that mails the currently previewed template, fixture and language to th
 
 `tests/fixtures/<name>.py`, inside the _checkout_ of whichever add-on ships the template — not inside the installed package. `tests/` is not shipped, and must not be: it is not importable from a released egg.
 
-So the fixture is resolved by walking up from the template directory to find the checkout. **Its absence is reported as a plain fact rather than an error**: an egg installed without its source tree is the normal production case, and the preview simply has nothing to show for that template there.
+So the fixture is resolved by walking up from the template directory to find the checkout. **Its absence is reported as a plain fact rather than an error**: an egg installed without its source tree is the normal production case. The page then offers the `.pt` mode, which needs no fixture — in the template list and beside the explanation both.
 
 ## Which Plone default mails show up here
 

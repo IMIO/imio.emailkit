@@ -119,7 +119,9 @@ def render_shell(subject, body_html, language=None):
 
     :param subject: an i18n msgid **or** a literal string, exactly like
         ``.subject()`` (§6.2). Translated into the render language and handed to
-        the shell as its heading, under the name ``subject``.
+        the shell as its heading, under the name ``subject``. The shell feeds it
+        to the kit layout's banner through a build-time slot, so a missing
+        ``subject`` raises rather than producing an untitled mail.
     :param body_html: the existing body, inserted **verbatim** into the shell's
         ``body_html`` slot with ``structure`` -- §3 rule 4's one sanctioned use of
         unescaped markup. Not sanitised, not reformatted and **not re-parsed as a
@@ -298,6 +300,18 @@ def _page_template(path):
     return template if bind is None else bind(None, None)
 
 
+def resolved_path(path):
+    """The file :func:`render_file` would actually compile for ``path``.
+
+    ``path`` itself, unless z3c.jbot has an override registered for it (SPEC
+    §4) -- in which case it is the override, which is the whole point. Exposed
+    because the §6.3 preview can show the ``.pt`` itself, and a preview that
+    kept showing the original file while ``render()`` compiled somebody's
+    override would be a trap rather than a tool.
+    """
+    return Path(getattr(_page_template(path), "filename", None) or path)
+
+
 def invalidate_cache():
     """Drop the cached ``PageTemplateFile`` instances. For tests."""
     _page_templates.clear()
@@ -335,10 +349,26 @@ _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # `render_shell` has no plaintext twin to fall back on -- naive extraction IS its
 # plaintext part, by design.
 _CELL_BREAK = re.compile(r"</(?:td|th)\s*>", re.IGNORECASE)
-_TRAILING_CELL = re.compile(r"\s*\|\s*$", re.MULTILINE)
+# Asymmetric on purpose. The part AFTER the separator stays `\s*`: it swallows one
+# newline, which is what keeps consecutive table rows on consecutive lines instead
+# of blank-line-separated. The part BEFORE it is horizontal whitespace only,
+# because `\s*` there reached back across newlines and ate the blank line that
+# preceded a separator sitting alone on its own line -- which is exactly the shape
+# a heading in its own table cell produces, and is how the kit shell's banner
+# title ended up glued to the first paragraph of the body.
+_TRAILING_CELL = re.compile(r"[ \t]*\|\s*$", re.MULTILINE)
+
+# A heading ends a *block*, not a line. It matters because the kit shell puts the
+# mail's title in its own banner cell, well away from the body: with a single
+# newline the title reads as the first line of the opening paragraph
+# ("Point publié : Approbation du budget\nBonjour,"). Applied before
+# `_LINE_BREAK`, which would otherwise consume the same tags first. `_BLANK_RUN`
+# collapses the run afterwards, so a heading that already had blank space around
+# it does not gain more.
+_HEADING_BREAK = re.compile(r"</h[1-6]\s*>", re.IGNORECASE)
 
 _LINE_BREAK = re.compile(
-    r"<br\s*/?>|</(?:p|div|tr|li|h[1-6]|table|blockquote)\s*>", re.IGNORECASE
+    r"<br\s*/?>|</(?:p|div|tr|li|table|blockquote)\s*>", re.IGNORECASE
 )
 _TAG = re.compile(r"<[^>]+>")
 _BLANK_RUN = re.compile(r"\n{3,}")
@@ -397,6 +427,7 @@ def naive_text(html):
     text = _COMMENT.sub("", text)
     text = _HIDDEN_ELEMENT.sub("", text)
     text = _CELL_BREAK.sub(" | ", text)
+    text = _HEADING_BREAK.sub("\n\n", text)
     text = _LINE_BREAK.sub("\n", text)
     text = _TAG.sub("", text)
     text = unescape(text)

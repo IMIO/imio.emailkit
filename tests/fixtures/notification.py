@@ -27,6 +27,10 @@ CONTEXT = {
     # Accented and non-ASCII on purpose: a charset regression in the compiled
     # output or in the render shows up here and nowhere else.
     "title": "Séance du conseil communal du 12 août",
+    # The banner's second line. Optional in the shell, so a fixture that omitted
+    # it would leave the v2 layout's `subtitle` branch unrendered in every golden
+    # file -- and an unrendered branch is one nobody notices breaking.
+    "subtitle": "Commune de Sambreville",
     "intro": (
         "La convocation pour la prochaine séance est disponible. "
         "Vous pouvez la consulter dès maintenant."

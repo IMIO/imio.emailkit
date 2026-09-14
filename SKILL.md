@@ -1,6 +1,6 @@
 ---
 name: emailkit
-description: Author, test and ship transactional email templates with imio.emailkit (Maizzle 6 + Chameleon, Plone). Use whenever you touch a .vue email template, a compiled .pt under templates/, an emails/ Maizzle project, a KitMain/KitButton/KitPanel/KitDataTable component, an <emailkit:templates> ZCML registration, a tests/fixtures/*.py or tests/golden/* snapshot, render()/render_shell()/Email(), or theme tokens (logo_url, primary_color, footer_html). Also use when an email renders wrong, ships raw ${...} placeholders, loses its CSS, or fails to parse at runtime.
+description: Author, test and ship transactional email templates with imio.emailkit (Maizzle 6 + Chameleon, Plone). Use whenever you touch a .vue email template, a compiled .pt under templates/, an emails/ Maizzle project, a KitMain/KitPill/KitCard/KitDataList/KitDataRow/KitButton/KitButtonGroup/KitPanel/KitDataTable component, an <emailkit:templates> ZCML registration, a tests/fixtures/*.py or tests/golden/* snapshot, render()/render_shell()/Email(), or theme tokens (logo_url, primary_color, footer_html). Also use when an email renders wrong, ships raw ${...} placeholders, loses its CSS, or fails to parse at runtime.
 ---
 
 # imio.emailkit — authoring emails
@@ -83,14 +83,22 @@ A related trap: `<Outlook :open="…" />` with an **empty slot** emits
 `<!--[endif]---->` — a `--` in a comment. Give `<Outlook>` real slot content, or use
 `v-html`.
 
-### 4. Naming the raw-escape component inside a comment swallows the real block
+### 4. Writing `<style>` in prose inside an HTML comment breaks the lint
+
+`markup_only` in the authoring lint blanks everything between a literal `<style>`
+and the next `</style>`, comments included. A comment that mentions the element by
+name therefore swallows its own `-->`, and the *next* comment's `<!--` is reported
+as a stray `--` at a line that looks innocent. Spell it `&lt;style&gt;` in prose.
+Same shape as the trap below, which has a named rule; this one does not.
+
+### 5. Naming the raw-escape component inside a comment swallows the real block
 
 Maizzle extracts its raw/escape component with a naive global regex that also
 matches **inside HTML comments**. Mentioning that component's name in angle
 brackets in a comment silently swallows the real block and deletes it from the
 output. Do not write component names in angle brackets inside comments.
 
-### 5. No `i18n:domain` means `i18n:translate` renders the msgid untranslated
+### 6. No `i18n:domain` means `i18n:translate` renders the msgid untranslated
 
 …and that is **indistinguishable from success**, because the msgid's default text
 appears in the output either way. The kit's `Main.vue` declares
@@ -108,7 +116,7 @@ misses, and renders its default in every language. Snapshot two languages
 (`languages = ("fr", "en")`) and a translation that stopped resolving shows up as
 identical snapshots rather than as nothing at all.
 
-### 6. `${helper(x)}` must be `${python: helper(x)}`
+### 7. `${helper(x)}` must be `${python: helper(x)}`
 
 TAL **path** expressions cannot call functions. `${format_date(when)}` raises
 `Invalid variable name`. This one fails loudly, but you will hit it constantly:
@@ -120,13 +128,13 @@ TAL **path** expressions cannot call functions. `${format_date(when)}` raises
 
 Same for `tal:content`: `tal:content="python: format_date(when)"`.
 
-### 7. Theme tokens go via `tal:attributes` or `bgcolor`, never a literal `style`
+### 8. Theme tokens go via `tal:attributes` or `bgcolor`, never a literal `style`
 
 SPEC §3 as originally written showed `style="background-color: ${theme/primary_color}"`.
 That is failure 1. The amended rule is in `docs/DECISIONS.md`; the three tokens,
 their registry records and the locked-kit model are unchanged.
 
-### 8. A legacy body's own `<style>` block is dropped by Gmail and Outlook.com
+### 9. A legacy body's own `<style>` block is dropped by Gmail and Outlook.com
 
 `render_shell(subject, body_html)` injects legacy HTML into the shell's content
 well, which is inside `<body>` — invalid placement for `<style>`, and Gmail and
@@ -135,21 +143,21 @@ the block into `<head>`. Inline `style="…"` attributes in the injected body su
 untouched: convert the block to inline styles before migrating. It looks perfect in
 a browser preview, so you cannot discover this before real clients do.
 
-### 9. A top-level SFC `<style>` block never reaches the email
+### 10. A top-level SFC `<style>` block never reaches the email
 
 Standard Vue semantics: the bundler extracts it. Purge then strips the
 now-orphaned class from the `class` attribute too, so the markup silently loses
 both rule and class. Custom CSS must be a real `<style>` **element** inside
 `<template>`, or live in the kit's CSS entry.
 
-### 10. `maizzle build` empties its output directory, silently
+### 11. `maizzle build` empties its output directory, silently
 
 It has already deleted a committed hand-authored plaintext twin. Maizzle 6.0.7
 exposes no `output.clean` / `emptyOutDir` option. So **hand-authored `.txt.pt`
 twins live in `emails/twins/`** and are copied into `templates/` after the build.
 Never keep the only copy of anything in an output directory.
 
-### 11. Dark-mode rules keyed on a class are deleted by purge
+### 12. Dark-mode rules keyed on a class are deleted by purge
 
 `css.purge` models only `class=` and `id=`, so a class-keyed
 `@media (prefers-color-scheme: dark)` rule is stripped with a successful build. The
@@ -157,7 +165,7 @@ kit keys dark mode on `data-dark="page|surface|body|muted"` **attribute** select
 which purge cannot see and therefore cannot remove. If you add a dark rule, key it
 on an attribute.
 
-### 12. A new `emails/` project with no `node_modules` ships uncompiled CSS
+### 13. A new `emails/` project with no `node_modules` ships uncompiled CSS
 
 Tailwind resolves the `@import "@maizzle/tailwindcss"` that the shell emits by
 walking up from the **template's** directory. With no `node_modules` ancestor the
@@ -171,7 +179,26 @@ So: if a rebuild's output suddenly gets much smaller, check for inline `style`
 attributes before anything else. `MIN_INLINE_STYLES`-style assertions exist for
 this reason.
 
-### 13. Injected names beat your context
+### 14. Rewording an existing msgid ships it untranslated
+
+`python -m imio.emailkit.locales` marks an entry `#, fuzzy` when the msgid's
+English default changes, and **msgfmt skips fuzzy entries**. So a msgid you
+reworded and correctly retranslated in all three `.po` files renders in English,
+while the sync reports "0 added, 0 removed", the `.mo` timestamps come out newer
+than the `.po` files, and `make update-golden` regenerates the snapshots from the
+same broken catalogs so they agree with the bug.
+
+After rewording an existing msgid: strip the `#, fuzzy` lines, recompile, and read
+the rendered mail in a language you can check.
+
+```bash
+grep -rn '^#, fuzzy' src/imio/emailkit/locales/   # must be empty
+python -c "import gettext; print(gettext.GNUTranslations(open('src/imio/emailkit/locales/fr/LC_MESSAGES/imio.emailkit.mo','rb')).gettext('<msgid>'))"
+```
+
+A msgid echoed back to you is an untranslated one.
+
+### 15. Injected names beat your context
 
 `render()` injects `theme`, `lang`, `target_language`, `portal_url`, `translate`,
 `format_date`, `format_datetime`, `format_number` — and those win over keys of the
@@ -222,29 +249,149 @@ are auto-imported and prefixed `Kit`.
 Wrap every template in it. It owns the whole document and you never write any of
 this yourself: `<html lang="${lang}">`, charset/viewport/format-detection/colour-scheme
 meta, the MSO document settings, `i18n:domain`, `role="presentation"` on layout
-tables, the dark-mode `<style>`, the hidden preheader div, the logo header with an
-enforced translatable `alt`, the `primary_color` rule, the content well, the
-`footer_html` footer with a translated default, and the `body_html` injection point.
+tables, the responsive and dark-mode `<style>`, the hidden preheader div, and the
+four bands of the v3 design —
+
+1. **white band** — the head artwork as a background, the `logo_url` logo with an
+   enforced translatable `alt`, and the `pill` slot on the right;
+2. **title band** — `#f8f8f8` closed by a 1 px rule, with the artwork's tail
+   running down into it, holding the title and optional subtitle in ink;
+3. **content well** — your markup, plus the `body_html` injection point;
+4. **negative footer** — `footer_html` or a translated default, then the iMio
+   logo, introduced by the cap artwork above it.
+
+The two artwork cuts are v3's whole subject, and they are shell-owned: a template
+never references them. `primary_color` no longer paints the title band; it is
+`KitCard`'s rail and `KitButton`'s fill, and the brand colour at the top of the
+mail is now the artwork, which is iMio magenta for every consumer.
 
 ```html
 <template>
   <KitMain>
-    <h1 class="m-0 mb-3 font-display text-lg font-bold leading-7 text-imio-black">${title}</h1>
-    <p class="m-0 mb-4 text-sm leading-6 text-imio-black">${intro}</p>
+    <template #pill>
+      <KitPill tone="success">
+        <span i18n:translate="email_pill_new_account" tal:omit-tag="">New account</span>
+      </KitPill>
+    </template>
+    <template #title>
+      <span i18n:translate="email_welcome_title" tal:omit-tag="">Welcome</span>
+    </template>
+    <template #subtitle>${site_name}</template>
+
+    <p class="m-0 text-[15px] leading-6 text-imio-black">${intro}</p>
+
+    <template #mentions>
+      <p class="m-0 text-[13px] leading-[21px] text-imio-grey-dark">…</p>
+    </template>
   </KitMain>
 </template>
 ```
 
-It also exposes a named `preheader` slot, a **build-time** fallback for templates a
-stock Plone view renders (they never see `render()`'s context). The runtime msgid
-from the registration always wins when present.
+**The title is the shell's, not yours.** Do not write an `<h1>` in the content
+well; it would sit under a band that already has one. Two ways to fill it:
 
-### `<KitButton href align>` — the call to action
+| Shape | Use when | How |
+|---|---|---|
+| `#title` / `#subtitle` slot | the title is **wording** | the only shape that can carry `i18n:translate` |
+| `title` / `subtitle` in the render context | the title is **data** | nothing to write — the shell reads the names itself |
 
-A single-cell table, not a padded `<a>`: cell padding is the one padding every
-client including Outlook honours. `href` takes a `${...}` placeholder (`href` is not
-CSS). `align` is `left` | `center` | `right`. Colour comes from `primary_color`,
-which the shell defines — so it only works inside `<KitMain>`.
+A template that supplies neither gets the band's closing 1 px `#d2d2d2` rule and
+no band, so a template that predates the title band still renders.
+
+> **Porting a pre-v2 template:** delete its `<h1>`. If its context already has a
+> `title`, the shell is now rendering that in the title band and the old `<h1>`
+> prints it a second time. This is the one thing the upgrade breaks, and it is visible on
+> the first preview.
+
+`#mentions` is the centred small print between the body and the footer — a
+copy-this-link fallback, why you received this. Put it there rather than at the
+end of the body: the shell centres it, sizes it and gives it the dark-mode hook.
+
+`#preheader` is a **build-time** fallback for templates a stock Plone view renders
+(they never see `render()`'s context). The runtime msgid from the registration
+always wins when present.
+
+### `<KitPill tone>` — the status badge
+
+Goes in `KitMain`'s `pill` slot. `tone` is `info` (default), `success`, `warning`
+or `danger`, resolved at **build** time. One per mail; it says in two words what
+kind of message this is.
+
+```html
+<template #pill>
+  <KitPill tone="success">
+    <span i18n:translate="email_pill_new_account" tal:omit-tag="">New account</span>
+  </KitPill>
+</template>
+```
+
+**The pill is white on every tone.** It sits on the head artwork, not on white, so
+a tinted fill there is either washed out or a second colour against the brand. The
+tone is a coloured disc baked into the 14 px icon: blue, green, yellow, red.
+
+That icon disappears when the render had no request to build an absolute URL from
+(a golden file, a unit test), and a client that blocks remote images drops it too.
+That is deliberate — a relative image URL in an inbox is a broken-image icon — and
+the pill stays legible without it, as a bold label on white. What it loses is the
+colour, all of it, so write a label that carries the meaning on its own.
+
+### `<KitCard>` — the rail card
+
+The block that holds what the mail is *about*: the content submitted for review,
+the account that was created. A tinted panel with a 6 px `primary_color` rail. Its
+`overline` names the kind of thing, its `title` names the thing, and the default
+slot takes a lead paragraph and/or a `KitDataList`.
+
+```html
+<KitCard>
+  <template #overline>
+    <span i18n:translate="email_card_kind" tal:omit-tag="">News item</span>
+  </template>
+  <template #title>${item_title}</template>
+  <p class="m-0 text-sm leading-[22px] text-imio-grey-dark">${item_description}</p>
+</KitCard>
+```
+
+### `<KitDataList>` / `<KitDataRow>` — label/value rows
+
+A fixed handful of facts inside a card: who, when, where. Presentational, no
+header — that is what makes it not a `KitDataTable`. `KitDataRow` carries the two
+cells; `label-width` is `'130'` (default) or `'120'`, a **string**, so it is
+written as a plain attribute:
+
+```html
+<KitDataList>
+  <KitDataRow>
+    <template #label><span i18n:translate="email_field_author" tal:omit-tag="">Author</span></template>
+    ${author}
+  </KitDataRow>
+  <KitDataRow label-width="120">
+    <template #label><span i18n:translate="email_field_submitted" tal:omit-tag="">Submitted</span></template>
+    ${python: format_datetime(submitted)}
+  </KitDataRow>
+</KitDataList>
+```
+
+The 1 px rule between rows is **not** yours to write: `tailwind.css` hangs a
+`tr + tr > td` selector off `KitDataList`'s class, so it is a top border on every
+row but the first. It has to be that way round — a bottom border needs omitting on
+the *last* row, and nothing in an email can say "last" (`:last-child` does not
+survive CSS inlining).
+
+`KitDataRow` may be a component where `KitDataTable`'s rows may not: a data list is
+a fixed handful of pairs, never a `tal:repeat`, so the no-`tal:`-on-a-component rule
+does not bite. If you do need a repeat here, write a plain `<tr>` with the cell
+classes spelled out; it still gets the rule between rows.
+
+### `<KitButton href align variant inline>` — the call to action
+
+A single-cell table holding a **block** anchor that carries the padding, so the
+whole rectangle is a click target; the cell repeats the values in
+`mso-padding-alt` for Word's renderer. `href` takes a `${...}` placeholder (`href`
+is not CSS). `align` is `left` | `center` | `right`. `variant` is `solid`
+(default, filled with `primary_color`) or `outline` (a `#b3004b` rule, for a
+secondary action). Colour comes from `primary_color`, which the shell defines — so
+it only works inside `<KitMain>`.
 
 ```html
 <div tal:condition="cta_url | nothing">
@@ -252,32 +399,62 @@ which the shell defines — so it only works inside `<KitMain>`.
 </div>
 ```
 
-Note the `tal:condition` on a plain `<div>`, not on the component.
+Note the `tal:condition` on a plain `<div>`, not on the component. Outlook renders
+the button square: it ignores `border-radius`, and the VML fix needs a width in
+pixels that a translated label makes unknowable.
 
-### `<KitPanel tone>` — a tinted callout
+### `<KitButtonGroup align>` — two actions on one row
 
-`tone` is `neutral` (default) or `accent`. Resolved at **build** time, so the class
-strings are literal in the output. Magenta is high-signal at iMio: use `accent` for
-the one thing the reader must not miss.
+Each `KitButton` is its own table and two tables do not share a line in mail, so
+the row has to be markup. `inline` drops each button's own top margin, which the
+group supplies once for the pair.
 
 ```html
-<KitPanel tone="accent"><strong>${python: format_date(when)}</strong></KitPanel>
+<KitButtonGroup align="center">
+  <template #primary>
+    <KitButton href="${review_url}" inline>${review_label}</KitButton>
+  </template>
+  <template #secondary>
+    <KitButton href="${back_url}" variant="outline" inline>${back_label}</KitButton>
+  </template>
+</KitButtonGroup>
+```
+
+Two **named** slots, because a component cannot wrap children it has not been told
+about and the 12 px gap would have nowhere to live. `#secondary` is optional. The
+cells stay side by side on a phone; a pair whose labels do not fit on one line
+wants two stacked `KitButton`s instead.
+
+### `<KitPanel tone>` — the callout
+
+A bordered block for the one condition attached to the message: how long the link
+lasts, what happens if you ignore it. `tone` is `accent` (default, pink) or
+`neutral`, resolved at **build** time. The optional `overline` names the condition.
+
+```html
+<KitPanel>
+  <template #overline>
+    <span i18n:translate="email_callout_link_validity" tal:omit-tag="">Link validity</span>
+  </template>
+  <p class="m-0 text-sm leading-[22px] text-imio-black">…</p>
+</KitPanel>
 ```
 
 ### `<KitDataTable>` — table chrome for real tabular data
 
-The one table in the kit that is **not** `role="presentation"` — marking a data
-table as presentational hides its structure from screen readers. Rows are yours,
-because `tal:` may not go on the component:
+For many rows of the same shape with a header naming the columns. The one table in
+the kit that is **not** `role="presentation"` — marking a data table as
+presentational hides its structure from screen readers. Rows are yours, because
+`tal:` may not go on the component:
 
 ```html
 <KitDataTable>
   <template #head>
-    <th scope="col" class="border border-solid border-imio-grey-border p-2 text-left text-sm">Point</th>
-    <th scope="col" class="border border-solid border-imio-grey-border p-2 text-left text-sm">Decision</th>
+    <th scope="col" class="border-b border-solid border-imio-grey-border p-2 text-left text-sm">Point</th>
+    <th scope="col" class="border-b border-solid border-imio-grey-border p-2 text-left text-sm">Decision</th>
   </template>
   <tr tal:repeat="row rows">
-    <td class="border border-solid border-imio-grey-border p-2 text-sm">${row/title}</td>
+    <td class="border-b border-solid border-imio-grey-border p-2 text-sm">${row/title}</td>
   </tr>
 </KitDataTable>
 ```

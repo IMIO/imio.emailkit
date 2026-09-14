@@ -179,7 +179,7 @@ class RegisteredNotifyView(DefaultMailView):
 
     template_name = "imio.emailkit:registered_notify_template"
 
-    def build_context(self, member=None, reset=None, **stock_kwargs):
+    def build_context(self, member=None, email=None, reset=None, **stock_kwargs):
         # `registeredNotify` always passes `reset`, but the same view is
         # registered `for="*"` and other callers do not. Stock's template carried
         # the same fallback; it costs nothing when the value is already there.
@@ -191,7 +191,12 @@ class RegisteredNotifyView(DefaultMailView):
             # The login rather than "Hello ," for a member with no fullname.
             "fullname": member.getProperty("fullname") or username,
             "username": username,
-            "activation_url": (
+            # `registeredNotify` reads this off the member and passes it on, so
+            # taking the kwarg is taking the same value stock validated before it
+            # decided to send at all. The fallback is for the other callers the
+            # `for="*"` registration allows, which pass no `email`.
+            "email": email or member.getProperty("email") or "",
+            "password_url": (
                 f"{self.construct_url(reset['randomstring'])}?userid={username}"
             ),
             # A real datetime, formatted by the template through the kit's
