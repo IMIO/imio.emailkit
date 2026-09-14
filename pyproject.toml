@@ -206,6 +206,15 @@ ignore = [
     "instance.yaml",
     ".editorconfig",
 ]
+# The compiled catalogs are committed on purpose: a released egg has to ship
+# translations, and nothing in an installed distribution can run msgfmt. That is
+# a deliberate exception to "auto-generated files should not be versioned", and
+# without this check-manifest raises it as a problem -- which zest.releaser then
+# turns into "MANIFEST.in has problems. Continue?", answered `no` under
+# --no-input, aborting every automated release.
+ignore-bad-ideas = [
+    "src/imio/emailkit/locales/*/LC_MESSAGES/*.mo",
+]
 
 [tool.zest-releaser]
 python-file-with-version = "src/imio/emailkit/__init__.py"
