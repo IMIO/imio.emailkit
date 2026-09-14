@@ -27,5 +27,5 @@ _(
 )
 _(
     "email_preheader_registered_notify_template",
-    default="Follow the link to activate your account.",
+    default="Follow the link to choose your password.",
 )

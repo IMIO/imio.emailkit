@@ -1,12 +1,12 @@
 export const metadata = {
   title: 'The design kit',
   description:
-    'The canonical shell and the three components every iMio mail is built from, shipped inside the Python egg.',
+    'The canonical shell and the components every iMio mail is built from, shipped inside the Python egg.',
 }
 
 # The design kit
 
-One canonical layout, three components, one Tailwind preset. It ships inside the Python package at `imio/emailkit/kit/`, so the buildout pin that governs the runtime governs the design system too. {{ className: 'lead' }}
+One canonical layout, eight components, one Tailwind entry. It ships inside the Python package at `imio/emailkit/kit/`, so the buildout pin that governs the runtime governs the design system too. {{ className: 'lead' }}
 
 ```
 imio/emailkit/kit/
@@ -15,10 +15,21 @@ imio/emailkit/kit/
 ├── layouts/
 │   └── Main.vue             # the single canonical shell
 └── components/
-    ├── Button.vue
-    ├── Panel.vue
-    └── DataTable.vue
+    ├── Button.vue           # the call to action
+    ├── ButtonGroup.vue      # two actions on one row
+    ├── Card.vue             # the rail card: what this message is about
+    ├── DataList.vue         # label/value pairs
+    ├── DataRow.vue          # one pair inside a DataList
+    ├── DataTable.vue        # real tabular data
+    ├── Panel.vue            # a tinted callout
+    └── Pill.vue             # the status pill in the header band
 ```
+
+## Vertical rhythm: blocks space themselves from above
+
+`KitCard`, `KitPanel`, `KitDataTable`, `KitButton` and `KitButtonGroup` all carry a 20 px **top** margin and no bottom margin; the content well supplies the closing padding. Nothing in email can express "except the last one" — `:last-child` does not survive CSS inlining — so the only way to stop spacing compounding at the end of a mail is for no block to claim any space under itself.
+
+For you that means one rule: a block that wants more air above it overrides with `mt-6`, and nothing ever needs a bottom margin.
 
 ## KitMain — the shell
 
@@ -57,7 +68,7 @@ This is also what makes theme tokens reach the jbot-hosted default mails, which 
 
 ## KitButton
 
-The bulletproof call-to-action. A single-cell table rather than a padded `<a>`, because cell padding is the one form of padding every mail client including Outlook honours — so no MSO spacer hacks are needed.
+The bulletproof call-to-action: a single-cell table holding a **block** anchor that carries the padding, so the whole coloured rectangle is a click target and not just the glyphs of the label. The cell repeats the same values in `mso-padding-alt`, because Word's renderer ignores padding on a block anchor.
 
 ```html
 <KitButton href="${cta_url}" align="center">
@@ -72,9 +83,144 @@ The bulletproof call-to-action. A single-cell table rather than a padded `<a>`, 
   <Property name="align" type="String, default 'left'">
     Horizontal placement of the button block: `left`, `center` or `right`.
   </Property>
+  <Property name="variant" type="String, default 'solid'">
+    `solid` fills with `primary_color` and takes a white label; `outline` is a
+    2 px rule and a magenta label on no fill, for the second action in a pair.
+  </Property>
+  <Property name="inline" type="Boolean, default false">
+    Drop the component's own top margin. Only meaningful inside
+    `KitButtonGroup`, which supplies the margin once for the pair.
+  </Property>
 </Properties>
 
 The `primary_color` theme token rides on `bgcolor`, not on `style`. `primary_color` is defined by the shell, so this component only works inside it — which is the only place it is meant to be used.
+
+<Note>
+  Outlook on Windows renders the button square: it ignores `border-radius`, and
+  the VML fix needs a width in pixels that a translated label makes unknowable.
+  Padding, colour and click target are correct there; only the corners are not.
+</Note>
+
+## KitButtonGroup
+
+Two actions on one row. Each `KitButton` is its own table and two tables do not share a line in mail, so the row has to exist as markup — this is that markup, so you never write the cells yourself.
+
+```html
+<KitButtonGroup align="center">
+  <template #primary>
+    <KitButton href="${cta_url}" inline>
+      <span i18n:translate="">email_cta_review</span>
+    </KitButton>
+  </template>
+  <template #secondary>
+    <KitButton href="${back_url}" variant="outline" inline>
+      <span i18n:translate="">email_cta_send_back</span>
+    </KitButton>
+  </template>
+</KitButtonGroup>
+```
+
+<Properties>
+  <Property name="align" type="String, default 'center'">
+    Horizontal placement of the row.
+  </Property>
+</Properties>
+
+Two **named** slots rather than one default slot, because a component cannot wrap children it has not been told about — and the 12 px gap between the buttons would then have nowhere to live. Naming them also states the design's rule in the API: the pair is one primary action with an alternative, never two equal choices. `#secondary` is optional.
+
+<Note>
+  The cells stay side by side on a phone. Two short labels are the contract; a
+  mail whose actions do not fit on one line wants two stacked `KitButton`s.
+</Note>
+
+## KitCard
+
+The rail card: a magenta rail down the left edge and a tinted body, for **the thing this message is about** — the submitted content, the account, the error. One per mail, or none.
+
+```html
+<KitCard>
+  <template #overline>
+    <span i18n:translate="">email_field_news_item</span>
+  </template>
+  <template #title>${item_title}</template>
+  <p>${item_description}</p>
+</KitCard>
+```
+
+<Properties>
+  <Property name="overline">
+    The small uppercase label above the title: what kind of thing this is.
+  </Property>
+  <Property name="title">
+    The thing's name, in the display face.
+  </Property>
+  <Property name="default">
+    Anything else — a description, or a `KitDataList` of its fields.
+  </Property>
+</Properties>
+
+## KitDataList and KitDataRow
+
+A handful of label/value pairs — who, when, where. Not the same thing as `KitDataTable`: this is a definition list wearing a table's clothes, with no header row and no repetition, so it is `role="presentation"` and the labels do the work.
+
+```html
+<KitDataList>
+  <KitDataRow>
+    <template #label><span i18n:translate="">email_field_author</span></template>
+    ${author}
+  </KitDataRow>
+  <KitDataRow>
+    <template #label><span i18n:translate="">email_field_submitted</span></template>
+    ${python: format_datetime(submitted)}
+  </KitDataRow>
+</KitDataList>
+```
+
+<Properties>
+  <Property name="labelWidth" type="String, default '130'">
+    On `KitDataRow`: width of the label column in pixels, `'130'` or `'120'`. A
+    string, so `label-width="120"` works as written.
+  </Property>
+</Properties>
+
+The 1 px rule between rows is not a class you write: `tailwind.css` hangs a `tr + tr > td` selector off `KitDataList`'s own class, drawing a top border on every row but the first. It has to be that way round — a bottom border would need leaving off the **last** row, and nothing in an email can say "last".
+
+<Note>
+  `KitDataRow` may be a component where `KitDataTable`'s rows may not, because a
+  data list is a fixed handful of pairs and never a `tal:repeat`. If you do need
+  a repeat, write a plain `<tr>` with the cell classes spelled out; it still gets
+  the rule between rows.
+</Note>
+
+## KitPill
+
+The status pill in the header band, opposite the logo: one word saying what kind of message this is before the reader has read anything.
+
+The pill is white on every tone. It sits on the head artwork rather than on white, so a tinted fill there is either washed out or a second colour fighting the brand; the tone is carried instead by a coloured disc baked into the icon.
+
+```html
+<template #pill>
+  <KitPill tone="success">
+    <span i18n:translate="">email_pill_new_account</span>
+  </KitPill>
+</template>
+```
+
+<Properties>
+  <Property name="tone" type="String, default 'info'">
+    `info` (blue disc), `success` (green), `warning` (yellow) or `danger` (red).
+    Each resolves to a 14 px PNG icon at *build* time, so a runtime tone cannot
+    work — a template that needs to say something else writes its own pill.
+  </Property>
+</Properties>
+
+<Note>
+  The icon is skipped when there is no `portal_url` to build an absolute URL
+  from (a golden file, a unit test), and a client that blocks remote images
+  drops it too. A pill stays legible without it — a bold label on white — but it
+  loses its colour entirely, because since v3 the colour is only in the icon.
+  Write a label that works on its own.
+</Note>
 
 ## KitPanel
 
@@ -123,9 +269,19 @@ Rows are yours, not the kit's: `tal:` attributes on a kit component are forbidde
 
 ## Dark mode
 
-Currently `color-scheme` hints plus a `prefers-color-scheme` block keyed on `data-dark` attributes, which the shell places on the four surfaces it owns: the page canvas, the content well, the body copy and the footer.
+`color-scheme` hints plus a `prefers-color-scheme` block keyed on `data-dark` attributes, which the kit places itself on the surfaces it owns. Six tokens: `page` (the canvas behind the card), `surface` (the card, and the data tables nested inside it), `raised` (tinted blocks within the card — a rail card's body, a callout), `body`, `muted` and `accent`. You never write one, exactly as you never write `role="presentation"`.
+
+The footer is deliberately absent from that list: it is a negative block already, and a hook there would only let a dark client lighten the one part of the mail meant to stay black.
+
+The six values are the greys the v2 mockups' own dark model uses, and they are **not** charte colours — the iMio palette does not cover dark mode, and communication has not signed those greys off. They are reused rather than invented so the package has one unvalidated dark ramp instead of two.
 
 `data-dark` is not decoration. `css.purge` only understands `class=` and `id=`, so a class-keyed dark block is deleted silently with a successful build; an attribute selector is outside purge's model and survives untouched.
+
+## Web fonts
+
+Quicksand is served from the kit's own resource directory (`browser/static/fonts.css`, two weights), linked from the shell's head. Apple Mail, iOS, Thunderbird and Samsung honour it; Gmail, Outlook and most webmail strip the `<link>` and fall back to Trebuchet MS and then Arial, which is why the display stack still names both.
+
+Self-hosted, not Google Fonts, which is what the mockups used: a font fetched from `fonts.gstatic.com` reports the IP address, the time and the mail client of every citizen who opens a message from a Walloon local authority.
 
 ## The kit is locked
 

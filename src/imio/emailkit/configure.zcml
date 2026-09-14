@@ -46,7 +46,7 @@
         />
     <emailkit:template
         name="registered_notify_template"
-        preheader="[email_preheader_registered_notify_template] Follow the link to activate your account."
+        preheader="[email_preheader_registered_notify_template] Follow the link to choose your password."
         subject="[email_subject_registered_notify_template] An account has been created for you"
         />
   </emailkit:templates>

@@ -22,10 +22,21 @@
  */
 @theme {
   /*
-   * Quicksand (display) and Nunito (body) are brand faces, not email faces:
-   * no mail client will have them and remote web fonts are unreliable and
-   * privacy-hostile in mail. They lead the stack so a client that does have
-   * them uses them, and everything falls back to Arial.
+   * Quicksand (display) and Nunito (body) are brand faces, not email faces. They
+   * lead the stack so a client that has them uses them, and the fallbacks carry
+   * everything else -- which is most clients, most of the time.
+   *
+   * Quicksand, and ONLY Quicksand, is also served as a web font from the kit's
+   * resource directory, so the clients that honour a remote stylesheet in mail
+   * (Apple Mail, iOS, Thunderbird, Samsung) render the banner and the overlines
+   * in the real face. See `browser/static/fonts.css` for the file and
+   * `layouts/Main.vue` for the `<link>` -- self-hosted rather than Google Fonts,
+   * which would report every citizen's IP address to a third party.
+   *
+   * Nunito is NOT served that way. It is the body face, the clients that would
+   * load it are the same ones whose fallback to Arial nobody can tell at 15 px,
+   * and a second family would double the request weight for that. The brand
+   * signature lives in the display face.
    */
   --font-display: Quicksand, "Trebuchet MS", Arial, Helvetica, sans-serif;
   --font-body: Nunito, "Avenir LT Std", Arial, Helvetica, sans-serif;
@@ -35,26 +46,107 @@
   --color-imio-magenta-dark: #b3004b;
   --color-imio-pink-soft: #ffadd9;
 
-  /* Neutrals. */
+  /* Neutrals.
+
+     `grey-canvas` and `grey-bg` are two different jobs and the v2 shell needs
+     both at once: #ededed is the page behind the white card, #f8f8f8 is the
+     tint INSIDE the card (the rail card's body). They were interchangeable
+     while the shell had one flat background; they are not any more. */
   --color-imio-black: #1c1c1c;
   --color-imio-grey-dark: #3c3c3b;
   --color-imio-grey-light: #d2d2d2;
   --color-imio-grey-border: #ededed;
+  --color-imio-grey-canvas: #ededed;
   --color-imio-grey-bg: #f8f8f8;
   --color-imio-white: #ffffff;
 
-  /* Semantic. */
+  /* Semantic.
+
+     DECLARED, AND NO LONGER USED BY THE KIT, which is the state `negative` was
+     already in. They were `KitPill`'s four fills until v3 made the pill white
+     and moved the tone into a coloured disc baked into the icon PNG, so the
+     values now live in `browser/static/pill-*.png` and not in any class. They
+     stay declared because they are the design system's semantic palette and a
+     consumer template may want `bg-imio-positive` for something of its own;
+     nothing in this package generates them any more.
+
+     The DISC colours, for whoever has to match them: `info` #1b6c9c (the
+     design's own value, from `pill-info-solid.png` in the v3 assets), `success`
+     #00e667, `warning` #e6da00, `danger` #c8102e. The two that are not charte
+     colours are the blue and the red, and they are not because the iMio palette
+     has no blue at all and no red distinct from the dark magenta. Same standing
+     as before: awaiting sign-off from communication, and the substitution is
+     now four PNGs and no markup.
+
+     Light disc, dark glyph; dark disc, white glyph. `positive` and `warning` are
+     light fills that carry #1c1c1c and never white, which is the rule the pill
+     LABELS used to follow and which the glyphs inherited when the fill left the
+     markup. */
   --color-imio-positive: #00e667;
   --color-imio-warning: #e6da00;
   --color-imio-negative: #b3004b;
+  --color-imio-info: #c7e4f7;
+  --color-imio-danger: #c8102e;
+}
+
+/*
+ * The rule between `KitDataList` rows.
+ *
+ * The one piece of the design a utility class cannot carry, because it belongs
+ * to the relationship between two rows rather than to either of them: the
+ * mockups draw a 1 px rule BETWEEN rows and none under the last. Expressed as a
+ * top border on every row but the first, which a sibling combinator can state
+ * and `:last-child` cannot -- see `components/DataRow.vue` for why that
+ * inversion is forced rather than stylistic.
+ *
+ * A plain class rather than an arbitrary Tailwind variant: `css.safe` rewrites
+ * the special characters in `[&_tr+tr>td]:border-t` into something legible to
+ * mail clients, and the result is a selector nobody can grep for. `kit-datalist`
+ * is a literal string in `DataList.vue`, so `css.purge` finds it and keeps it.
+ *
+ * Juice inlines this onto the matching cells at build time, so it does not
+ * depend on a client honouring an embedded stylesheet.
+ */
+.kit-datalist tr + tr > td {
+  border-top: 1px solid #ededed;
 }
 
 /*
  * Dark mode (SPEC §3, the last of `Main.vue`'s listed responsibilities).
  *
- * Four tokens only: `page`, `surface`, `body`, `muted`. The kit applies them
- * itself through a `data-dark` attribute on the elements it owns; authors never
- * write one, exactly as they never write `role="presentation"` or `lang`.
+ * Six tokens: `page`, `surface`, `raised`, `body`, `muted`, `accent`. The kit
+ * applies
+ * them itself through a `data-dark` attribute on the elements it owns; authors
+ * never write one, exactly as they never write `role="presentation"` or `lang`.
+ *
+ * `raised` is the v2 addition. The shell used to have one white surface, so one
+ * dark fill answered for all of it; the v2 shell nests -- a tinted rail card and
+ * tinted callouts sit INSIDE the white card, and a metadata table sits inside
+ * the rail card. Collapsing those onto a single fill would flatten the whole
+ * layout to one colour in a dark client while the light rendering has three.
+ * The nesting order inverts in dark mode (`raised` is lighter than `surface`,
+ * where #f8f8f8 is darker than #ffffff), which is what a dark theme normally
+ * does: depth reads as light, not as shade.
+ *
+ * The footer is NOT in this list, and that is deliberate rather than an
+ * oversight. It is a negative block at #1c1c1c in the light rendering already,
+ * so it needs no flip; giving it a `data-dark` hook would only let a dark client
+ * lighten the one part of the mail that is meant to stay black.
+ *
+ * WHERE THE SIX VALUES COME FROM. All of them are the greys the v2 mockups' own
+ * dark model uses -- #121212 behind the card, #1c1c1c for the card, #242424 for
+ * a tinted block inside it, #d2d2d2 for body copy, #a8a8a8 for small print,
+ * #ffadd9 for the accent. They are NOT charte colours: the iMio palette does not
+ * cover dark mode at all, and the mockups flag those greys as additions awaiting
+ * sign-off from communication. The point of reusing them anyway is that this
+ * package then has ONE unvalidated dark ramp rather than two: the fourth v2
+ * model is an alert mail rendered in forced dark, and a client flipping a normal
+ * mail has to land on the same colours that model is drawn in, or the two dark
+ * treatments read as two different products.
+ *
+ * An earlier revision of this block used a blue-tinted ramp (#14161a / #23262b /
+ * #2b2f36 / #e9eaec / #b7bbc2) invented here. It was a third palette answering
+ * to nothing, and it is what this note exists to stop coming back.
  *
  * WHY AN ATTRIBUTE AND NOT A CLASS. `css.purge` understands `class=` and `id=`
  * and nothing else, and it deletes what it cannot match. A dark block keyed on
@@ -84,32 +176,67 @@
  * defined above is the one every client has to get right, and it stands alone.
  */
 @media (prefers-color-scheme: dark) {
-  /* The canvas behind the content well. On `<body>` and on the article div,
-     because webmail clients routinely discard the former. */
+  /* The canvas behind the white card. On `<body>`, on the article div and on
+     the full-width table, because webmail clients routinely discard some of
+     them and the seam shows immediately if the canvas is missed. */
   [data-dark="page"] {
-    background-color: #14161a !important;
+    background-color: #121212 !important;
   }
 
-  /* The white content well, and every panel surface inside it. */
+  /* The white card itself, and the metadata tables nested two levels in. */
   [data-dark="surface"] {
-    background-color: #23262b !important;
+    background-color: #1c1c1c !important;
   }
 
-  /* Body copy inside the well. */
+  /* Tinted blocks inside the card: the rail card body, the callouts, a data
+     table's head row. Lighter than `surface`, because depth reads as light. */
+  [data-dark="raised"] {
+    background-color: #242424 !important;
+  }
+
+  /* The `KitDataList` separator, which is #ededed in the light rendering and
+     would be a white line across a dark card. #3c3c3b is the charte's own dark
+     grey and the value the mockups' dark model uses for exactly this rule. */
+  .kit-datalist tr + tr > td {
+    border-top-color: #3c3c3b !important;
+  }
+
+  /* Body copy inside the card. */
   [data-dark="body"],
   [data-dark="body"] td,
+  [data-dark="body"] th,
   [data-dark="body"] div,
   [data-dark="body"] p,
   [data-dark="body"] h1,
   [data-dark="body"] h2,
   [data-dark="body"] h3,
   [data-dark="body"] li {
-    color: #e9eaec !important;
+    color: #d2d2d2 !important;
   }
 
-  /* The footer, whether it is the kit default or `footer_html`. */
+  /* Small print: the shell's `mentions` region, and anything a component marks
+     as secondary. Dimmer than body copy, still above the 4.5:1 line on
+     `surface`. */
   [data-dark="muted"],
+  [data-dark="muted"] td,
   [data-dark="muted"] p {
-    color: #b7bbc2 !important;
+    color: #a8a8a8 !important;
+  }
+
+  /* The overlines on a card and a callout, which are #b3004b in the light
+     rendering. Dark magenta on a dark surface is around 2:1 and unreadable, so
+     the accent moves up the brand ramp to #ffadd9 (9:1 on `raised`) rather
+     than being surrendered to the body colour. Without this rule the overline
+     is legible but grey, and a dark client sees no brand accent anywhere in the
+     content well.
+
+     The double selector is a specificity fight, not a typo: `[data-dark="body"]
+     p` above also matches an overline and is `!important` too, and one class
+     plus one element beats one class. Naming the ancestor makes it two classes,
+     which wins; the bare selector covers an overline that is not inside the
+     body region. */
+  [data-dark="body"] [data-dark="accent"],
+  [data-dark="accent"] {
+    color: #ffadd9 !important;
   }
 }

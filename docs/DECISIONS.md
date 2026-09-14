@@ -8,6 +8,436 @@ Newest entries at the top.
 
 ---
 
+## 2026-09-14 — the preview gains a third mode that shows the `.pt` unrendered, and §5's objection to it is what bounds it
+
+**Context.** The preview shows `render()`'s two return values: the HTML part in the iframe,
+the plaintext part beside it. Both need a committed fixture, so a template with none shows
+nothing at all — an accurate refusal, and a useless one for the two cases where it fires.
+Authoring order is the first: the `.pt` is compiled and committed before anyone writes
+`tests/fixtures/<name>.py`, and the window in which you most want to look at a new layout is
+exactly the window in which the preview declines. A released egg with no source tree is the
+second, already documented as the normal production case.
+
+**The objection, which is §5's and is correct.** §5 rejects `maizzle --watch` outright:
+its dev server shows *build-time* output — raw `${item/title}`, unexpanded `tal:repeat` —
+"a miserable authoring loop, and one that hides exactly the class of bug the authoring rules
+are about". A mode that serves the committed `.pt` straight to a browser shows that same
+build-time output. Adding one is, on its face, adding back the thing §5 threw out.
+
+**Why it is not the same thing.** §5's objection is to an authoring loop whose *only* output
+is unsubstituted markup — one you could work in all day and never learn that
+`${item/created}` silently renders nothing. Here the unrendered view is one labelled mode of
+three, sitting beside the two that do render, on a page that says in so many words that
+nothing is substituted in it. It answers "what does this layout look like"; the two modes
+next to it answer "does this template render", which is the question §5 is protecting. The
+failure mode §5 names requires the *absence* of the rendering loop, not the presence of a
+source view.
+
+**What that bought, and what it did not.** It is deliberately not a fallback: the HTML mode
+does not quietly degrade to source when the fixture is missing. It still refuses, still
+prints the full explanation of where §7 puts a fixture, and now offers a link to the mode
+that needs none. A preview that silently showed you `${item/title}` where you expected a
+value would be the §5 failure exactly.
+
+**Two details.** The file is served as `text/html` rather than escaped into a `<pre>`, because
+TAL attributes are unknown attributes to a browser and it draws the markup around them —
+a `<pre>` would show the CSS instead of applying it, which is the opposite of the point. And
+it goes through the new `render.resolved_path()`, so a jbot-overridden template shows the
+override: a source view that kept showing the original while `render()` compiled somebody
+else's file would be a trap rather than a tool.
+
+`bin/preview-emails` gets the same thing as a `.pt` link per template, written for every
+registered template whether its fixture resolved or not — the one artifact in that directory
+that cannot fail for lack of a fixture.
+
+---
+
+## 2026-09-14 — v3: the brand artwork enters the shell, and the title band stops being magenta
+
+**Context.** The v3 design (`Modeles email v3`) is one change of subject: the iMio brand
+shapes enter the mail as two raster cuts. A head visual sits behind the logo band, and a cap
+closes the white body above the negative footer. Everything else about the card is v2.
+
+**The design folder contradicts itself, and the maintainer chose.** `v3/notification-contenu.html`
+uses a 400x120 head cut with a #f8f8f8 title band carrying an 80 px tail of the same artwork;
+`v3/bienvenue-compte.html` and `v3/reinitialisation-mot-de-passe.html` use a 500x92 cut whose
+magenta joins a title band that stays #e6007e, which is also what the design's own notes
+describe. Two different mastheads, and the shell can only have one. The maintainer picked the
+notification variant, so that is what `KitMain` implements and what all five templates get.
+
+**`primary_color` lost its largest surface, and that is the cost of the change.** The token
+painted the title band. It now paints `KitCard`'s rail and `KitButton`'s fill and nothing
+else, while the brand colour at the top of every mail is a PNG that is iMio magenta for every
+consumer. A commune that sets the token to its own colour therefore gets its own rails and
+buttons under iMio's artwork. The token cannot drive a raster; the escape is the resource
+directory, where `art-head.png`, `art-head-tail.png` and `art-hero.png` can be replaced
+without touching markup, and the design's own notes offer the same escape for official
+crops. Recorded rather than solved: a per-site artwork mechanism is a feature, not a
+redesign, and nothing has asked for one.
+
+Consequence in the suite: `render_shell`'s output no longer contains `primary_color` at all,
+because a shell around a legacy body has no rail and no button. Three `TestThemeTokens` tests
+moved onto `logo_url`, which is the token the shell still renders, and a fourth now pins the
+absence so the decision is revisited deliberately rather than by accident. Caveat A1's guard
+on a colour in a closed attribute is unaffected: `tests/test_theme_tokens.py` keeps it on the
+four templates that do paint with the token.
+
+**The head cut is a background; the cap is an image.** Not a style choice. The logo and the
+status pill sit ON the head cut, and nothing can sit on an image in a table cell, so the head
+has to be a background. Nothing sits on the cap, so it is an image, which is the shape every
+client renders without help.
+
+**The url rides on the `background` attribute, never on `background-image`.** This is caveat
+A1 again, one step further out. `${asset_base}` inside a literal `style` attribute is the
+silent catastrophe the authoring lint exists for, and a background image in CSS means exactly
+that. So the runtime half (the url) goes on the `background` HTML attribute, which Juice never
+parses as CSS, and the static half (`background-size`, `background-position`,
+`background-repeat`) stays in classes that Juice inlines on top. Browsers treat the attribute
+as a presentational hint for `background-image` and author CSS outranks a hint, so the two
+halves compose; verified in Chrome before the shell was written. `tal:attributes` rather than
+a literal value, so an empty `asset_base` drops the attribute instead of emitting a relative
+url that would resolve against the reader's webmail.
+
+**NO VML FALLBACK, and this one is a hard limit rather than a judgement.** The design ships a
+`v:rect` for Outlook on Windows, which ignores `background-image`. Every way of writing it puts
+the url inside an Outlook conditional comment, and **Chameleon does not interpolate a
+placeholder inside a comment at all** — the compiled `.pt` ships `${asset_base}` to the
+recipient verbatim. Measured, not assumed: Maizzle's `OutlookBg` produced exactly that and
+`test_no_unresolved_placeholder_in_html` caught it, which is the one failure this package's
+whole suite is built around.
+
+Nothing is lost that Outlook was going to show. Word's engine honours the `background`
+attribute on its own, so Outlook renders the artwork; it ignores size, position and repeat, so
+it tiles the PNG at natural size from the top left instead of anchoring it at 400x120 top
+right. The left third of the cut is transparent either way, so the logo keeps its clear space.
+A `v:rect` would have been worse: VML has no equivalent of a sized, anchored background, and
+`type="frame"` stretches the art across the full 600 px and drags magenta under the logo. If a
+client renders neither, the band is plain white with the logo and the pill intact, which is
+the v2 rendering and the fallback the design itself specifies.
+
+**The 3 px `primary_color` rule for a title-less template became a 1 px #d2d2d2 rule.** The
+3 px bar was a stub of the magenta flat that used to sit there. With the flat gone the stub
+stands for nothing, and a magenta line under artwork that is already magenta reads as a
+mistake. What separates the masthead from the content well in v3 is the title band's own
+closing rule, so that is what an untitled mail keeps.
+
+**Dark mode: `raised` over `body`, and the artwork is left alone.** The title band is a tinted
+block inside the card, which is exactly what the `raised` token already means, and its type
+needs `body`. One element cannot carry both `data-dark` values, so the cell takes `raised` and
+the table inside it takes `body`; no new token, no new CSS. The two artwork bands set no
+background colour of their own, so the card's `surface` flip reaches them through the PNGs'
+transparency. What the flip cannot do is recolour a raster: the cuts' opaque light-grey shapes
+read as bright white against #1c1c1c. Left as it is. The design has no dark variant of the
+cuts, dropping them in a dark client would remove the brand from the one place v3 exists to put
+it, and nothing is illegible — the logo, the pill and the title all keep their contrast.
+
+**The pill went white on every tone, on the maintainer's call.** `v3/notification-contenu.html`
+gives the info pill a white fill and a solid blue disc icon (`pill-info-solid.png`); the other
+two v3 models keep the v2 coloured fills. Shipped as flagged, the pale blue #c7e4f7 fill sat
+on the magenta cut washed out. The maintainer extended the design's own answer to all four
+tones: white pill, dark label, and the tone carried by a coloured disc under the glyph.
+
+**The colour left the markup entirely.** `KitPill`'s `TONES` was `{fill, ink, icon}` per tone
+and is now `{icon}`: the disc is baked into the PNG, so `bg-imio-info` and its three siblings
+are generated by nothing. They stay declared in `kit/tailwind.css` as the design system's
+semantic palette, in the state `negative` was already in. Consequence worth stating plainly,
+because it is a real loss: a pill used to degrade to a coloured fill with a bold label when a
+client blocked images, and it now degrades to a bold label on white with no colour anywhere.
+Accepted — the label is words and always carried the meaning; the tone only ever carried it
+faster.
+
+**Baked into the PNG rather than a coloured cell behind the glyph.** A cell would keep the
+colour under image blocking, which is the one real argument for it, and it costs a
+`border-radius` that Outlook squares into a coloured box plus three more nested tables to
+centre a 14 px glyph in a 22 px cell. The design ships the composited form; a PNG renders
+identically everywhere it renders at all.
+
+**Three of the four icons are drawn here, to match the one the design supplied.** Geometry,
+so they can be redrawn or replaced by official ones: 48x48 canvas, disc centred at (24,24)
+with radius 22, glyph strokes 6 px with round caps, glyph roughly within y 11..35 — all of it
+measured off `pill-info-solid.png`. `success` is a check, `warning` an exclamation mark (the
+info glyph turned over), `danger` a cross.
+
+Disc colours: `info` #1b6c9c (the design's own), `success` #00e667, `warning` #e6da00,
+`danger` #c8102e. Light disc takes a #1c1c1c glyph, dark disc takes a white one, which is the
+rule the pill LABELS followed before the fill left the markup. The blue and the red remain the
+two values that are not charte colours, for the reason already recorded: the iMio palette has
+no blue at all and no red distinct from the dark magenta. Their standing is unchanged and the
+substitution got cheaper — it is now four files in `browser/static/` and no markup.
+
+**`mail_password_template` moved from `warning` to `info`, which retires the warning triangle.**
+The case for `warning` was that this is the one mail whose link stops working. The case against
+won: this mail and `get_username` carry the same label, "Your account", and two mails saying the
+same words while showing different colours and different glyphs assert a distinction that does
+not exist. v3 sharpened it — reduced to a disc, the difference was a yellow circle with an
+exclamation mark against a blue one with an `i`, and an exclamation mark on a password mail
+reads as "something is wrong with your account", which is the one thing it must not imply. The
+deadline is stated where it belongs, in the callout that can give the actual date. `warning`
+and `danger` now ship with no template using them; they stay, because the tone set is public
+API and a consumer's own template is exactly where an incident mail would live.
+
+---
+
+## 2026-09-11 — The registration mail stops claiming an account needs activating
+
+**Context.** The "an account has been created for you" mail said *Activate my account*, under
+an *Activation deadline*, pointing at an `activation_url`. Plone activates nothing.
+`RegistrationTool.registeredNotify` runs after the account exists and is usable;
+`RegisteredNotifyView.build_context` calls `portal_password_reset.requestReset()` and builds
+an ordinary password-reset url. There is no pending state and nothing the recipient can fail
+to do that leaves the account unusable.
+
+The wording was not merely imprecise. A reader told to activate looks for a state change, and
+one whose link has expired reasonably concludes the account is dead — when the answer is
+"use forgotten password". Raised by the maintainer, who was right.
+
+**What changed.** `email_registered_notify_created`, `_cta`, `_expiry` and the preheader
+reworded around choosing a password; the callout reuses `mail_password_template`'s
+`email_callout_link_validity` instead of a second msgid saying the same thing about a
+different imaginary thing, and `email_callout_activation_deadline` is gone. The context key
+`activation_url` became `password_url`. FR, NL and DE moved with them.
+
+**The card carries three rows now**, on the maintainer's call: username, full name, email
+address. The card's `#title` went with it — it held the fullname, which is now a row, and a
+title repeating the row under it is the one thing a rail card must not do. The email comes
+from the `email` kwarg `registeredNotify` already passes (it reads it off the member and
+validates it before deciding to send at all), with `member.getProperty("email")` as the
+fallback for the other callers the `for="*"` registration allows.
+
+**The sign-off went too.** "Kind regards, <email_from_name>" was the pre-v2 layout's way of
+closing a mail that had no footer. The v2 shell names the sender in the banner subtitle and
+again in the footer, so it was a third repetition.
+
+**A trap in the i18n loop, worth more than this entry.** `python -m imio.emailkit.locales`
+marks an entry `#, fuzzy` when the msgid's English default changes — and **msgfmt skips
+fuzzy entries**, so a mail whose wording was edited and correctly retranslated in all three
+`.po` files still went out in English. Nothing failed: the sync reported "0 added, 0
+removed", the `.mo` timestamps were newer than the `.po` files, and the golden files were
+regenerated from the same broken catalogs, so they agreed with the bug. It was visible only
+by reading a rendered preview in French. Recorded in `SKILL.md` next to the other
+silent-failure modes: after rewording an existing msgid, clear the fuzzy markers and
+recompile, then read the output in a language you can check.
+
+---
+
+## 2026-09-11 — `preview-emails` serves the kit's resources and owns its own `portal_url`
+
+**Context.** The preview rendered the v2 fidelity work and showed almost none of it. Every
+image in the design, and now the Quicksand stylesheet too, is gated on
+`tal:condition="asset_base"`, and `asset_base` is built from `portal_url`, which is empty
+without a request. The header logo, the status pill's icon, the footer mark and the web
+font were therefore *absent* — no markup, no broken-image icon, no warning. A tool whose
+stated purpose is "what render() produces, not what Maizzle emits" was silently dropping
+the four things that make the design recognisable, and the module docstring recorded the
+empty `portal_url` as a known limitation rather than as the bug it had become.
+
+The gating itself is right and stays: a golden file and a unit test *should* render no
+image, because a relative `/++resource++…` in an inbox is a broken-image icon. What was
+wrong is that the preview inherited a degradation meant for a render with no reader.
+
+**The preview now stands in for the site on this too.** `seed_portal_url()` points
+`render.portal_url` at the preview server's own base url, and the request handler answers
+`/++resource++<package>/<file>` out of each project's `browser/static`. That is the same
+move `seed_theme()` already makes for `plone.app.registry`, in the same place, for the same
+reason — the preview is a site-less renderer that substitutes the few site-shaped things
+`render()` reads.
+
+**Monkeypatching, not a context key.** `render()` injects `portal_url` into the namespace
+itself, and an injected name beats anything the caller passes (SKILL.md's pitfall 14), so
+there is no way in through the context. Changing `render()` to defer to a caller-supplied
+value was rejected: it would loosen a production API to fix a dev tool.
+
+**A trap inside the fix.** `from imio.emailkit import render` gets the `render` FUNCTION,
+not the `imio.emailkit.render` module — §6.1 spells the public API that way, so
+`__init__.py` rebinds the name and shadows the submodule. Written the obvious way, the
+patch assigns an unused attribute to a function object, patches nothing, and the preview
+goes on dropping every image with no error at all. It is `importlib.import_module` for that
+reason, with the reason next to it.
+
+**The resource name is a convention, not a lookup.** `++resource++<dotted package name>`,
+because that is how `browser:resourceDirectory` is registered here. Reading the real name
+means parsing each package's ZCML for a directive this tool otherwise has no reason to
+know about; a consumer that names its directory something else loses images in the preview
+and nothing else.
+
+**Scope of the path check.** The handler resolves the file and requires the resource
+directory to be one of its parents. This binds to 127.0.0.1 and serves a developer's own
+checkout, so the url is attacker-controlled in no meaningful sense — but `..` reaching an
+`open()` is the kind of code that gets copied somewhere it does matter.
+
+---
+
+## 2026-09-11 — v2 fidelity pass: what a side-by-side with the mockups still showed
+
+**Context.** The v2 shell and components landed structurally correct, but rendering the
+four mockups next to the four goldens in one page showed the result reading as a different
+design. The gaps were not in the bands; they were in what the kit ships with, what a block
+claims for spacing, and three pieces of markup. Recorded together because they were found
+together, in one comparison, and because the comparison is the method: the design is a
+picture, and only a picture disagrees with it.
+
+**The white band was empty out of the box.** `logo_url` is a registry token with no default
+and no sensible one — it is the *consumer's* product logo, which a shared kit cannot know —
+so every site rendered a blank 46 px strip until someone filled the record in, which is
+every site on the day it is installed. The shell now falls back to a kit-shipped
+`imio-logo.png` at 110 px. iMio built every consumer of this package, so its own mark is
+the one honest placeholder; a site that sets `logo_url` is unaffected.
+
+**The footer lost two thirds of itself.** Every mockup ends on three blocks (the sender's
+contact details, who runs the service, the mark); the shell had the first and the third.
+The middle line is the kit's own signature and identical for every consumer, so it is a
+msgid (`email_footer_powered_by`) rather than a fourth registry token nobody would fill
+in. `footer_html` remains the first block and stays site-specific.
+
+**Spacing compounded at the bottom of every mail.** `KitCard`, `KitPanel`, `KitDataTable`
+and `KitButton` carried `my-5`; a mail ending in a button spent 20 px of button margin plus
+the well's 24 px of padding, 44 px where the design draws 22. They now carry `mt-5` and
+nothing underneath, which is the mockups' own model (each row is `padding: <gap> 40px 0`
+and only the last sets a bottom). This is forced rather than stylistic: `:last-child` does
+not survive CSS inlining, so "except the last one" cannot be expressed at all, and the only
+stable rule is that no block claims space under itself.
+
+**The button's click target was the label.** Padding sat on the `<td>` with a bare inline
+`<a>` inside, so a recipient who aimed at the coloured area around the text hit nothing.
+The anchor is now `display: block` and carries the padding, with `mso-padding-alt` on the
+cell for Word's renderer. A bug fix that happened to be found by a fidelity pass.
+
+**Outlook's square corners are kept, deliberately.** The mockups give Outlook a
+`<v:roundrect>`; it needs a width in pixels, which a component whose label is a translated
+slot cannot know, and a `width` prop measured by hand would be wrong in at least two of the
+three languages shipped. Ghost padding (`mso-text-raise` and a spacer `<i>`) sizes a fluid
+button without a width but does not round it, so it would buy nothing `mso-padding-alt`
+does not. Padding, colour and click target are right in Outlook; only the corners are not.
+
+**Two buttons stacked where the design draws a row.** `KitButtonGroup` is the row, with
+`#primary` and `#secondary` named slots. Named rather than one default slot because a
+component cannot wrap children it has not been told about, and the 12 px gap would then
+have nowhere to live; naming them also states the design's rule in the API, that the pair
+is one primary action with an alternative and never two equal choices.
+
+**The rule between `KitDataList` rows had no way to exist.** The mockups draw a 1 px rule
+between rows and none under the last. Written as a bottom border it needs omitting on the
+final row, which is the same `:last-child` problem as above; written as a *top* border it
+needs omitting on the first, and "first" is something `tr + tr` knows without being told.
+So the rule lives in `kit/tailwind.css` keyed on `KitDataList`'s own class, Juice inlines it
+onto the matching cells at build time, and `KitDataRow` carries the two cells. `KitDataRow`
+may be a component where `KitDataTable`'s rows may not: a data list is a fixed handful of
+pairs, never a `tal:repeat`, so SPEC §3 rule 1 does not bite.
+
+**The copy-this-link fallback was plain grey text.** A client that autolinked it styled it
+its own way, and one that did not left the reader retyping a sixty-character url by hand.
+It is now a real `<a>` in `#b3004b`, with `data-dark="accent"` so it moves to `#ffadd9`
+where `#b3004b` is about 2:1.
+
+**The preheader was hidden with `display: none` alone**, which Outlook.com strips from a
+block element. It now carries the five further declarations every mail framework converged
+on, as the mockups write them.
+
+**Quicksand is served from the portal, not from Google.** The kit had no web font at all,
+on the reasoning that remote fonts in mail are unreliable and privacy-hostile. The second
+half is the real objection and it is specific to Google: a font fetched from
+`fonts.gstatic.com` reports the IP address, the time and the mail client of every citizen
+who opens a message from a Walloon local authority. Self-hosting from
+`++resource++imio.emailkit` costs 30 KB in the egg and leaks nothing, and reaches exactly
+the clients the mockups' own Google Fonts link reached (Apple Mail, iOS, Thunderbird,
+Samsung). Delivered as a `<link>` to a stylesheet rather than an `@font-face` block in the
+document, because the url must carry `${asset_base}` and a Chameleon placeholder inside a
+`<style>` element is parsed as CSS by Juice, which kills inlining for the whole document
+while the build still exits 0. An `href` is never parsed as CSS.
+
+**The dark ramp was invented and is now the mockups'.** The `data-dark` block used a
+blue-tinted ramp (`#14161a` / `#23262b` / `#2b2f36` / `#e9eaec` / `#b7bbc2`) answering to
+nothing. It is now the greys the mockups' own dark model uses (`#121212`, `#1c1c1c`,
+`#242424`, `#d2d2d2`, `#a8a8a8`, accent unchanged at `#ffadd9`). Those are **not** charte
+colours and the mockups flag them as awaiting sign-off, same standing as the two pill
+fills above. Reused anyway so the package has ONE unvalidated dark ramp rather than two:
+the deferred fourth model is a forced-dark alert, and a client flipping a normal mail has
+to land on the colours that model is drawn in.
+
+**`<title>` is runtime-only, and that is a parser limit.** Vue treats `<title>` as a
+rawtext element exactly as it treats `<style>`, so a `<slot>` written inside it is escaped
+into literal text and shipped. A Chameleon placeholder is plain text and survives, so the
+element renders for a template whose title is *data* and not for one whose title is a
+translated slot. `tests/support.head_of` excludes it from the shell/authored parity
+assertion for that reason: a title is content, and it is the only part of the head that
+varies with the context.
+
+**A trap worth naming: `<style>` written in prose inside an HTML comment.** The authoring
+lint's `markup_only` blanks everything between a literal `<style>` and the next `</style>`,
+comments included, so a comment mentioning the element by name swallows its own `-->` and
+the next comment's `<!--` is reported as a stray `--`. Spell it `&lt;style&gt;` in prose.
+The same shape is already a named rule for `<Raw>` (`raw-in-comment`); this one is not, and
+the failure surfaces as a `comment-double-dash` violation pointing at the wrong line.
+
+**What is still not done.** The fourth model, the forced-dark technical alert, remains
+deferred on the same reasoning as the entry below. Outlook's button corners stay square.
+
+---
+
+## 2026-09-11 — The v2 design: the shell owns the title, and two pill colours are not charte yet
+
+**Context.** The v2 email design (`Modeles email v2`, four models) replaces the pre-v2
+shell: a white card on an #ededed canvas, with a white logo band, a `primary_color` title
+banner, the content well and a negative footer. Three of its four models map onto mails
+this package already ships. The fourth, a forced-dark technical alert, does not, and is
+deferred — no template needs it, its greys are marked unvalidated in the design itself,
+and a forced-dark variant would double the shell's colour logic to serve nothing.
+
+**The title moved, and that is a contract change.** Templates used to write their own
+`<h1>` into the content well. The banner is where the design puts a title, and a banner is
+the shell's, so `KitMain` now renders the heading. Two ways in, and the difference is not
+cosmetic: a `#title` SLOT is build-time markup and the only shape that can carry
+`i18n:translate`, which is what a title that is *wording* needs; a `title` NAME in the
+render context is a runtime string, which is what a title that is *data* needs. The three
+restyled Plone mails take the slot, `notification` and `shell` take the name.
+
+A template that supplies neither gets the pre-v2 3 px `primary_color` rule where the
+banner would be. That is the compatibility hinge, and it is a partial one: a template
+with no `title` in its context keeps rendering exactly as before, but a template that
+*has* one and still writes its own `<h1>` now prints the title twice — once in the banner
+and once in the well. Both dummy add-ons did, which is how it was caught; porting is one
+deleted line per template, and it is visible on the first preview rather than silent.
+
+**`shell.pt` keeps its heading on `subject`, through the slot.** The obvious move was to
+have `render_shell` pass `title` and let the layout's runtime path handle it. That path
+resolves through `title | options/title | nothing`, so a caller who omitted the subject
+would get a silently headless mail — exactly what `TestTheCompiledShellRequiresASubject`
+exists to prevent. `shell.vue` therefore fills the `#title` slot with `${subject}`: a bare
+name with no `|` default, so the compiled artifact still raises `KeyError` on a missing
+subject. `render.py` is unchanged.
+
+**Two pill fills are not charte colours.** `KitPill`'s `info` (#c7e4f7) and `danger`
+(#c8102e) come from the design, which flags them itself: the iMio palette provides neither
+a blue nor a red distinct from the dark magenta, and communication has not signed them
+off. Options were to substitute charte colours now (`pink-soft` and `negative`, both
+already tokens with the right contrast) or to ship the design as drawn and flag it. Ship
+as drawn, on the maintainer's call. `kit/tailwind.css` carries the substitution next to
+the tokens, so reversing it is a two-line change and nothing else moves — the tone names
+are semantic, not colour names.
+
+**Images had to become browser resources.** The pill icons and the footer's iMio logo are
+the first raster assets the kit needs, and a mail client fetches an image over HTTP days
+later, from outside the site. So: a `++resource++imio.emailkit` directory, and an
+`asset_base` the shell builds from `portal_url`. `portal_url` is empty whenever there is
+no request, so every one of those images carries `tal:condition="asset_base"` and is
+simply absent from such a render. Emitting a relative `/++resource++…` instead would put a
+broken-image icon in the inbox, which is worse than no icon; both places degrade to
+something still legible.
+
+**Dark mode grew two tokens.** `raised`, because the v2 layout nests three fills (card,
+rail card, metadata table) where the old one had a single white surface, and one dark fill
+for all three flattens the layout to one colour. And `accent`, because the card and
+callout overlines are #b3004b, which is about 2:1 on a dark surface; without it the
+`[data-dark="body"]` rule wins and the last brand accent in the content well goes grey.
+
+**One wording change, and its translations.** The account-activation mail's opening
+sentence no longer names the username, which now has a labelled row in the rail card —
+which is what the design's own "bienvenue" model does. The msgid is unchanged but its
+interpolation is (`${username}` is gone), so FR, NL and DE were edited with it. A
+translation left carrying the old placeholder would have rendered it unresolved.
+
+---
+
 ## 2026-09-11 — SUPERSEDES "Default-mail templates are built once and copied to the jbot overrides dir": `imio.emailkit` owns the two stock views
 
 **Context.** `mail_password_template` and `registered_notify_template` were `z3c.jbot`

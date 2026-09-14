@@ -22,7 +22,8 @@ import datetime
 CONTEXT = {
     "fullname": "Jeanne Dupont",
     "username": "jdupont",
-    "activation_url": (
+    "email": "jeanne.dupont@example.be",
+    "password_url": (
         "https://sambreville.example.be/passwordreset/8f3c1a9e2b?userid=jdupont"
     ),
     "expires": datetime.datetime(2026, 9, 18, 17, 30),

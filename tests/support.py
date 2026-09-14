@@ -893,7 +893,21 @@ def head_of(html):
     same language. Comparing the whole head rather than a handful of markers is
     the only form of "exactly as for an authored template"
     (``docs/plans/phase-3.md`` §4 gate 2) that a marker cannot fake.
+
+    ``<title>`` is the one exclusion, and it is the narrowing the gate's own
+    docstring anticipated. A title is *content*: the layout emits one when the
+    render context carries a ``title`` name and none when the template supplies
+    its heading as a translated slot instead, because Vue parses ``<title>`` as a
+    rawtext element and escapes a slot written inside it (see
+    ``kit/layouts/Main.vue``). So the shell, whose heading is a ``#title`` slot
+    over ``${subject}``, legitimately has no title element while
+    ``notification``, whose heading is runtime data, legitimately has one. That
+    difference is the two templates differing, not the layout differing, and it
+    is the only part of the head that varies with the context.
     """
     index = html.lower().find("<body")
     assert index != -1, "no <body> in the rendered document"
-    return html[:index]
+    return _TITLE_ELEMENT.sub("", html[:index])
+
+
+_TITLE_ELEMENT = re.compile(r"<title>.*?</title>", re.IGNORECASE | re.DOTALL)

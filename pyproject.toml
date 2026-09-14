@@ -75,9 +75,15 @@ namespaces = true
 # `.vue`/`.js`/`.css` sources ship too: SPEC §3 keeps the design system inside
 # the egg so `bin/compile-emails` can resolve it from the installed
 # distribution, which means they are package data, not dev-only files.
+#
+# `.png` and `.woff2` are `browser/static/`: the v3 brand cuts, the pill icons,
+# the two iMio logos and the two Quicksand weights the kit shell serves through
+# its `++resource++imio.emailkit` directory. A wheel that dropped them would install
+# a package whose every mail has broken images and no brand face, and nothing at
+# import time would say so.
 "*" = [
     "*.zcml", "*.xml", "*.pt", "*.pot", "*.po", "*.mo", "*.txt",
-    "*.css", "*.js", "*.vue",
+    "*.css", "*.js", "*.vue", "*.png", "*.woff2",
 ]
 
 [tool.towncrier]

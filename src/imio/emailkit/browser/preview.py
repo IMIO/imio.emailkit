@@ -24,6 +24,17 @@ absence is reported as a plain fact rather than an error: an egg installed
 without its source tree is the normal production case, and the preview simply
 has nothing to show for that template there.
 
+**Modes.** ``render()`` returns two things and the preview shows both -- the
+HTML part in the iframe, the plaintext part beside it. A third mode shows the
+committed ``.pt`` *itself*, served to the same iframe as ``text/html`` with no
+``render()`` pass at all. It is the only one of the three that needs no fixture,
+which is what it is for: a template being authored before its fixture exists, or
+one installed from an egg with no source tree, is otherwise the one template
+nobody can look at. Nothing is substituted in that mode -- ``${item/title}``
+stands where the value would be and every ``tal:condition`` branch shows at once
+-- so it answers "what does this layout look like", never "does this template
+render".
+
 **Send test.** §6.3's whole point is that "browser previews lie, Outlook
 doesn't". The button goes through the §6.2 ``Email`` builder unchanged -- same
 code path as a production mail -- and always to
@@ -40,6 +51,7 @@ from imio.emailkit.recipients import default_language
 from imio.emailkit.render import get_theme
 from imio.emailkit.render import negotiated_language
 from imio.emailkit.render import render
+from imio.emailkit.render import resolved_path
 from plone import api
 from Products.Five.browser import BrowserView
 from Products.Five.browser.pagetemplatefile import ViewPageTemplateFile
@@ -60,6 +72,30 @@ logger = logging.getLogger("imio.emailkit.preview")
 #: would leave §6.3's language switcher with a single entry on exactly the
 #: machine a developer previews on. Site languages are appended, not substituted.
 PREVIEW_LANGUAGES = ("fr", "nl", "de", "en")
+
+#: What the preview shows for the selected template. The first two are the two
+#: halves of ``render()``'s return value; the third is the committed file itself.
+MODE_HTML = "html"
+MODE_TEXT = "text"
+MODE_SOURCE = "source"
+PREVIEW_MODES = (MODE_HTML, MODE_TEXT, MODE_SOURCE)
+
+MODE_LABELS = {
+    MODE_HTML: "html",
+    MODE_TEXT: "text",
+    MODE_SOURCE: ".pt",
+}
+
+MODE_HINTS = {
+    MODE_HTML: "render()'s HTML part, with the committed fixture.",
+    MODE_TEXT: "render()'s plaintext part, with the committed fixture.",
+    MODE_SOURCE: (
+        "The committed .pt as a browser draws it -- no render(), no fixture, and "
+        "so no substitution: ${...} stands where its value would be and every "
+        "tal:condition branch shows at once. What the layout looks like, not "
+        "whether the template renders."
+    ),
+}
 
 #: Where SPEC §7 puts a fixture, relative to the checkout root of the addon that
 #: ships the template.
@@ -195,6 +231,21 @@ class PreviewBase(BrowserView):
     def languages(self):
         return preview_languages()
 
+    def mode(self):
+        """Which of :data:`PREVIEW_MODES` to show, defaulting to the HTML part."""
+        requested = self.request.form.get("mode")
+        return requested if requested in PREVIEW_MODES else MODE_HTML
+
+    def is_source(self):
+        return self.mode() == MODE_SOURCE
+
+    def unregistered_message(self):
+        """The one error that survives every mode: there is nothing to show."""
+        return (
+            f"No email template is registered as {self.selected_name()!r}. "
+            f"Registered: {', '.join(sorted(get_templates())) or '(none)'}."
+        )
+
     def language(self):
         """The requested language, else the negotiated one, else the first offered."""
         languages = self.languages()
@@ -221,6 +272,7 @@ class PreviewBase(BrowserView):
         state = {
             "template": None,
             "fixture": None,
+            "fixture_missing": False,
             "context": None,
             "html": None,
             "text": None,
@@ -228,14 +280,12 @@ class PreviewBase(BrowserView):
         }
         template = state["template"] = self.template()
         if template is None:
-            state["error"] = (
-                f"No email template is registered as {self.selected_name()!r}. "
-                f"Registered: {', '.join(sorted(get_templates())) or '(none)'}."
-            )
+            state["error"] = self.unregistered_message()
             return state
 
         path = state["fixture"] = fixture_path(template)
         if path is None:
+            state["fixture_missing"] = True
             state["error"] = NO_FIXTURE.format(
                 name=template.name,
                 basename=template.basename,
@@ -265,11 +315,39 @@ class PreviewBase(BrowserView):
     def error(self):
         return self.state()["error"]
 
+    def fixture_missing(self):
+        """Whether the selection has no committed fixture. Source mode's cue."""
+        return self.state()["fixture_missing"]
+
+    def display_error(self):
+        """What stops the *current mode* from showing anything, or ``None``.
+
+        Not the same question as :meth:`error`, which is about the render.
+        Source mode reads a file off disk and needs neither a fixture nor a
+        successful render, so a fixture problem is a note beside it rather than
+        a wall in front of it -- and a template that renders in no language at
+        all is precisely one you want to look at the source of.
+        """
+        if not self.is_source():
+            return self.error()
+        return self.unregistered_message() if self.template() is None else None
+
+    def source_path(self):
+        """The ``.pt`` source mode shows, or ``""`` when nothing is selected."""
+        template = self.template()
+        if template is None:
+            return ""
+        return str(resolved_path(template.html_path))
+
     # -- urls -----------------------------------------------------------------
 
     def view_url(self, name, **overrides):
         """A URL for ``name`` carrying the current selection, with overrides."""
-        query = {"template": self.selected_name(), "language": self.language()}
+        query = {
+            "template": self.selected_name(),
+            "language": self.language(),
+            "mode": self.mode(),
+        }
         query.update(overrides)
         return f"{self.context.absolute_url()}/{name}?{urlencode(query)}"
 
@@ -322,6 +400,7 @@ class EmailkitPreview(PreviewBase):
                 "url": self.page_url(template=template.name),
                 "css": "selected" if template.name == selected else "",
                 "subject": self.subject(template),
+                "source_url": self.page_url(template=template.name, mode=MODE_SOURCE),
                 "fixture": str(path) if path is not None else "",
                 "twin": template.text_path is not None and template.text_path.exists(),
             })
@@ -338,6 +417,44 @@ class EmailkitPreview(PreviewBase):
             }
             for language in self.languages()
         ]
+
+    def mode_rows(self):
+        """The three things the page can show, as a switcher beside the languages."""
+        current = self.mode()
+        return [
+            {
+                "mode": mode,
+                "label": MODE_LABELS[mode],
+                "url": self.page_url(mode=mode),
+                "css": "selected" if mode == current else "",
+            }
+            for mode in PREVIEW_MODES
+        ]
+
+    def mode_hint(self):
+        return MODE_HINTS[self.mode()]
+
+    def source_url(self):
+        """Source mode for the current selection -- the offer made when the
+        fixture is missing and the other two modes have nothing to show."""
+        return self.page_url(mode=MODE_SOURCE)
+
+    def offer_source(self):
+        """Whether the missing fixture is what is on screen instead of a mail.
+
+        The one case where the page should say what to do next: source mode is
+        right there, needs nothing, and is not obvious from an error about a
+        directory that is not shipped.
+        """
+        return bool(self.display_error()) and self.fixture_missing()
+
+    def show_iframe(self):
+        """Both the HTML part and the raw ``.pt`` are markup, and go in the frame."""
+        return not self.display_error() and self.mode() in (MODE_HTML, MODE_SOURCE)
+
+    def show_text(self):
+        """The plaintext part is text, and needs no frame to be shown safely."""
+        return not self.display_error() and self.mode() == MODE_TEXT
 
     def theme_rows(self):
         """SPEC §6.3's theme-token panel: the three §3 tokens as they render now.
@@ -495,6 +612,8 @@ class EmailkitPreviewBody(PreviewBase):
     """
 
     def __call__(self):
+        if self.is_source():
+            return self.source()
         state = self.state()
         response = self.request.response
         if state["error"]:
@@ -504,3 +623,35 @@ class EmailkitPreviewBody(PreviewBase):
             return state["error"]
         response.setHeader("Content-Type", "text/html; charset=utf-8")
         return state["html"]
+
+    def source(self):
+        """The committed ``.pt``'s own bytes, served as HTML and nothing else.
+
+        No ``render()`` and no fixture, which is the whole point: this is the
+        one mode that works for a template being authored before its fixture
+        exists. Served as ``text/html`` rather than escaped into a ``<pre>``
+        because what a developer wants from a mail template is to *see* the
+        layout -- the TAL attributes are simply unknown attributes to a browser,
+        and it draws the markup around them.
+
+        The path goes through ``render.resolved_path``, so a jbot-overridden
+        template shows the override -- the file that would actually be compiled.
+        """
+        response = self.request.response
+        template = self.template()
+        if template is None:
+            response.setHeader("Content-Type", "text/plain; charset=utf-8")
+            return self.unregistered_message()
+
+        path = resolved_path(template.html_path)
+        try:
+            markup = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            response.setHeader("Content-Type", "text/plain; charset=utf-8")
+            return (
+                f"Could not read {path}: {exc}. The compiled output is committed, "
+                f"so this is a build or packaging problem (SPEC §5), not a runtime "
+                f"one."
+            )
+        response.setHeader("Content-Type", "text/html; charset=utf-8")
+        return markup

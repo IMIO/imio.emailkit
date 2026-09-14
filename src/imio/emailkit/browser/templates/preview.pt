@@ -50,7 +50,8 @@
       <h1>imio.emailkit preview</h1>
       <p class="hint">
         The <em>committed</em> <code>.pt</code> files rendered through
-        <code>render()</code> with the <em>committed</em> fixtures of SPEC §7.
+        <code>render()</code> with the <em>committed</em> fixtures of SPEC §7 --
+        or, in <code>.pt</code> mode, shown as they are, with no fixture needed.
         Run <code>make build-emails</code> and reload after editing a source.
       </p>
     </header>
@@ -76,13 +77,23 @@
             <a href="${row/url}">${row/name}</a>
             <span class="meta">subject: ${row/subject}</span>
             <span tal:condition="not:row/fixture" class="meta warn">
-              no fixture under tests/fixtures/
+              no fixture under tests/fixtures/ --
+              <a href="${row/source_url}">look at the .pt</a>
             </span>
             <span tal:condition="not:row/twin" class="meta warn">
               no .txt.pt twin -- plaintext comes from the deprecated fallback
             </span>
           </li>
         </ul>
+
+        <h2>Show</h2>
+        <p class="switch">
+          <a tal:repeat="row view/mode_rows"
+             href="${row/url}"
+             tal:attributes="class row/css"
+          >${row/label}</a>
+        </p>
+        <p class="hint">${view/mode_hint}</p>
 
         <h2>Language</h2>
         <p class="switch">
@@ -112,6 +123,17 @@
         <p class="hint">
           <code tal:condition="view/fixture">${view/fixture}</code>
           <em tal:condition="not:view/fixture">none resolved</em>
+          <span tal:condition="view/is_source" class="meta">
+            not used in this mode -- <code>.pt</code> shows the file itself.
+          </span>
+        </p>
+
+        <h2 tal:condition="view/is_source">Source file</h2>
+        <p tal:condition="view/is_source" class="hint">
+          <code>${view/source_path}</code>
+          <span class="meta">
+            jbot-resolved: this is the file <code>render()</code> compiles.
+          </span>
         </p>
       </aside>
 
@@ -119,6 +141,7 @@
         <form method="post" action="${view/page_url}">
           <input type="hidden" name="template" value="${view/selected_name}">
           <input type="hidden" name="language" value="${view/language}">
+          <input type="hidden" name="mode" value="${view/mode}">
           <span tal:replace="structure context/@@authenticator/authenticator"></span>
           <button tal:condition="not:view/send_test_blocker"
                   type="submit"
@@ -137,17 +160,22 @@
           </p>
         </form>
 
-        <pre tal:condition="view/error" class="error" tal:content="view/error"></pre>
+        <pre tal:condition="view/display_error"
+             class="error"
+             tal:content="view/display_error"
+        ></pre>
 
-        <iframe tal:condition="not:view/error"
+        <p tal:condition="view/offer_source" class="hint warn">
+          <a href="${view/source_url}">Show the <code>.pt</code> itself instead</a>
+          -- that mode needs no fixture.
+        </p>
+
+        <iframe tal:condition="view/show_iframe"
                 src="${view/body_url}"
                 title="Rendered email"
         ></iframe>
 
-        <details tal:condition="view/text_part">
-          <summary>plaintext part (SPEC §6.1 returns both)</summary>
-          <pre tal:content="view/text_part"></pre>
-        </details>
+        <pre tal:condition="view/show_text" tal:content="view/text_part"></pre>
       </main>
     </div>
   </body>

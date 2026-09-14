@@ -23,11 +23,20 @@ translations. No ``zope.conf``, no database, no site. The watcher is therefore a
 ordinary polling loop, and live reload is ~30 lines.
 
 What is *not* real without a site, stated plainly rather than left to be
-discovered: ``portal_url`` is empty, and the §3 theme tokens come from
-:class:`IEmailkitTheme`'s own defaults (seeded into an in-memory registry) rather
-than from a site's ``plone.app.registry``. ``--theme token=value`` overrides them,
-which is the §6.3 token panel in its command-line form. For a preview against a
-*real* site's branding, use ``@@emailkit-preview`` (§6.3) -- that is what it is for.
+discovered: the §3 theme tokens come from :class:`IEmailkitTheme`'s own defaults
+(seeded into an in-memory registry) rather than from a site's
+``plone.app.registry``. ``--theme token=value`` overrides them, which is the §6.3
+token panel in its command-line form. For a preview against a *real* site's
+branding, use ``@@emailkit-preview`` (§6.3) -- that is what it is for.
+
+``portal_url`` **is** real, and has to be. It is what the kit shell builds
+``asset_base`` from, and every image in the design is gated on that being
+non-empty -- the header logo, the status pill's icon, the footer mark, and the
+Quicksand stylesheet. Left to its site-less default the preview rendered all four
+as *nothing at all*: not broken images, no markup, no warning, just a design
+missing the parts that make it recognisable. So this server points ``portal_url``
+at itself (:func:`seed_portal_url`) and answers ``++resource++`` urls out of each
+package's ``browser/static`` (:func:`read_resource`).
 """
 
 from imio.recipe.emailkit import cli
@@ -65,6 +74,11 @@ DEFAULT_OUTPUT = Path("var") / "preview"
 
 #: Polled by the browser; bumped by every re-render.
 VERSION_PATH = "/__emailkit/version"
+
+#: Where the preview server answers the urls the kit shell builds from
+#: ``asset_base``. Matches Zope's own traversal spelling, so the rendered html is
+#: byte-identical to what a site would produce apart from the host.
+RESOURCE_PREFIX = "/++resource++"
 
 WATCH_INTERVAL = 0.6
 
@@ -133,13 +147,15 @@ def main(config=None, argv=None):
     output = Path(arguments.output) if arguments.output else _default_output()
     output.mkdir(parents=True, exist_ok=True)
 
+    base_url = f"http://{arguments.host}:{arguments.port}"
     try:
         configure(found)
         seed_theme(_theme_overrides(arguments.theme))
+        seed_portal_url(base_url)
     except Exception as exc:
         return cli.report_error(f"{type(exc).__name__}: {exc}")
 
-    state = {"generation": 0}
+    state = {"generation": 0, "resources": resource_dirs(found)}
 
     def pass_once():
         if not arguments.no_compile and compile_all(found, kit_dir, merged) != 0:
@@ -166,6 +182,64 @@ def main(config=None, argv=None):
     finally:
         stop.set()
     return status
+
+
+def seed_portal_url(base_url):
+    """Make ``render()`` build ``asset_base`` against this server.
+
+    ``render()`` injects ``portal_url`` itself, from ``getSite()`` and a REQUEST,
+    and an injected name beats anything the caller puts in the context -- so a
+    preview cannot supply one by passing it in. It stands in for the site here the
+    same way :func:`seed_theme` stands in for ``plone.app.registry``: by replacing
+    the function the render reads.
+
+    Without this every image in the mail is *absent*, not broken. The kit gates
+    each one on ``tal:condition="asset_base"`` precisely so a render with no
+    request degrades to no image rather than to a broken-image icon -- correct for
+    a golden file, and the wrong thing entirely for the tool whose whole job is
+    showing you what the mail looks like. The header logo, the status pill's icon,
+    the footer mark and the Quicksand stylesheet all hang off it, which is most of
+    what makes the design recognisable.
+
+    Paired with :func:`resource_dirs` and the handler's ``++resource++`` route,
+    which is what actually serves the bytes.
+
+    ``import_module`` and not ``from imio.emailkit import render``: §6.1 spells the
+    public API as the latter, so ``imio/emailkit/__init__.py`` rebinds the name to
+    the ``render`` FUNCTION and shadows the submodule of the same name. Written the
+    obvious way this assigns an unused attribute to a function object, patches
+    nothing, and the preview goes on silently dropping every image -- which is how
+    it was found.
+    """
+    try:
+        render_module = importlib.import_module("imio.emailkit.render")
+    except ImportError as exc:
+        logger.warning(
+            "Not seeding portal_url (%s). Images and web fonts will be missing "
+            "from the preview.",
+            exc,
+        )
+        return None
+    render_module.portal_url = lambda: base_url
+    return base_url
+
+
+def resource_dirs(projects):
+    """``{resource_name: directory}`` for every project shipping ``browser/static``.
+
+    The convention, and it is a convention rather than a lookup: a package's
+    ``browser:resourceDirectory`` is registered under the package's own dotted
+    name, so ``imio.emailkit`` serves at ``++resource++imio.emailkit``. Reading the
+    real name would mean parsing each package's ZCML for a directive this tool has
+    no other reason to care about; a consumer that names its directory something
+    else gets no images in the *preview* and is otherwise unaffected.
+    """
+    found = {}
+    for project in projects:
+        static = project.package_dir / "browser" / "static"
+        if static.is_dir():
+            found[project.package] = static
+    return found
 
 
 def _default_output():
@@ -363,6 +437,10 @@ def render_all(projects, languages, output):
         project = wanted.get(template.package)
         if project is None:
             continue
+        # Before the fixture check, deliberately: this is the one artifact that
+        # cannot fail for lack of one, and a template whose fixture is missing is
+        # exactly the template you want it for.
+        _write_source(name, template, output)
         fixture = find_fixture(project, template.basename)
         if fixture is None:
             rows.append(
@@ -382,6 +460,37 @@ def render_all(projects, languages, output):
         for language in languages:
             rows.append(_render_one(name, dict(context), language, output))
     return rows
+
+
+def _write_source(name, template, output):
+    """Copy the compiled ``.pt`` in beside the rendered mails, as ``<stem>.pt.html``.
+
+    The third part the page offers, and the only one that needs no fixture,
+    because it is the file itself. Nothing is substituted: ``${item/title}``
+    stands where its value would be and every ``tal:condition`` branch shows at
+    once.
+
+    **This is the build-time output §5 threw out, and that is deliberate.** §5's
+    objection to ``maizzle --watch`` is to an authoring loop whose *only* output
+    is unsubstituted markup -- one you can work in all day without ever learning
+    that ``${item/created}`` renders nothing. Here it is one labelled part of
+    three, next to the two that do render, and it is never substituted for them:
+    a template with no fixture still reports FAILED and still exits non-zero. It
+    answers "what does this layout look like"; the parts beside it answer "does
+    this template render", which is the question §5 is protecting.
+
+    One file per template rather than one per language: there is no render, so
+    there is nothing for a language to change.
+    """
+    from imio.emailkit.render import resolved_path
+
+    stem = name.replace(":", ".")
+    path = resolved_path(template.html_path)
+    try:
+        markup = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        markup = f"<pre>Could not read {html_module.escape(str(path))}: {exc}</pre>"
+    (output / f"{stem}.pt.html").write_text(markup, encoding="utf-8")
 
 
 def _render_one(name, context, language, output):
@@ -484,8 +593,12 @@ function paint() {
     b.setAttribute('aria-pressed', String(b.dataset.lang === state.language)));
   document.querySelectorAll('button.part').forEach(b =>
     b.setAttribute('aria-pressed', String(b.dataset.part === state.part)));
-  const src = state.template + '.' + state.language + '.' + state.part
-              + '?g=' + window.__generation;
+  // The .pt part is one file per template, not one per language: nothing is
+  // rendered in it, so there is nothing for a language to change.
+  const name = state.part === 'pt'
+    ? state.template + '.pt.html'
+    : state.template + '.' + state.language + '.' + state.part;
+  const src = name + '?g=' + window.__generation;
   document.getElementById('frame').src = src;
   document.getElementById('current').textContent = src;
 }
@@ -553,7 +666,9 @@ def write_index(rows, output, languages, generation, watch=False):
         f"<style>{INDEX_CSS}</style></head><body>"
         "<aside><h1>imio.emailkit preview</h1>"
         "<p class='hint'>Rendered through <code>render()</code> with the committed "
-        "fixtures (SPEC §7). This is the mail, not the build output."
+        "fixtures (SPEC §7). This is the mail, not the build output -- except in "
+        "the <code>.pt</code> part, which is the committed file itself, needs no "
+        "fixture and substitutes nothing."
         + ("<br>Watching sources; the page reloads itself." if watch else "")
         + "</p>"
         f"<div class='langs'>{language_buttons}</div>"
@@ -561,6 +676,9 @@ def write_index(rows, output, languages, generation, watch=False):
         "<main><nav>"
         "<button class='part' data-part='html'>html</button>"
         "<button class='part' data-part='txt'>text</button>"
+        "<button class='part' data-part='pt' "
+        "title='The committed .pt, unrendered: no fixture, no substitution'>"
+        ".pt</button>"
         "<code id='current'></code></nav>"
         "<iframe id='frame' title='rendered mail'></iframe></main>"
         f"<script>{data}{INDEX_JS}</script></body></html>",
@@ -638,6 +756,9 @@ def _handler_class(directory, state):
                 self.end_headers()
                 self.wfile.write(body)
                 return
+            if path.startswith(RESOURCE_PREFIX):
+                self.serve_resource(path)
+                return
             if path == "/favicon.ico":
                 # Every browser asks for it on every page load and the preview
                 # directory holds rendered mails, nothing else. Answering 204
@@ -648,6 +769,21 @@ def _handler_class(directory, state):
                 self.end_headers()
                 return
             super().do_GET()
+
+        def serve_resource(self, path):
+            """Answer one ``++resource++`` url; see :func:`read_resource`."""
+            found = read_resource(state["resources"], path)
+            if found is None:
+                self.send_error(404)
+                return
+            body, content_type = found
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            # A preview rebuilds on save and an asset may be replaced with it.
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
 
         def log_message(self, format, *args):  # noqa: A002 - stdlib signature
             """Quieten the live-reload poll, and nothing else.
@@ -665,6 +801,40 @@ def _handler_class(directory, state):
             super().log_message(format, *args)
 
     return functools.partial(PreviewHandler, directory=str(directory))
+
+
+def read_resource(resources, path):
+    """``(bytes, content_type)`` for a ``++resource++`` url, or ``None``.
+
+    The shell writes image and stylesheet urls as ``${asset_base}/<file>``, where
+    ``asset_base`` is ``<portal_url>/++resource++<package>``.
+    :func:`seed_portal_url` points that at this server; this is the other half,
+    and it is what makes the preview show the header logo, the pill icon, the
+    footer mark and Quicksand instead of silently dropping all four.
+
+    The url is split on the FIRST slash after the prefix, so the segment before it
+    is the resource name and the rest is the file. The result is resolved and then
+    checked to be inside the directory: a resource url is attacker-controlled in no
+    meaningful sense here, since this binds to 127.0.0.1 and serves a developer's
+    own checkout, but `..` reaching an ``open()`` is the kind of thing that gets
+    copied somewhere it does matter.
+    """
+    import mimetypes
+
+    name, _, relative = path[len(RESOURCE_PREFIX) :].partition("/")
+    directory = resources.get(name)
+    if directory is None or not relative:
+        return None
+    root = Path(directory).resolve()
+    target = (root / relative).resolve()
+    if root not in target.parents:
+        return None
+    try:
+        body = target.read_bytes()
+    except OSError:
+        return None
+    content_type, _ = mimetypes.guess_type(target.name)
+    return body, content_type or "application/octet-stream"
 
 
 def serve(output, host, port, state):
