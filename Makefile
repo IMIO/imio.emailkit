@@ -152,7 +152,20 @@ RUFF_TARGETS=src tests scripts
 
 # Hand-written markup and configuration only: the compiled .pt files under
 # templates/ and browser/overrides/ are generated artifacts (see lint target).
-ZPRETTY_TARGETS=$(shell find src -name '*.zcml' -o -name '*.xml' | sort)
+#
+# Expressed as zpretty's own --include rather than a shell file list. The CI job
+# takes the same value through an input, and that input reaches the run line as
+# an env var, which bash EXPANDS but never EVALUATES -- so the `$(find ...)` this
+# used to be arrived at zpretty as a literal string and it exited 2 on every run:
+#
+#     zpretty: error: unrecognized arguments: -name '*.zcml' -o -name '*.xml' | sort)
+#
+# An --include pattern needs no shell at all, so the same characters mean the same
+# thing in both places. Quoted here and unquoted there, because a Makefile recipe
+# is parsed by a shell and `|` would be a pipe; an expanded env var is not
+# re-parsed, so the pattern survives either way.
+ZPRETTY_ROOT=src
+ZPRETTY_INCLUDE=--include '\.(xml|zcml)$$'
 
 # QA
 .PHONY: lint
@@ -162,6 +175,13 @@ lint: ## Check code base according to Plone standards
 	# it fixed something, so a clean tree fails on the first run and passes on
 	# the second. Checking is `lint`, rewriting is `format`.
 	@uvx ruff@latest check --no-fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
+	# Whole repo and no --config, because that is exactly what CI runs
+	# (`ruff format --diff`, no path). Scoped like `ruff check` above it, this
+	# target passed while CI failed on two files under tests/ -- a local lint that
+	# cannot reproduce the CI gate is not a lint. The scope difference is
+	# deliberate: `recipe/` is a second distribution with its own ruff config, and
+	# forcing this one's on it reports 215 violations its own does not.
+	@uvx ruff@latest format --check
 	@uvx pyroma@latest -d .
 	@uvx check-python-versions@latest .
 	# zpretty must never see the compiled .pt files. They are Maizzle build
@@ -169,14 +189,14 @@ lint: ## Check code base according to Plone standards
 	# would make `check-emails` fail forever: the two gates would fight, and the
 	# staleness gate is the one that protects production. Only hand-written
 	# templates and ZCML/XML are linted.
-	@uvx zpretty@latest --check $(ZPRETTY_TARGETS)
+	@uvx zpretty@latest --check $(ZPRETTY_ROOT) $(ZPRETTY_INCLUDE)
 
 .PHONY: format
 format: ## Fix code base according to Plone standards
 	@echo "$(GREEN)==> Format codebase$(RESET)"
 	@uvx ruff@latest check --select I --fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
-	@uvx ruff@latest format --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
-	@uvx zpretty@latest -i $(ZPRETTY_TARGETS)
+	@uvx ruff@latest format
+	@uvx zpretty@latest -i $(ZPRETTY_ROOT) $(ZPRETTY_INCLUDE)
 
 .PHONY: check
 check: format lint ## Check and fix code base according to Plone standards

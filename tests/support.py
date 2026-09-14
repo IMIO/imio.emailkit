@@ -100,11 +100,19 @@ def qualified(name):
 #: what asserts that.
 STOCK_TEMPLATE_TAILS = {
     MAIL_PASSWORD: os.path.join(
-        "Products", "CMFPlone", "browser", "login", "templates",
+        "Products",
+        "CMFPlone",
+        "browser",
+        "login",
+        "templates",
         "mail_password_template.pt",
     ),
     REGISTERED_NOTIFY: os.path.join(
-        "Products", "CMFPlone", "browser", "login", "templates",
+        "Products",
+        "CMFPlone",
+        "browser",
+        "login",
+        "templates",
         "registered_notify_template.pt",
     ),
 }
