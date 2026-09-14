@@ -6,7 +6,7 @@ export const metadata = {
 
 # Testing
 
-Every template ships a fixture and a snapshot. The golden tests catch the two regressions nothing else does: a Tailwind class silently purged at build, and a `${}` placeholder that stopped resolving after a refactor. {{ className: 'lead' }}
+Every template ships a fixture. A chosen few also ship a snapshot — the golden gate is a smoke test of the rendering pipeline, not a byte-comparison of everything you render. {{ className: 'lead' }}
 
 ```shell
 make test              # the whole suite
@@ -30,9 +30,39 @@ tests/
 
 A fixture is a module exporting `CONTEXT`. A snapshot is the rendered output, per template, per language, per part.
 
+## How many templates to snapshot
+
+Fewer than you have. Set `templates` to a subset:
+
+```python
+class TestGoldenTemplates(GoldenTemplateTests):
+    templates = ("item_published",)   # not every template you register
+    languages = ("fr", "en")
+```
+
+A byte comparison of a whole rendered mail fails for two very different reasons,
+and it cannot tell them apart. A purged Tailwind class or a `${}` that stopped
+resolving is one — a real regression, and the reason the gate exists. Any edit to
+a shared layout, or a Plone point release that reflows the markup, is the other:
+it fails *every* snapshot at once, and a wall of diffs that all have to be
+regenerated is a wall nobody reads. `imio.emailkit` snapshots one of its four
+templates for exactly this reason.
+
+<Note>
+  What you lose is less than it looks. The placeholder audit
+  (`test_golden_has_no_unresolved_placeholder`) is the check that catches the
+  regression you care about, and `make check-emails` compares your committed build
+  against a fresh one byte for byte regardless of how many snapshots you keep.
+</Note>
+
+Two rules the gate does still enforce, whatever subset you pick: a snapshot set
+must be complete (every language, both parts — a half-generated set silently
+checks less than it looks like it does), and no snapshot may outlive the template
+it was made from.
+
 ## The golden test base class
 
-`imio.emailkit.golden.GoldenTemplateTests` generates one test per template × language × part. Subclass it in your add-on:
+`imio.emailkit.golden.GoldenTemplateTests` generates one test per snapshotted template × language × part. Subclass it in your add-on:
 
 ```python
 from imio.emailkit.golden import GoldenTemplateTests
@@ -54,7 +84,9 @@ It asserts three things:
     was left behind.
   </Property>
   <Property name="test_every_template_has_a_fixture">
-    A registered template with no fixture is a failure, not a skip.
+    A registered template with no fixture is a failure, not a skip — every template,
+    not just the snapshotted ones. A fixture is read by the preview and by
+    `bin/preview-emails` too.
   </Property>
 </Properties>
 

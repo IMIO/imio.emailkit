@@ -124,13 +124,15 @@ Run `make help` for every target. The ones you will reach for most: `make test`,
 
 ## The design record
 
-This README and the documentation site describe *what the package does*. Two
-files describe *why*, and they are the authority when the three disagree:
+This README and the documentation site describe *what the package does*.
+[`docs/DECISIONS.md`](docs/DECISIONS.md) describes *why*, and it is the authority
+when the two disagree: every measured finding, every reverted attempt, every
+"this looked like it worked".
 
-- [`SPEC.md`](SPEC.md) — goals, non-goals, architecture, phasing, and what was
-  explicitly rejected.
-- [`docs/DECISIONS.md`](docs/DECISIONS.md) — the decision record: every measured
-  finding, every reverted attempt, every "this looked like it worked".
+Comments throughout the code cite a `SPEC.md` by section number (§4, §6.2, §7).
+That file is no longer in the repository; the citations are kept as stable names
+for the contracts they refer to, and DECISIONS.md is where the reasoning behind
+each one actually lives.
 
 [`SKILL.md`](SKILL.md) carries the authoring conventions for AI-assisted work,
 which is how much of the template work here is done.

@@ -1,10 +1,31 @@
-"""Golden files for ``imio.emailkit``'s own templates -- the dogfooding gate (§7).
+"""The golden-file smoke test for ``imio.emailkit``'s own templates (SPEC §7).
 
 > Golden files + ``check-emails`` for its own templates -- dogfooding the full
 > contract.
 
-Together with ``make check-emails`` (build output is not stale) this is the whole
-CI contract §7 asks of every consumer add-on, applied to us first.
+**One snapshot, deliberately.** This gate used to byte-compare every template in
+every language: eighteen files, and they failed for two very different reasons
+that the gate could not tell apart. A purged Tailwind class or a ``${...}`` that
+stopped resolving is one. Any edit to a shared layout, or a Plone point release
+that reflows the markup, is the other -- and that one arrived as eighteen diffs
+that all had to be regenerated and none of which anybody read. A gate people stop
+reading is a gate that no longer catches the first kind.
+
+So one template, in one language, both parts: enough to notice that the rendering
+pipeline produced something different, small enough that the diff gets looked at.
+What covers the rest, and covered it all along:
+
+* ``support.assert_render_is_clean`` runs on every body this suite renders, and
+  ``test_render.py``, ``test_i18n.py``, ``test_theme_tokens.py`` and
+  ``test_preview.py`` between them render all four templates in several
+  languages. That is the check that catches an unresolved placeholder.
+* ``make check-emails`` compares the committed build against a fresh one byte for
+  byte, which is the gate that catches a stale or purged build.
+* ``tests/dummies/`` runs the *shipped* harness end to end for two consumer
+  add-ons, which is what proves §7's promise to consumers still works.
+
+``TestFixtureCoverage`` below is unchanged in spirit and never churns: it is about
+which templates exist, not what they render.
 
 **The two Plone default mails are not here, for two independent reasons.**
 
@@ -16,14 +37,7 @@ CI contract §7 asks of every consumer add-on, applied to us first.
    run would differ.
 
 They are covered instead in ``tests/test_default_mails.py``, on invariants, through
-the real call site. Golden files cover the ``render()`` path, where §6.1's purity
-guarantee makes a byte comparison meaningful.
-
-**Two harnesses, one contract.** ``TestOwnTemplateGoldens`` snapshots the authored
-templates through ``render()``; ``TestShellGoldens`` snapshots a realistic legacy
-body through §9 phase 3's ``render_shell()``. Both are the same §7 gate -- fixture
-in, snapshot out, regenerated deliberately -- and the shell needs its own class only
-because it has no template *name* to look up.
+the real call site.
 """
 
 import golden_harness
@@ -34,47 +48,21 @@ support.require_runtime()
 
 
 class TestOwnTemplateGoldens(golden_harness.GoldenTemplateTests):
-    """Every template ``imio.emailkit`` ships through ``render()``.
+    """One template through ``render()``, as a smoke test of the pipeline.
 
-    The two restyled Plone default mails are deliberately absent -- see
-    ``TestFixtureCoverage`` below for why, and ``tests/test_default_mails.py`` for
-    how they are covered instead.
+    ``notification`` is the one, because it is the worked example the docs point
+    at and the only template with no special calling convention behind it.
     """
 
-    templates = support.RENDERABLE_TEMPLATES
+    templates = support.GOLDEN_TEMPLATES
 
 
-class TestShellGoldens(golden_harness.GoldenTemplateTests):
-    """SPEC §9 phase 3 -- a realistic legacy body wrapped by ``render_shell``.
-
-    ``docs/plans/phase-3.md`` §4 gate 4 asks for exactly this and §1 explains why
-    it is the phase's *evidence* rather than a nicety: the exit criterion claims
-    "zero template redesign", and the only honest way to support that claim
-    without the PloneMeeting codebase is to snapshot the HTML idioms those
-    notifications really emit and let a diff speak. ``tests/fixtures/
-    shell_plonemeeting.py`` documents each idiom and why it is there.
-
-    The one seam ``golden_harness`` exposes is :meth:`render_parts`, and this is
-    what it exists for: the shell has no registered name (``render_shell`` takes
-    ``subject`` and ``body_html``, not a template name), so the fixture holds the
-    call rather than a context. Everything else -- one test per language per part,
-    the deliberate-regeneration rule, the placeholder audit of the committed
-    snapshot -- is inherited unchanged.
-    """
-
-    templates = support.SHELL_FIXTURES
-
-    def render_parts(self, template, language):
-        from imio.emailkit import render_shell
-
-        subject, body_html = support.load_shell_fixture(template)
-        return render_shell(subject, body_html, language=language)
-
-
-#: Every fixture/snapshot name this module renders, in either harness. The orphan
-#: tests below read this rather than one class's ``templates``, so adding a
-#: harness cannot silently stop the orphan checks from covering it.
-COVERED = set(TestOwnTemplateGoldens.templates) | set(TestShellGoldens.templates)
+#: Every name a fixture may legitimately belong to. Deliberately NOT the snapshot
+#: set: a fixture is read by ``bin/preview-emails`` and ``@@emailkit-preview`` as
+#: well as by this gate, so narrowing the gate to one template must not turn the
+#: other three fixtures into "orphans" and delete them. What makes a fixture dead
+#: is a template that no longer exists, which is what this checks.
+COVERED = set(support.RENDERABLE_TEMPLATES) | set(support.SHELL_FIXTURES)
 
 
 class TestFixtureCoverage:
@@ -148,10 +136,20 @@ class TestFixtureCoverage:
         assert orphans == [], f"fixtures with no template in the harness: {orphans}"
 
     def test_no_orphan_golden_files(self):
+        """A snapshot nothing renders any more.
+
+        Scoped to :data:`support.GOLDEN_TEMPLATES` rather than to ``COVERED``,
+        because that is what this directory is now for: narrowing the gate and
+        leaving the old snapshots behind would keep eighteen files in git that no
+        test reads and no target regenerates.
+        """
         orphans = sorted({
             path.name.split(".")[0]
             for path in support.GOLDEN_DIR.glob("*.*.*")
-            if path.name.split(".")[0] not in COVERED
+            if path.name.split(".")[0] not in set(support.GOLDEN_TEMPLATES)
         })
 
-        assert orphans == [], f"golden files with no template: {orphans}"
+        assert orphans == [], (
+            f"golden files for templates the gate no longer snapshots: {orphans}. "
+            "Delete them, or add the template back to support.GOLDEN_TEMPLATES."
+        )
