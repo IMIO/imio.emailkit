@@ -23,15 +23,24 @@ jobs:
       # them would make `make check-emails` fail forever: the two gates would
       # fight, and the staleness gate is the one that protects production.
       #
-      # The upstream default is `src`, which makes zpretty recurse into every .pt
-      # it finds, so this narrows it to the hand-written ZCML/XML instead. Same
-      # expression as ZPRETTY_TARGETS in the Makefile, so the two cannot drift.
+      # The upstream default path is `src`, which makes zpretty recurse into every
+      # .pt it finds, so the narrowing happens through zpretty's own --include
+      # instead of through a file list.
       #
-      # The reusable workflow interpolates this value unquoted into a bash line,
-      # which is what lets the command substitution run. If upstream ever quotes
-      # it, zpretty gets a path that does not exist and fails loudly rather than
-      # silently checking nothing.
-      zpretty-check-path: "$(find src -name '*.zcml' -o -name '*.xml' | sort)"
+      # This was a `$(find ...)` in zpretty-check-path, on the assumption that the
+      # reusable workflow interpolated the value unquoted into a bash line and the
+      # command substitution would run. It does interpolate it unquoted -- but out
+      # of an env var, and bash expands those without evaluating them, so zpretty
+      # received the literal string and exited 2 on every run since:
+      #
+      #     zpretty: error: unrecognized arguments: -name '*.zcml' -o -name '*.xml' | sort)
+      #
+      # An --include pattern needs no shell. Word-splitting still separates the two
+      # arguments, and nothing in the pattern is a glob character, so it arrives
+      # intact. Same value as ZPRETTY_INCLUDE in the Makefile, so the two cannot
+      # drift -- and `make lint` now reproduces this job rather than approximating
+      # it.
+      zpretty-options: '--include \.(xml|zcml)$'
 
   test:
     name: "Backend: Test"

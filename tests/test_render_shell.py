@@ -472,9 +472,7 @@ class TestThemeTokens:
         assert OTHER_LOGO in second
         assert PROBE_LOGO not in second, "the render cached the old token value"
 
-    def test_primary_color_has_no_surface_left_in_the_shell(
-        self, shell, set_record
-    ):
+    def test_primary_color_has_no_surface_left_in_the_shell(self, shell, set_record):
         """The v3 design took the flat colour out of the title band.
 
         It was the one place the shell painted `primary_color`: a magenta band
