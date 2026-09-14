@@ -10,7 +10,37 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pytest_plone import fixtures_factory
 
+import inspect
 import pytest
+
+
+# ``pytest_plone`` 1.1.0 added ``keep_session``, defaulting to **True**: it
+# registers an autouse *session* fixture per layer, so every layer handed to
+# ``fixtures_factory`` is set up at session start and stays up until the end. It
+# is a large speed-up (25s against 4 minutes here) and it is wrong for this
+# suite.
+#
+# Two of these layers are mutually exclusive by construction. ``FIXTURE`` applies
+# ``imio.emailkit:default`` and ``BASE_FIXTURE`` applies ``imio.emailkit:base`` --
+# §8.2's opt-out, whose entire point is that the browser layer is *absent*. They
+# are siblings over the same ``PLONE_FIXTURE``, so with both pinned up at once the
+# second one's ``DemoStorage`` stacks on a database where the first one's profile
+# has already run, and the ``:base`` site comes up with ``:default`` applied:
+#
+#     AssertionError: imio.emailkit:default leaked into a :base site: ('1000',)
+#     AssertionError: the request leaked IEmailkitLayer from another test
+#
+# Which is the opt-out's own guard firing, correctly, against its own test setup.
+# It reached CI as "6.2-latest fails, 6.2.1 passes" -- nothing to do with Plone:
+# 6.2's constraints simply pull pytest_plone 1.1.0 while 6.2.1's pull 1.0.0.
+#
+# So: opt out, and pay the four minutes. Guarded on the signature because 1.0.0
+# does not take the argument at all and 6.1 still resolves to it.
+_FACTORY_OPTIONS = (
+    {"keep_session": False}
+    if "keep_session" in inspect.signature(fixtures_factory).parameters
+    else {}
+)
 
 
 pytest_plugins = ["pytest_plone"]
@@ -36,25 +66,28 @@ except ImportError as exc:  # pragma: no cover - only before W2 lands
     RUNTIME_IMPORT_ERROR = exc
 else:
     globals().update(
-        fixtures_factory((
-            (ACCEPTANCE_TESTING, "acceptance"),
-            (FUNCTIONAL_TESTING, "functional"),
-            (INTEGRATION_TESTING, "integration"),
-            # SPEC §8.2 level 3: the opt-out profile gets its own layer, because
-            # an opt-out nobody exercises is an opt-out nobody notices breaking.
-            (BASE_INTEGRATION_TESTING, "base"),
-            (BASE_FUNCTIONAL_TESTING, "base_functional"),
-            # SPEC §8.2 level 1: a site package's layer extending IEmailkitLayer.
-            # Not named "site": that would collide with
-            # ``zope.component.hooks.site`` in this module's namespace, and
-            # ``globals().update`` would silently win -- the resulting error
-            # ("Fixture 'site' called directly") points nowhere near the cause.
-            (SITE_OVERRIDE_INTEGRATION_TESTING, "site_override"),
-            # SPEC §6.2/§6.3: the one layer the Phase 2 tests run on. Functional
-            # because a queued send only reaches the MTA at commit time, and
-            # content-typed because one attachment source is a Plone File/Image.
-            (SENDING_FUNCTIONAL_TESTING, "sending"),
-        ))
+        fixtures_factory(
+            (
+                (ACCEPTANCE_TESTING, "acceptance"),
+                (FUNCTIONAL_TESTING, "functional"),
+                (INTEGRATION_TESTING, "integration"),
+                # SPEC §8.2 level 3: the opt-out profile gets its own layer, because
+                # an opt-out nobody exercises is an opt-out nobody notices breaking.
+                (BASE_INTEGRATION_TESTING, "base"),
+                (BASE_FUNCTIONAL_TESTING, "base_functional"),
+                # SPEC §8.2 level 1: a site package's layer extending IEmailkitLayer.
+                # Not named "site": that would collide with
+                # ``zope.component.hooks.site`` in this module's namespace, and
+                # ``globals().update`` would silently win -- the resulting error
+                # ("Fixture 'site' called directly") points nowhere near the cause.
+                (SITE_OVERRIDE_INTEGRATION_TESTING, "site_override"),
+                # SPEC §6.2/§6.3: the one layer the Phase 2 tests run on. Functional
+                # because a queued send only reaches the MTA at commit time, and
+                # content-typed because one attachment source is a Plone File/Image.
+                (SENDING_FUNCTIONAL_TESTING, "sending"),
+            ),
+            **_FACTORY_OPTIONS,
+        )
     )
 
 

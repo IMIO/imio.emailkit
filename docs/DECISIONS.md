@@ -8,6 +8,45 @@ Newest entries at the top.
 
 ---
 
+## 2026-09-14 — `keep_session=False`: the opt-out layer cannot share a session with the default one
+
+**Context.** `6.2-latest` failed while `6.2.1` passed, on tests that have nothing to do
+with either: `imio.emailkit:default leaked into a :base site`, and the opt-out suite's own
+guard, `the request leaked IEmailkitLayer from another test`. It reproduced with a single
+test in isolation, which ruled out ordering, and it had nothing to do with Plone. The two
+constraint sets pull different `pytest_plone`: 1.0.0 for 6.2.1, 1.1.0 for 6.2-latest.
+
+**What 1.1.0 changed.** It added `keep_session`, defaulting to **True**: an autouse
+*session* fixture per layer, so every layer handed to `fixtures_factory` is set up at
+session start and kept up. For most suites that is a large and free speed-up — 25 seconds
+here against four minutes.
+
+**Why it is not free here.** Two of these layers are mutually exclusive by construction.
+`FIXTURE` applies `imio.emailkit:default`; `BASE_FIXTURE` applies `imio.emailkit:base`,
+§8.2's opt-out, whose entire point is that the browser layer is *absent*. They are
+siblings over the same `PLONE_FIXTURE`, so with both pinned up at once the second one's
+`DemoStorage` stacks on a database where the first one's profile has already run. A probe
+on `runAllImportStepsFromProfile` showed the order plainly for a test that asked for the
+`:base` site and nothing else: `:default`, then `:base`, then `:default` again.
+
+**Choice.** Opt out, and pay the four minutes. Guarded on the signature, because 1.0.0
+does not take the argument and 6.1 still resolves to it — a bare keyword would turn a
+silent wrong answer into a `TypeError` on half the matrix, which is not an improvement.
+
+**Not a workaround for our own mistake.** Two sibling `PloneSandboxLayer`s applying
+different profiles to the same site is what every add-on with an opt-out profile looks
+like; `keep_session=True` breaks that arrangement silently, and worth reporting upstream.
+What saved us is that the suite already had the guard: `TestStockMailsAreUntouched`
+asserts the request is clean *before* it asserts anything else, so the failure arrived as
+"your test setup is lying to you" rather than as a green suite over a broken opt-out.
+
+**Cost, stated plainly.** The suite is back to ~3m50s on every row of the matrix. That is
+what it cost before 1.1.0 existed, so nothing regressed; a speed-up was declined because
+it is unsound for this arrangement. Revisit if `fixtures_factory` ever takes the flag per
+layer.
+
+---
+
 ## 2026-09-14 — the golden gate snapshots one template, and `SPEC.md` leaves the repository
 
 **Context.** Two maintainer decisions taken together, because the second is why the
