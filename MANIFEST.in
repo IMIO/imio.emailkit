@@ -17,6 +17,14 @@ include LICENSE.GPL
 # anywhere near an installed distribution.
 prune emails
 
+# `recipe/` is the OTHER distribution in this repository (`imio.recipe.emailkit`)
+# and must never travel inside this one's sdist. Nothing above reaches it today --
+# `graft src/imio` is rooted at ./src, and `include *.toml` does not recurse -- so
+# this line asserts the rule rather than implementing it. It is here because the
+# rule is one careless `recursive-include` away from being broken silently, and
+# check-manifest suggests exactly such lines.
+prune recipe
+
 global-exclude *.pyc
 global-exclude __pycache__
 global-exclude .DS_Store

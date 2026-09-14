@@ -8,7 +8,7 @@ requires-python = ">=3.10,<3.14"
 authors = [{ name = "Antoine Duchêne", email = "antoine.duchene@imio.be" }]
 keywords = ["buildout", "recipe", "Plone", "email", "Maizzle"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Plugins",
     "Framework :: Buildout",
     "Framework :: Buildout :: Recipe",
@@ -52,7 +52,10 @@ managed = false
 [build-system]
 # setuptools, not hatchling: zc.buildout's `develop` runs `setup.py` directly,
 # so this distribution needs the same shim `imio.emailkit` carries.
-requires = ["setuptools>=68.2"]
+#
+# >=77 for the same reason as the root distribution: `license` above is a PEP 639
+# SPDX expression and only 77.0+ understands that form.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
@@ -98,3 +101,11 @@ order-by-type = false
 # columns would produce a skeleton that is not what a template actually looks
 # like, which defeats the point of scaffolding.
 "src/imio/recipe/emailkit/scaffold.py" = ["E501"]
+
+[tool.zest-releaser]
+python-file-with-version = "src/imio/recipe/emailkit/__init__.py"
+# Prefixed: this distribution shares a git repository, and therefore a tag
+# namespace, with `imio.emailkit`. See the same block in the root pyproject.toml
+# for what a colliding bare tag does.
+tag-format = "imio.recipe.emailkit-{version}"
+tag-message = "Release imio.recipe.emailkit {version}"

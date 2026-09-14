@@ -4,14 +4,15 @@ dynamic = ["version"]
 description = "Transactional email templating and sending for the iMio Plone ecosystem, built on Maizzle 6"
 readme = "README.md"
 license = "GPL-2.0-only"
-# Upper bound on purpose: the classifiers, the CI matrix and Plone itself stop
-# at 3.13, and an open ">=3.10" claims 3.14 support that is neither tested nor
-# real (check-python-versions flags exactly that).
+# Upper bound on purpose: an open ">=3.12" would claim support for interpreters
+# that have never run this suite. 3.14 IS claimed and IS tested -- the CI matrix
+# runs 3.12/3.13/3.14 against Plone 6.1 and 6.2 on every commit -- so the cap
+# sits above it. Narrowing this later breaks consumers; widening it is free.
 requires-python = ">=3.12,<3.15"
 authors = [{ name = "Antoine Duchêne", email = "antoine.duchene@imio.be" }]
 keywords = ["CMS", "Plone", "Python", "email", "Maizzle"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Web Environment",
     "Framework :: Plone",
     "Framework :: Plone :: 6.0",
@@ -56,7 +57,14 @@ managed = false
 # setuptools rather than the hatchling the cookieplone template ships:
 # zc.buildout's ``develop`` runs ``setup.py`` directly, so a PEP 517 only
 # package cannot be a develop egg in the iMio buildouts.
-requires = ["setuptools>=68.2"]
+#
+# >=77 and not the 68.2 this said until the first release: `license` below is a
+# PEP 639 SPDX expression, and setuptools only understands that form from 77.0.
+# Under 68.2-76.x it fails config validation outright. It built anyway because
+# PEP 517 isolation quietly fetches the newest setuptools -- so the floor was
+# never exercised, and any constrained, offline or --no-build-isolation build
+# would have hit it.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.dynamic]
@@ -174,5 +182,38 @@ branch = true
 parallel = true
 omit = ["src/imio/emailkit/locales/*.py"]
 
+# check-manifest runs as a zest.releaser prerelease hook. Its default ignore
+# list does not know that this repository is a dev harness wrapped around one
+# shipped package, so without this it reports every one of these as "in VCS but
+# missing from the sdist" and the release stops to ask about it. The sdist
+# contents are asserted directly at release time instead; see MANIFEST.in.
+[tool.check-manifest]
+ignore = [
+    "docs",
+    "docs/**",
+    "emails",
+    "emails/**",
+    "recipe",
+    "recipe/**",
+    "scripts",
+    "scripts/**",
+    "instance",
+    "instance/**",
+    "Makefile",
+    "SKILL.md",
+    "*.cfg",
+    "mx.ini",
+    "instance.yaml",
+    ".editorconfig",
+]
+
 [tool.zest-releaser]
 python-file-with-version = "src/imio/emailkit/__init__.py"
+# Prefixed because this repository ships TWO distributions and git has one tag
+# namespace. A bare "1.0.0b1" is not just ambiguous: zest.releaser's `_make_tag`
+# returns early when the tag already exists instead of failing, and `_release`
+# then builds from whatever that tag points at -- so the second distribution
+# released under a colliding tag is built from the first one's commit and
+# published, silently, at the wrong version.
+tag-format = "imio.emailkit-{version}"
+tag-message = "Release imio.emailkit {version}"
