@@ -8,6 +8,32 @@ Newest entries at the top.
 
 ---
 
+## 2026-09-14 — the footer's attribution line is removed, and `email_footer_powered_by` retired
+
+**Context.** The v2 mockups end every model on three blocks: the sender's contact details,
+a "Service provided by iMio" signature, then the iMio mark. An earlier entry below records
+adding the middle one as a msgid rather than a fourth registry token. The maintainer has
+now asked for it to go.
+
+**Why it is the right one of the three to lose.** `footer_html` is the sender's own block
+and is site-specific. The mark is an image in the negative band and reads as a signature
+without saying anything. The middle line was the only part of a transactional mail that
+spoke a full sentence on behalf of a third party, in French on behalf of iMio, inside a
+message a commune sends to its own citizens — and it said what the mark beneath it already
+says.
+
+**Scope.** The row leaves `KitMain`, so it leaves all five templates and both dummy
+consumers at the next build. `email_footer_powered_by` is retired from the `.pot` and the
+three catalogs by `make i18n`; nothing referenced it outside the layout, and `msgids.py`
+never carried it (that shim covers ZCML subjects and preheaders only). The logo row keeps
+its own `pt-[18px]`, so the band does not collapse. Eighteen golden files lose the line,
+including the plaintext ones that took it from naive extraction.
+
+The entry below that introduced the line stays as it is: it records what was decided then,
+and this records what replaced it.
+
+---
+
 ## 2026-09-14 — the preview gains a third mode that shows the `.pt` unrendered, and §5's objection to it is what bounds it
 
 **Context.** The preview shows `render()`'s two return values: the HTML part in the iframe,

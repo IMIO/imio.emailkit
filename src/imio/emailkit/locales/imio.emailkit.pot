@@ -4,7 +4,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
-"POT-Creation-Date: 2026-09-11 13:10+0000\n"
+"POT-Creation-Date: 2026-09-14 09:51+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -62,19 +62,19 @@ msgid "Uninstall iMio Emailkit setup."
 msgstr ""
 
 #. Default: "Link validity"
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:151
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:181
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:169
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:199
 msgid "email_callout_link_validity"
 msgstr ""
 
 #. Default: "Not you?"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:175
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:173
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:193
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:191
 msgid "email_callout_not_you"
 msgstr ""
 
 #. Default: "Your account"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:155
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:173
 msgid "email_card_your_account"
 msgstr ""
 
@@ -84,46 +84,39 @@ msgid "email_cta_view_item"
 msgstr ""
 
 #. Default: "Email address"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:167
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:185
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:8
 msgid "email_field_email"
 msgstr ""
 
 #. Default: "Full name"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:163
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:181
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:7
 msgid "email_field_fullname"
 msgstr ""
 
 #. Default: "Username"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:155
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:159
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:173
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:177
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:6
 msgid "email_field_username"
 msgstr ""
 
 #. Default: "This message was sent automatically. Please do not reply to it."
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:193
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:214
 #: imio.emailkit/src/imio/emailkit/templates/get_username.txt.pt:13
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:201
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:222
 msgid "email_footer_default"
 msgstr ""
 
-#. Default: "Service provided by ${imio}."
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:200
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:208
-#: imio.emailkit/src/imio/emailkit/templates/notification.pt:166
-msgid "email_footer_powered_by"
-msgstr ""
-
 #. Default: "Log in"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:167
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:185
 #: imio.emailkit/src/imio/emailkit/templates/get_username.txt.pt:8
 msgid "email_get_username_cta"
 msgstr ""
 
 #. Default: "Dear ${fullname},"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:141
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:159
 #: imio.emailkit/src/imio/emailkit/templates/get_username.txt.pt:2
 msgid "email_get_username_greeting"
 msgstr ""
@@ -134,82 +127,82 @@ msgid "email_get_username_label"
 msgstr ""
 
 #. Default: "You asked to be reminded of your username for ${site_name}."
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:145
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:163
 #: imio.emailkit/src/imio/emailkit/templates/get_username.txt.pt:4
 msgid "email_get_username_lead"
 msgstr ""
 
 #. Default: "Your username"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:133
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:148
 msgid "email_get_username_title"
 msgstr ""
 
 #. Default: "If you did not ask for this, simply ignore this message. The request came from the IP address ${ipaddress}."
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:179
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:197
 #: imio.emailkit/src/imio/emailkit/templates/get_username.txt.pt:10
 msgid "email_get_username_tracking"
 msgstr ""
 
 #. Default: "iMio"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:110
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:110
-#: imio.emailkit/src/imio/emailkit/templates/notification.pt:110
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:113
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:113
+#: imio.emailkit/src/imio/emailkit/templates/notification.pt:113
 msgid "email_logo_alt"
 msgstr ""
 
 #. Default: "The site administrator has asked you to reset the password of the account ${userid}. Your previous password no longer works."
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:141
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:159
 #: imio.emailkit/src/imio/emailkit/templates/mail_password_template.txt.pt:2
 msgid "email_mail_password_admin_request"
 msgstr ""
 
 #. Default: "Choose a new password"
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:164
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:182
 #: imio.emailkit/src/imio/emailkit/templates/mail_password_template.txt.pt:6
 msgid "email_mail_password_cta"
 msgstr ""
 
 #. Default: "This link is valid for ${hours} hours."
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:155
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:173
 #: imio.emailkit/src/imio/emailkit/templates/mail_password_template.txt.pt:8
 msgid "email_mail_password_expiry"
 msgstr ""
 
 #. Default: "If the button does not work, copy this address into your browser:"
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:189
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:207
 msgid "email_mail_password_fallback"
 msgstr ""
 
 #. Default: "Use the button below to choose a new password for ${site_name}."
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:145
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:163
 #: imio.emailkit/src/imio/emailkit/templates/mail_password_template.txt.pt:4
 msgid "email_mail_password_lead"
 msgstr ""
 
 #. Default: "Reset your password"
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:133
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:148
 msgid "email_mail_password_title"
 msgstr ""
 
 #. Default: "If you did not ask for this, simply ignore this message: your password has not been changed. The request came from the IP address ${ipaddress}."
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:177
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:195
 #: imio.emailkit/src/imio/emailkit/templates/mail_password_template.txt.pt:10
 msgid "email_mail_password_tracking"
 msgstr ""
 
 #. Default: "New account"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:123
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:126
 msgid "email_pill_new_account"
 msgstr ""
 
 #. Default: "Notification"
-#: imio.emailkit/src/imio/emailkit/templates/notification.pt:120
+#: imio.emailkit/src/imio/emailkit/templates/notification.pt:123
 msgid "email_pill_notification"
 msgstr ""
 
 #. Default: "Your account"
-#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:120
-#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:120
+#: imio.emailkit/src/imio/emailkit/templates/get_username.pt:123
+#: imio.emailkit/src/imio/emailkit/templates/mail_password_template.pt:123
 msgid "email_pill_your_account"
 msgstr ""
 
@@ -234,36 +227,36 @@ msgid "email_preheader_registered_notify_template"
 msgstr ""
 
 #. Default: "Your account has been created. Choose a password to start using it."
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:146
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:164
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:4
 msgid "email_registered_notify_created"
 msgstr ""
 
 #. Default: "Choose my password"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:193
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:211
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:10
 msgid "email_registered_notify_cta"
 msgstr ""
 
 #. Default: "This link is valid until ${expiration_date}."
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:185
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:203
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:12
 msgid "email_registered_notify_expiry"
 msgstr ""
 
 #. Default: "If the button does not work, copy this address into your browser:"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:203
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:221
 msgid "email_registered_notify_fallback"
 msgstr ""
 
 #. Default: "Hello ${fullname},"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:144
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:162
 #: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.txt.pt:2
 msgid "email_registered_notify_greeting"
 msgstr ""
 
 #. Default: "Welcome"
-#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:136
+#: imio.emailkit/src/imio/emailkit/templates/registered_notify_template.pt:151
 msgid "email_registered_notify_title"
 msgstr ""
 
