@@ -3,11 +3,7 @@
 <!-- Absolute raw URL rather than a relative path: this README is the PyPI long
      description too, and PyPI resolves no relative links. Pinned to `main`, so it
      renders once this lands there. -->
-<img
-  src="https://raw.githubusercontent.com/IMIO/imio.emailkit/main/docs/banner.png"
-  alt="A transactional email rendered by imio.emailkit: the Délibérations.be masthead over a white card, an 'À relire' status pill, and a notification asking a section editor to review a page submitted for publication."
-  width="640"
->
+<img src="https://raw.githubusercontent.com/IMIO/imio.emailkit/main/docs/banner.png" alt="A transactional email rendered by imio.emailkit: the Délibérations.be masthead over a white card, an 'À relire' status pill, and a notification asking a section editor to review a page submitted for publication." width="640">
 
 <h1 align="center">imio.emailkit</h1>
 
