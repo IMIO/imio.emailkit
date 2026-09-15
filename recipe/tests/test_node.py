@@ -1,4 +1,4 @@
-"""The one module that knows Node exists (SPEC §1: a developer/CI tool only)."""
+"""The one module that knows Node exists (a developer/CI tool only)."""
 
 from conftest import invocations
 from conftest import NPM_LOG
@@ -19,7 +19,7 @@ class TestResolvingTheToolchain:
         )
 
     def test_npm_and_npx_are_taken_beside_an_explicit_node_bin(self, node_on_path):
-        """§5 names only ``node-bin``; one option, three executables."""
+        """Only ``node-bin`` is named; one option, three executables."""
         binary, _logs = node_on_path
         node, npm, npx = node_module.resolve(str(binary / "node"))
         assert node == str(binary / "node")
@@ -48,7 +48,7 @@ class TestResolvingTheToolchain:
 
 
 class TestTheNpmStalenessCheck:
-    """SPEC §5: ``npm ci`` "only if ``node_modules`` is stale vs. lockfile"."""
+    """``npm ci`` runs "only if ``node_modules`` is stale vs. lockfile"."""
 
     def test_no_node_modules_means_install(self, project, node_on_path):
         binary, logs = node_on_path
@@ -80,7 +80,7 @@ class TestTheNpmStalenessCheck:
         """A touched-but-unchanged lockfile must not trigger a reinstall.
 
         The Makefile precursor compares mtimes, which npm and git both perturb for
-        unrelated reasons. A digest of the lockfile is the actual question §5 asks.
+        unrelated reasons. A digest of the lockfile is the actual question that matters.
         """
         binary, logs = node_on_path
         lockfile = project.emails_dir / "package-lock.json"
@@ -129,7 +129,7 @@ class TestRunningCommands:
             node_module.run(["/definitely/not/here"], cwd=project.emails_dir)
 
     def test_watch_delegates_to_maizzles_dev_server(self, project, node_on_path):
-        """§5: "``--watch`` delegates to Maizzle's dev server"."""
+        """``--watch`` delegates to Maizzle's dev server."""
         binary, logs = node_on_path
         node_module.build(project.emails_dir, str(binary / "npx"), watch=True)
         assert invocations(logs, "npx.log") == ["maizzle dev"]

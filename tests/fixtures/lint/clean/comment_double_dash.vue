@@ -14,7 +14,7 @@
 
 <template>
   <KitMain>
-    <!-- The subject is translated Python-side; see SPEC §6.2. -->
+    <!-- The subject is translated Python-side; nothing here needs a placeholder. -->
     <!--[if mso]><table role="presentation" width="600"><tr><td><![endif]-->
     <p class="m-0 text-sm">${intro}</p>
     <!--[if mso]></td></tr></table><![endif]-->

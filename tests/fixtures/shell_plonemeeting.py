@@ -1,9 +1,9 @@
-"""A realistic PloneMeeting-shaped legacy body for ``render_shell`` (§9 phase 3).
+"""A realistic PloneMeeting-shaped legacy body for ``render_shell``.
 
-``docs/plans/phase-3.md`` §1 makes this fixture the *evidence* for the phase's
-central claim -- "zero template redesign" -- and §4 gate 4 asks for exactly this:
-a body carrying "the actual HTML idioms those notifications emit", snapshotted so
-that a change to the kit which quietly mangles legacy markup shows up as a diff.
+This fixture is the *evidence* for the phase's central claim -- "zero template
+redesign" -- and gate 4 asks for exactly this: a body carrying "the actual HTML
+idioms those notifications emit", snapshotted so that a change to the kit which
+quietly mangles legacy markup shows up as a diff.
 
 So the shape below is not decoration. Every idiom in it is one PloneMeeting
 notifications really produce, because they are assembled by string concatenation
@@ -12,8 +12,7 @@ out of `MeetingConfig` mail texts and item data rather than authored as template
 * **nested tables** -- an outer layout table wrapping an inner data table, the
   1990s way of getting a border and padding in Outlook;
 * **``bgcolor`` rows** -- zebra striping done with the presentational attribute,
-  not CSS, which is also what the kit itself has to do for Outlook
-  (``docs/DECISIONS.md``, "theme tokens colour cells via ``bgcolor``");
+  not CSS, which is also what the kit itself has to do for Outlook;
 * **inline ``style``** on cells and paragraphs, unrelated to and unaware of the
   kit's own inlined CSS -- the collision the plan wants proof about;
 * **a styled ``<a>``** with its own colour and underline, which is what makes
@@ -32,8 +31,7 @@ line each, with no newline between cells, because that is what
 ``'<tr><td>%s</td><td>%s</td></tr>' % (...)`` in a loop produces -- and it is the
 only shape in which the plaintext extraction's cell separator is observable at
 all: a newline between cells leaves the separator at end of line, where
-``naive_text`` strips it (``docs/DECISIONS.md``, "Plaintext: table cells get a
-`` | `` separator"). The surrounding layout tables keep their indentation, because
+``naive_text`` strips it. The surrounding layout tables keep their indentation, because
 the other half of a legacy body comes from a rich-text field that has newlines.
 Both shapes therefore go through the golden.
 
@@ -52,8 +50,8 @@ Two things are deliberately **absent**.
 
 ``subject`` is a **literal string**, not a msgid, because that is what a legacy
 caller has: PloneMeeting computes the subject from the item and the meeting date
-before it ever reaches us. §6.2's "a msgid or a literal" is exercised on the msgid
-side by ``test_render_shell.py``'s language gate.
+before it ever reaches us. The builder's "a msgid or a literal" is exercised on
+the msgid side by ``test_render_shell.py``'s language gate.
 """
 
 CONTEXT = {

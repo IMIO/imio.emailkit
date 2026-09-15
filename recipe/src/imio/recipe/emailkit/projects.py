@@ -1,8 +1,8 @@
 """Which packages ship email templates, and where their directories are.
 
-SPEC §5 step 1: "Resolves all eggs, collects distributions whose ZCML registers
+Resolves all eggs, collects distributions whose ZCML registers
 ``<emailkit:templates>``, and records ``(package, emails_dir, templates_dir)``
-tuples. It also resolves the kit directory from the ``imio.emailkit`` egg."
+tuples. It also resolves the kit directory from the ``imio.emailkit`` egg.
 
 Two collectors, because the recipe runs in **two different interpreters**:
 
@@ -40,10 +40,10 @@ MARKER = "namespaces.imio.be/emailkit"
 #: Directories never worth descending into while looking for ZCML.
 PRUNE_DIRS = {"node_modules", "__pycache__", ".git", "emails"}
 
-#: The ``directory`` key of a §4 registration, when the addon omits it.
+#: The ``directory`` key of a registration, when the addon omits it.
 DEFAULT_DIRECTORY = "templates"
 
-#: Name of the Maizzle project directory inside a consumer addon (§4).
+#: Name of the Maizzle project directory inside a consumer addon.
 EMAILS_DIRNAME = "emails"
 
 #: A Maizzle project is only a Maizzle project if it has a config. Requiring one
@@ -57,14 +57,15 @@ MAIZZLE_CONFIGS = (
 #: Hand-authored plaintext twins live here and are copied into the templates
 #: directory after every build. This is not decoration: ``maizzle build`` empties
 #: its own output directory silently and Maizzle 6 exposes no option to stop it,
-#: so a twin committed beside the compiled output gets deleted (recorded in
-#: ``docs/DECISIONS.md``). Every consumer addon inherits the same hazard, so the
-#: convention is generalised here rather than left in one Makefile.
+#: so a twin committed beside the compiled output gets deleted. Every consumer
+#: addon inherits the same hazard, so the convention is generalised here rather
+#: than left in one Makefile.
 TWINS_DIRNAME = "twins"
 
-#: How far above the package directory to look for the Maizzle project. §4 puts
-#: ``emails/`` *inside* the package; ``imio.emailkit`` itself puts it at the
-#: repository root, four levels up from ``src/imio/emailkit``. Both are found.
+#: How far above the package directory to look for the Maizzle project. The
+#: convention puts ``emails/`` *inside* the package; ``imio.emailkit`` itself
+#: puts it at the repository root, four levels up from ``src/imio/emailkit``.
+#: Both are found.
 MAX_ASCENT = 5
 
 
@@ -76,11 +77,11 @@ class ProjectError(Exception):
 class Project:
     """One package that ships email templates, resolved on disk.
 
-    SPEC §5's ``(package, emails_dir, templates_dir)`` tuple, plus the two paths
+    The ``(package, emails_dir, templates_dir)`` tuple, plus the two paths
     every consumer of it immediately needs.
     """
 
-    #: The §4 namespace, i.e. the package's own dotted name (the ZCML
+    #: The namespace, i.e. the package's own dotted name (the ZCML
     #: registration's namespace, per ``iter_marker_packages``).
     package: str
     #: The importable package's own directory.
@@ -89,7 +90,7 @@ class Project:
     #: it is where the build writes, so it may legitimately not exist yet.
     templates_dir: Path
     #: The Maizzle project, or ``None`` when this distribution ships no sources.
-    #: An installed egg prunes ``emails/`` (§4's ``MANIFEST.in``), so ``None`` is
+    #: An installed egg prunes ``emails/`` (per ``MANIFEST.in``), so ``None`` is
     #: the *normal* answer in production and means "nothing to compile here",
     #: never "something is broken".
     emails_dir: Path | None
@@ -101,7 +102,7 @@ class Project:
 
     @property
     def sources_dir(self):
-        """``emails/src/templates`` -- where the ``.vue`` sources live (§4)."""
+        """``emails/src/templates`` -- where the ``.vue`` sources live."""
         if self.emails_dir is None:
             return None
         return self.emails_dir / "src" / "templates"
@@ -117,12 +118,12 @@ class Project:
 
     @property
     def tests_dir(self):
-        """Where §7's ``fixtures/`` and ``golden/`` live for this package.
+        """Where ``fixtures/`` and ``golden/`` live for this package.
 
         ``<root>/tests`` when the checkout keeps its suite at the top level (the
         Cookieplone layout ``imio.emailkit`` uses), otherwise
-        ``<package_dir>/tests``. Resolved rather than configured because §7 shows
-        the directory without saying which of the two roots it hangs off.
+        ``<package_dir>/tests``. Resolved rather than configured, since neither
+        root is named up front.
         """
         if self.root is not None and (self.root / "tests").is_dir():
             return self.root / "tests"
@@ -163,7 +164,7 @@ class Project:
 def make_project(package, package_dir, directory=None):
     """Build a :class:`Project` from a package directory.
 
-    :param package: the §4 namespace (the ZCML registration's dotted name)
+    :param package: the namespace (the ZCML registration's dotted name)
     :param package_dir: the importable package's directory
     :param directory: the registration's ``directory`` key; ``None`` means the
         caller could not read it and :data:`DEFAULT_DIRECTORY` is used
@@ -181,11 +182,12 @@ def make_project(package, package_dir, directory=None):
 def find_emails_dir(package_dir):
     """Locate the Maizzle project belonging to ``package_dir``, or ``None``.
 
-    §4 draws ``emails/`` as a sibling of ``templates/`` *inside* the package.
-    ``imio.emailkit`` itself keeps it at the repository root instead, because its
-    Maizzle project also emits the §8 jbot overrides, which live elsewhere in the
-    tree. Both layouts are legitimate, so both are searched: the package
-    directory first, then each ancestor up to :data:`MAX_ASCENT` levels.
+    The convention draws ``emails/`` as a sibling of ``templates/`` *inside* the
+    package. ``imio.emailkit`` itself keeps it at the repository root instead,
+    because its Maizzle project also emits the jbot overrides, which live
+    elsewhere in the tree. Both layouts are legitimate, so both are searched:
+    the package directory first, then each ancestor up to :data:`MAX_ASCENT`
+    levels.
 
     A directory only counts when it holds a Maizzle config. Without that check an
     unrelated ``emails/`` -- a content-type folder, say -- would be picked up and
@@ -312,8 +314,8 @@ def from_working_set(working_set):
 
     Imports nothing, executes nothing -- a buildout run stays a buildout run.
     The directive's ``directory`` attribute is therefore *not* read;
-    :data:`DEFAULT_DIRECTORY` is assumed, which is what the spec's example and
-    every registration in this repository use. The generated scripts resolve it
+    :data:`DEFAULT_DIRECTORY` is assumed, which is what every registration in
+    this repository uses. The generated scripts resolve it
     for real (:func:`from_environment`), so a package that overrides it still
     builds correctly -- only buildout's log line would name the default.
     """
@@ -345,7 +347,7 @@ def locate_package(dist, module_name):
 
 
 def kit_dir_from_working_set(working_set, package="imio.emailkit"):
-    """Resolve the built-in design kit's directory (SPEC §3) from the eggs.
+    """Resolve the built-in design kit's directory from the eggs.
 
     Raises rather than returning ``None``: a part that generates
     ``bin/compile-emails`` without a kit to compile against generates a script
@@ -361,7 +363,7 @@ def kit_dir_from_working_set(working_set, package="imio.emailkit"):
                 return _kit_dir(package_dir, package)
     raise ProjectError(
         f"{package} is not in this part's working set, so the design kit "
-        f"(SPEC §3) cannot be resolved. Add it to the part's `eggs` option -- "
+        f"cannot be resolved. Add it to the part's `eggs` option -- "
         f"`eggs = ${{instance:eggs}}` normally does it."
     )
 
@@ -371,7 +373,7 @@ def _kit_dir(package_dir, package):
     if not kit.is_dir():
         raise ProjectError(
             f"{package} is installed at {package_dir} but ships no `kit/` "
-            f"directory. SPEC §3 keeps the design system inside the egg; an "
+            f"directory. The design system lives inside the egg; an "
             f"install without it cannot compile anything."
         )
     return kit

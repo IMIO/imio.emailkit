@@ -1,14 +1,15 @@
-"""Verify a real, installed site against SPEC §9's Phase 1 exit criteria.
+"""Verify a real, installed site against the exit criteria: installed on one
+production site; stock mails restyled; opt-out and layer-override both
+verified.
 
 Run against a live ZODB, not a test fixture:
 
     .venv/bin/zconsole run instance/etc/zope.conf scripts/verify_install.py
 
-§9 asks for "installed on one production site; stock mails restyled; opt-out and
-layer-override both verified". A production site is not ours to deploy, so this
-covers the verifiable part on a real instance built from this repo: the profile
-is applied, the layer is live, the stock mail views render our compiled
-templates, and ``render()`` works through the ZODB rather than a fixture.
+A production site is not ours to deploy, so this covers the verifiable part
+on a real instance built from this repo: the profile is applied, the layer is
+live, the stock mail views render our compiled templates, and ``render()``
+works through the ZODB rather than a fixture.
 """
 
 from pathlib import Path

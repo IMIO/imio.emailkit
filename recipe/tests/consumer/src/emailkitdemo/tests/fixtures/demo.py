@@ -1,4 +1,4 @@
-"""SPEC §7's fixture for `emailkitdemo:demo`, feeding `bin/preview-emails`."""
+"""Fixture for `emailkitdemo:demo`, feeding `bin/preview-emails`."""
 
 CONTEXT = {
     "title": "Séance du conseil du 12 août",

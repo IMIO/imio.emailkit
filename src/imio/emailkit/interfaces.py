@@ -10,26 +10,26 @@ from zope.publisher.interfaces.browser import IDefaultBrowserLayer
 class IEmailkitLayer(IDefaultBrowserLayer):
     """Browser layer carrying the z3c.jbot overrides of Plone's default mails.
 
-    This layer is what *activates* SPEC §8's restyled stock mails, and it is
+    This layer is what *activates* the restyled stock mails, and it is
     installed by the ``imio.emailkit:default`` profile only. ``:base`` ships the
-    runtime without it, which is §8.2's opt-out: the jbot directory is bound to
+    runtime without it, which is the opt-out: the jbot directory is bound to
     this layer in ``browser/configure.zcml``, so the overrides are inert until
     the layer is installed.
 
     A site package overriding our templates in turn must declare a layer that
     **extends** this one -- z3c.jbot precedence is only a guarantee for child
-    layers, not for siblings (see docs/DECISIONS.md).
+    layers, not for siblings.
     """
 
 
 #: Prefix of the ``plone.app.registry`` records built from
-#: :class:`IEmailkitTheme`, so the record names read exactly as SPEC §3 has
-#: them: ``imio.emailkit.theme.logo_url`` and friends.
+#: :class:`IEmailkitTheme`, so the record names come out as
+#: ``imio.emailkit.theme.logo_url`` and friends.
 THEME_REGISTRY_PREFIX = "imio.emailkit.theme"
 
 
 class IEmailkitTheme(Interface):
-    """SPEC §3's three runtime-variable branding tokens.
+    """The three runtime-variable branding tokens.
 
     Everything else in the design system is Tailwind, fixed at build time; these
     are the only values a site may change without recompiling. The field
@@ -82,14 +82,14 @@ class IEmailkitTheme(Interface):
 
 
 class IEmailRecipient(Interface):
-    """SPEC §6.2: the one thing ``.to()``/``.cc()``/``.bcc()`` resolve a value to.
+    """The one thing ``.to()``/``.cc()``/``.bcc()`` resolve a value to.
 
-    §6.2 lets those methods take "an email string, a Plone member object, a
-    userid, or an iterable of those" and says resolution "goes through a single
-    adapter". So the builder holds whatever it was handed and, at ``.send()``,
-    adapts each value to this interface. Adding a new kind of recipient is one
-    adapter registration and no change to the builder -- which is what keeps
-    §6.2's "it holds data, it does not grow behaviour" true.
+    Those methods take "an email string, a Plone member object, a userid, or
+    an iterable of those", and resolution goes through a single adapter. So
+    the builder holds whatever it was handed and, at ``.send()``, adapts each
+    value to this interface. Adding a new kind of recipient is one adapter
+    registration and no change to the builder -- which is what keeps "it
+    holds data, it does not grow behaviour" true.
 
     An adapter that cannot resolve its value returns ``None`` (the ordinary
     zope.component "not adaptable" answer); ``recipients.resolve()`` turns that
@@ -108,7 +108,7 @@ class EmailkitError(Exception):
 class TemplateNotFound(EmailkitError):
     """No template is registered under the requested name.
 
-    SPEC §4 requires the available names to travel with the error: the mistake
+    The available names travel with the error: the mistake
     is nearly always a typo or a template whose ZCML never registered, and both
     are obvious once the list is in front of you.
     """
@@ -125,7 +125,7 @@ class TemplateNotFound(EmailkitError):
 class _CollectedError(EmailkitError):
     """Base of the two ``.send()``-time errors that report *every* problem.
 
-    SPEC §6.2 raises both at ``.send()`` rather than at collection time, and the
+    Both are raised at ``.send()`` rather than at collection time, and the
     reason is this class: a caller who mistyped three userids should learn about
     three, not fix one and run again. So resolution collects problems and raises
     once.
@@ -140,7 +140,7 @@ class _CollectedError(EmailkitError):
 
 
 class RecipientError(_CollectedError):
-    """One or more recipients could not be resolved (SPEC §6.2).
+    """One or more recipients could not be resolved.
 
     Raised at ``.send()``. Never a silent drop: a mail that quietly reaches four
     of five people is the failure mode this exception exists to make impossible.
@@ -150,7 +150,7 @@ class RecipientError(_CollectedError):
 
 
 class AttachmentError(_CollectedError):
-    """One or more attachments could not be resolved (SPEC §6.2).
+    """One or more attachments could not be resolved.
 
     Raised at ``.send()``, for an unreadable source or for missing filename /
     mimetype that could not be inferred.

@@ -15,5 +15,5 @@ Two reasons they cannot live in `templates/` directly:
    would ship a plausible-looking body with the wrong content in the wrong
    language.
 
-SPEC §4 wants the twin resolved as `<directory>/<name>.txt.pt`, which is what the
+The twin resolves as `<directory>/<name>.txt.pt`, which is what the
 copy produces in the installed package.

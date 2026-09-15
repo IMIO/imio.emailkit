@@ -1,4 +1,4 @@
-"""SPEC §6.2 -- the ``Email`` builder.
+"""The ``Email`` builder.
 
 .. code-block:: python
 
@@ -7,13 +7,12 @@
         .reply_to("noreply@imio.be").with_context(item=item, meeting=meeting) \\
         .attach(convocation_pdf, filename="convocation.pdf").send()
 
-**This API is frozen.** The methods are exactly the nine §6.2 names and there are
+**This API is frozen.** The methods are exactly the nine names and there are
 no others. Every one of them appends to a list or sets a field and returns
 ``self``; none of them touches the site, the registry, the filesystem or the
 network. Everything that can fail happens inside :meth:`Email.send`, which is what
-makes §6.2's "it holds data, it does not grow behaviour" checkable rather than
-aspirational: if a method here ever needs an ``if``, the design is wrong and the
-fix is a decision-log entry, not an ``if``.
+makes "it holds data, it does not grow behaviour" checkable rather than
+aspirational: if a method here ever needs an ``if``, the design is wrong.
 
 The two neighbouring modules hold the polymorphism, on purpose:
 :mod:`imio.emailkit.recipients` turns strings/userids/members into
@@ -62,7 +61,7 @@ HEADERS = {"to": "To", "cc": "Cc", "bcc": "Bcc"}
 
 
 class Email:
-    """Collect the parts of one styled mail, then send it (SPEC §6.2).
+    """Collect the parts of one styled mail, then send it.
 
     :param name: namespaced template name, e.g.
         ``"imio.pm.notifications:item_published"``
@@ -106,7 +105,7 @@ class Email:
     def reply_to(self, value):
         """Set the ``Reply-To`` addresses. Same accepted values as :meth:`to`.
 
-        §6.2 only shows a literal address here, and that is the common case. The
+        A literal address is the common case here. The
         same values are accepted because it is the same header machinery and the
         same resolution rules -- ``.reply_to(item_author)`` should not need the
         caller to dig out an address by hand, and a second, str-only code path for
@@ -118,27 +117,27 @@ class Email:
     def sender(self, value):
         """Override the ``From`` address. Same accepted values as :meth:`to`.
 
-        Omitted, ``From`` is the site's configured sender (§6.2).
+        Omitted, ``From`` is the site's configured sender.
         """
         self._sender = flatten(value)
         return self
 
     def subject(self, value):
-        """Override the subject; an i18n msgid or a literal string (§6.2).
+        """Override the subject; an i18n msgid or a literal string.
 
-        Omitted, the subject is the msgid in the template's registration (§4),
+        Omitted, the subject is the msgid in the template's registration,
         translated per language group.
         """
         self._subject = value
         return self
 
     def with_context(self, **context):
-        """Add names to the render context, as ``render()`` takes them (§6.1)."""
+        """Add names to the render context, as ``render()`` takes them."""
         self._context.update(context)
         return self
 
     def attach(self, source, filename=None, mimetype=None):
-        """Add an attachment (SPEC §6.2). Callable repeatedly, order preserved.
+        """Add an attachment. Callable repeatedly, order preserved.
 
         ``source`` is raw ``bytes``, a filesystem path, an open binary file, a
         ``NamedFile``/``NamedBlobFile`` value, or a Plone File/Image content
@@ -154,12 +153,12 @@ class Email:
         """Resolve, render per language group, and hand each message to ``MailHost``.
 
         :param immediate: bypass the transaction and talk to the MTA now. The only
-            escape hatch in §6.2; leave it alone unless you know why you want it.
+            escape hatch here; leave it alone unless you know why you want it.
         :returns: the :class:`~email.message.EmailMessage` objects handed to
-            ``MailHost``, one per language group, in group order. Not part of
-            §6.2's surface -- the spec's example discards it -- but returning what
+            ``MailHost``, one per language group, in group order. Not shown in
+            the usage example above, which discards it -- but returning what
             was built costs nothing and is what makes the preview view's send-test
-            and §7's assertions possible without re-deriving it.
+            and the test suite's assertions possible without re-deriving it.
         :raises TemplateNotFound: no template registered under :attr:`name`
         :raises RecipientError: any recipient could not be resolved
         :raises AttachmentError: any attachment could not be resolved
@@ -234,14 +233,14 @@ class Email:
         """The subject for one language group: the override, else the registration.
 
         Both go through ``zope.i18n.translate``, which returns a plain string
-        unchanged and translates a msgid into ``language`` -- so §6.2's "accepts a
+        unchanged and translates a msgid into ``language`` -- so "accepts a
         msgid or literal string" needs no branch here.
         """
         subject = self._subject if self._subject is not None else template.subject
         if subject is None:
             raise EmailkitError(
                 f"{template.name} has no subject: its registration declares no "
-                f"'subject' msgid (SPEC §4) and .subject() was not called. "
+                f"'subject' msgid and .subject() was not called. "
                 f"Refusing to send a mail whose subject would read '[No Subject]'."
             )
         return zope_translate(subject, target_language=language)
@@ -273,7 +272,7 @@ class Email:
 def flatten(value):
     """Flatten one ``.to()``-style argument into a list of scalar values.
 
-    §6.2 accepts "an email string, a Plone member object, a userid, or an iterable
+    This accepts "an email string, a Plone member object, a userid, or an iterable
     of those", nested freely -- ``.cc(meeting_managers)`` where that is a list of
     lists is nobody's mistake worth an exception.
 
@@ -326,12 +325,12 @@ def as_address(recipient):
 
 
 def build_message(sender, fields, reply_to, subject, html, text, attachments):
-    """Assemble SPEC §6.2's message: ``set_content(text)`` then the HTML alternative.
+    """Assemble the message: ``set_content(text)`` then the HTML alternative.
 
     The result is ``multipart/alternative`` -- plaintext first, HTML second, which
     is the order that makes a text-only client show the text part -- wrapped in
     ``multipart/mixed`` by ``add_attachment`` as soon as there is one attachment.
-    Attachments are identical across language groups (§6.2), so the same resolved
+    Attachments are identical across language groups, so the same resolved
     bytes are reused for every message.
 
     ``policy.SMTP`` gives CRLF line endings, RFC 2047 headers, and a suitable

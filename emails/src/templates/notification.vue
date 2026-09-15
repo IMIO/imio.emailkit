@@ -1,10 +1,10 @@
 <script setup>
 /**
  * A generic transactional notification, and the one template `imio.emailkit`
- * registers through SPEC §4's entry point for itself.
+ * registers through its own entry point.
  *
  * This is the template that speaks the *normal* dialect: a flat context from
- * §6.1 `render()`, with no `options/` and no `python:` anywhere. It is the shape
+ * `render()`, with no `options/` and no `python:` anywhere. It is the shape
  * consumer addons copy, and it is what the discovery, `render()` and golden-file
  * tests exercise.
  *
@@ -15,13 +15,13 @@
  *                 markup for it at all.
  *   subtitle   -- optional; the line under the banner heading, same deal.
  *   intro      -- lead paragraph
- *   body_html  -- optional; injected unescaped by the shell (§3 rule 4)
+ *   body_html  -- optional; injected unescaped by the shell
  *   cta_url    -- optional; renders the button when present
  *   cta_label  -- button label, when `cta_url` is set
  *
  * The pill is `info` and its label is a msgid rather than context data, because
  * a runtime tone cannot work: `KitPill` resolves its fill to a literal class at
- * build time (SPEC §3 rule 2). A consumer that needs to say something more
+ * build time. A consumer that needs to say something more
  * specific than "notification" writes its own template with its own pill, which
  * is a two-line diff on this file.
  */

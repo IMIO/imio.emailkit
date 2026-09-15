@@ -1,7 +1,7 @@
 {
   "name": "emailkitdemo-emails",
   "private": true,
-  "description": "Maizzle project of the throwaway consumer addon. Dev-only; SPEC §4 prunes emails/ from the sdist.",
+  "description": "Maizzle project of the throwaway consumer addon. Dev-only; emails/ is pruned from the sdist.",
   "scripts": {
     "build": "maizzle build"
   },

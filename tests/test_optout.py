@@ -1,4 +1,4 @@
-"""SPEC §8.2 level 3 -- opting out entirely with the ``:base`` profile.
+"""Opting out entirely with the ``:base`` profile.
 
 "``:base`` provides the runtime (API, discovery, kit) without the Plone-default
 overrides; stock Plone mails remain untouched."
@@ -82,7 +82,7 @@ class TestBaseProfileDoesNotInstallTheLayer:
         )
 
     def test_the_browser_layer_is_absent(self, base_portal, layers_of):
-        """§8.2: the whole opt-out hinges on this one line."""
+        """The whole opt-out hinges on this one line."""
         from imio.emailkit.interfaces import IEmailkitLayer
 
         assert IEmailkitLayer not in layers_of(base_portal)
@@ -102,8 +102,8 @@ class TestBaseProfileDoesNotInstallTheLayer:
         assert text is not None
 
     def test_the_theme_records_are_still_there(self, base_portal):
-        """The three tokens are §8.2 *level 2* -- branding without markup
-        changes. A site on ``:base`` still wants them."""
+        """The three tokens are the *branding-only* override level -- branding
+        without markup changes. A site on ``:base`` still wants them."""
         from plone.registry.interfaces import IRegistry
         from zope.component import getUtility
 

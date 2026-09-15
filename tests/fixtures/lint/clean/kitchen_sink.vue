@@ -2,7 +2,7 @@
 /**
  * CLEAN FIXTURE, everything at once -- the file whose job is to stay silent.
  *
- * Every construct the eight rules are near, written the way SPEC §3 asks for,
+ * Every construct the eight rules are near, written the sanctioned way,
  * in one template. If a change to `lint.py` makes this file report anything, the
  * change has produced a false positive, and a false positive is how the whole
  * gate ends up commented out of CI.

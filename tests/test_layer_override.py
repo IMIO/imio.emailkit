@@ -1,18 +1,16 @@
-"""SPEC §8.2 level 1 -- a site package's jbot directory beats ours.
+"""A site package's jbot directory beats ours.
 
 > Replace the template markup per site/client: register a jbot directory on a
 > *more specific* browser layer (the site package's own layer). z3c.jbot layer
 > precedence applies -- the most specific layer wins.
 
 **Why the test double extends ``IEmailkitLayer`` and could not do otherwise.**
-Phase 0 measured this against the request's ``__sro__`` and found §8.2 as written
-is only true for a layer that *subclasses* ``IEmailkitLayer``. For a **sibling**
+Phase 0 measured this against the request's ``__sro__`` and found the documented
+rule holds only for a layer that *subclasses* ``IEmailkitLayer``. For a **sibling**
 layer, precedence follows ``getAllUtilitiesRegisteredFor(ILocalBrowserLayerType)``
 registration order, which is effectively arbitrary -- so a sibling-layer test
 would pass or fail depending on ZCML load order and prove nothing either way.
-``docs/DECISIONS.md`` (2026-07-29, "§8.2 override story requires extending
-``IEmailkitLayer``") turns that into the documented rule, and this module is the
-executable form of it: ``tests/sitelayer/interfaces.py`` extends our layer, and
+That is the documented rule, and this module is the executable form of it: ``tests/sitelayer/interfaces.py`` extends our layer, and
 the docs must keep saying so.
 
 Only ``mail_password_template`` is covered. The mechanism is per-layer, not
@@ -22,9 +20,9 @@ per-template -- a second identical case would cost a fixture and buy nothing.
 ``imio.emailkit.templates.mail_password_template.pt``, not a stock CMFPlone
 file. This package overrides no stock template any more: it owns the view
 (``browser/default_mails.py``) and renders its own template through
-``render()``. That is what makes §4's last bullet -- "z3c.jbot works on the
-resolved ``.pt``" -- the single override story for every template the package
-ships, rather than one story for consumers and another for these two.
+``render()``. That is what makes "z3c.jbot works on the resolved ``.pt``" the
+single override story for every template the package ships, rather than one
+story for consumers and another for these two.
 """
 
 import support
@@ -103,7 +101,7 @@ class TestTheSiteLayerWins:
         assert SITE_MARKER in rendered
         # The site template reads `site_name` out of the flat render() context,
         # so this also proves it was really executed rather than resolved. The
-        # subject is no longer the site file's business: it comes from our §4
+        # subject is no longer the site file's business: it comes from our own
         # registration, and `DefaultMailView` emits the header.
         assert "Site name :" in rendered
 

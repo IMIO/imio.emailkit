@@ -1,4 +1,4 @@
-"""SPEC §6.2 -- per-language sending, the headline feature of the builder.
+"""Per-language sending, the headline feature of the builder.
 
 > **Per-language sending:** ``.send()`` groups recipients by resolved language,
 > renders once per language group (subject msgid translated accordingly), and
@@ -16,8 +16,8 @@ Three things have to hold at once, and each fails on its own:
 (3) is where this goes wrong quietly. A builder that groups correctly but renders
 once and reuses the result sends Dutch recipients a French body under a Dutch
 subject, and every count-based assertion still passes. So the body assertions
-here compare against ``render(..., language=...)`` -- §6.1's pure function, the
-same one §7's golden files pin -- rather than against a marker.
+here compare against ``render(..., language=...)`` -- a pure function, the
+same one the golden files pin -- rather than against a marker.
 """
 
 import pytest
@@ -32,7 +32,7 @@ def by_language(deliver, sent):
     """``by_language(email)`` -> ``{lang: SentMail}`` after a real commit.
 
     Keyed off the ``lang`` attribute the kit layout emits on ``<html>`` from the
-    render language (§3), because that is the one piece of evidence that comes
+    render language, because that is the one piece of evidence that comes
     from the *body* rather than from the builder's own bookkeeping.
     """
 
@@ -43,7 +43,7 @@ def by_language(deliver, sent):
         for record in sent:
             language = support.lang_of(record.message)
             assert language not in grouped, (
-                f"two messages rendered in {language!r}: §6.2 emits one message "
+                f"two messages rendered in {language!r}: the builder emits one message "
                 "per language group"
             )
             grouped[language] = record
@@ -63,7 +63,7 @@ class TestTwoLanguagesTwoMessages:
 
         assert len(sent) == 2, (
             f"one FR and one NL recipient produced {len(sent)} message(s). "
-            "§6.2 emits one message per language group."
+            "The builder emits one message per language group."
         )
 
     def test_each_message_goes_only_to_its_own_group(
@@ -81,7 +81,7 @@ class TestTwoLanguagesTwoMessages:
     def test_each_message_carries_its_own_subject_translation(
         self, mail, fr_member, nl_member, by_language
     ):
-        """§6.2: "subject msgid translated accordingly"."""
+        """The subject msgid is translated accordingly."""
         msgid = support.registration_subject()
         grouped = by_language(mail().to(fr_member).to(nl_member))
 
@@ -109,7 +109,7 @@ class TestTwoLanguagesTwoMessages:
     def test_each_message_carries_its_own_rendered_body(
         self, mail, fr_member, nl_member, by_language, notification_context
     ):
-        """The assertion this module exists for: the body is §6.1's ``render()``
+        """The assertion this module exists for: the body is ``render()``'s
         output *for that group's language*, byte for byte.
 
         Not "contains a French word" -- Phase 0 proved marker assertions coexist
@@ -196,14 +196,13 @@ class TestGroupingIsByLanguageNotByRecipient:
 
 
 class TestTheFallbackLanguage:
-    """``docs/plans/phase-2.md`` §4: a recipient with no language falls back to
-    "the site default"."""
+    """A recipient with no language falls back to "the site default"."""
 
     def test_a_plain_address_renders_in_the_site_default(
         self, mail, set_default_language, by_language
     ):
         """A bare address has no member behind it, so
-        ``IEmailRecipient.language`` is ``None`` -- §6.2 says so explicitly
+        ``IEmailRecipient.language`` is ``None`` -- the interface says so explicitly
         ("may be ``None``")."""
         set_default_language("nl")
 
@@ -271,7 +270,7 @@ class TestThreeLanguages:
     def test_fr_nl_de_yields_three_messages(
         self, mail, fr_member, nl_member, make_recipient_member, by_language
     ):
-        """§1 lists FR/NL/DE as first-class. Two groups can be produced by an
+        """FR/NL/DE are first-class languages. Two groups can be produced by an
         accidental binary split; three cannot."""
         de_member = make_recipient_member(
             dict(

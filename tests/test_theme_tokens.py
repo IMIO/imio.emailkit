@@ -1,12 +1,12 @@
-"""SPEC §3 -- theme tokens are the *only* runtime-variable branding.
+"""Theme tokens are the *only* runtime-variable branding.
 
-§8.2 level 2 makes these three registry records the answer to "the majority of
+These three registry records are the answer to "the majority of
 per-commune needs without touching markup". So the one thing that must be true is
 that changing a record changes the rendered mail. If it does not, every commune
 gets iMio blue and the documented override story quietly has two levels, not
 three.
 
-Phase 0's caveat A1 is the reason this is not obvious: the spec's original form,
+Phase 0's caveat A1 is the reason this is not obvious: the original form,
 ``style="background-color: ${theme/primary_color}"``, produced a *broken literal*
 (``${theme/primary_color`` -- closing brace eaten by Juice) **and** killed CSS
 inlining document-wide, with the build reporting success. The token therefore has
@@ -41,7 +41,7 @@ def set_record():
         record = support.THEME_RECORDS[name]
         assert record in registry.records, (
             f"{record} is not in the registry -- the {support.PACKAGE_NAME} "
-            "profile did not install the theme tokens (SPEC §3)"
+            "profile did not install the theme tokens"
         )
         registry[record] = value
 
@@ -64,7 +64,7 @@ def _render(template):
 class TestRecordsExist:
     @pytest.mark.parametrize("token", sorted(support.THEME_RECORDS))
     def test_record_is_installed(self, integration, token):
-        """§3's table, verbatim: the record names are part of the public API --
+        """Verbatim: the record names are part of the public API --
         a site's ``registry.xml`` refers to them by string."""
         from plone.registry.interfaces import IRegistry
         from zope.component import getUtility
@@ -149,11 +149,11 @@ class TestLogoUrl:
         assert PROBE_LOGO in html
 
     def test_the_logo_has_an_alt_attribute(self, integration, set_record, template):
-        """§3: "enforced ``alt`` on the logo/``Img`` component".
+        """The logo/``Img`` component: "enforced ``alt``".
 
         An image-only header with no ``alt`` is a mail that says nothing at all
-        to a screen reader or to a client that blocks remote images -- which,
-        per §10.5, is most corporate clients by default.
+        to a screen reader or to a client that blocks remote images -- which
+        is most corporate clients by default.
         """
         set_record("logo_url", PROBE_LOGO)
 
@@ -173,7 +173,7 @@ class TestFooterHtml:
     def test_the_footer_is_injected_as_structure(
         self, integration, set_record, template
     ):
-        """§3 rule 4: "``structure`` is reserved for the shell's ``body_html``
+        """The rule: "``structure`` is reserved for the shell's ``body_html``
         slot and ``footer_html``, nothing else".
 
         Escaped markup in the footer is the visible symptom of the wrong idiom,

@@ -1,7 +1,6 @@
 /*
- * The iMio email design system: one locked, email-safe Tailwind entry
- * (SPEC §3, as amended -- Maizzle 6 ships Tailwind 4, which is configured in
- * CSS, so this file replaces the spec's `tailwind.preset.js`).
+ * The iMio email design system: one locked, email-safe Tailwind entry,
+ * configured in CSS because Maizzle 6 ships Tailwind 4.
  *
  * `@maizzle/tailwindcss` already supplies the email-safe base: px font sizes,
  * a 4px spacing scale, a reset, MSO helpers and client-targeting variants.
@@ -112,7 +111,7 @@
 }
 
 /*
- * Dark mode (SPEC §3, the last of `Main.vue`'s listed responsibilities).
+ * Dark mode, the last of `Main.vue`'s listed responsibilities.
  *
  * Six tokens: `page`, `surface`, `raised`, `body`, `muted`, `accent`. The kit
  * applies

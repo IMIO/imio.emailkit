@@ -1,4 +1,4 @@
-"""Context data for ``imio.emailkit:mail_password_template`` (SPEC §7).
+"""Context data for ``imio.emailkit:mail_password_template``.
 
 The keys are exactly what
 ``imio.emailkit.browser.default_mails.MailPasswordView.build_context`` returns,
@@ -10,7 +10,7 @@ mail is sent in almost every case, and the branch that carries the IP-address
 panel.
 
 ``userid`` is therefore **absent**, and that is the one place this fixture departs
-from §7's "one key per placeholder". The template's two branches are mutually
+from "one key per placeholder". The template's two branches are mutually
 exclusive and use a different key each (``userid`` in the administrator branch,
 ``client_addr`` in the anonymous one), so no single fixture can carry both without
 one of them becoming dead data that "every fixture value reached the html" would

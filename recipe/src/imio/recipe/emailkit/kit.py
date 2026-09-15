@@ -1,10 +1,10 @@
-"""Wire the built-in design kit into a consumer's Maizzle project (SPEC §3/§5).
+"""Wire the built-in design kit into a consumer's Maizzle project.
 
-§3: "``bin/compile-emails`` resolves the kit directory from the installed
+``bin/compile-emails`` resolves the kit directory from the installed
 ``imio.emailkit`` egg and wires it into each consumer's Maizzle build -- either by
 pointing the Maizzle components/layouts paths at the egg directory directly, or by
 materializing a copy into the consumer's ``emails/.kit/`` (gitignored) before
-building. The recipe owns this choice; consumers never vendor kit files."
+building. The recipe owns this choice; consumers never vendor kit files.
 
 **Both modes materialise ``emails/.kit/``, and that is the point.** A consumer's
 ``maizzle.config.js`` always writes the same three lines:
@@ -15,9 +15,9 @@ building. The recipe owns this choice; consumers never vendor kit files."
 
 In ``path`` mode ``.kit/`` holds a two-line re-export of the real files inside the
 egg, so ``kitBaseConfig()`` still derives ``kitDir`` from the *egg's* location and
-Maizzle reads components straight out of ``site-packages`` -- genuine zero-copy,
-which §10.1 settled as viable. In ``copy`` mode ``.kit/`` holds the real thing.
-The consumer's config cannot tell, and does not have to.
+Maizzle reads components straight out of ``site-packages`` -- genuine zero-copy. In
+``copy`` mode ``.kit/`` holds the real thing. The consumer's config cannot tell,
+and does not have to.
 
 Nothing here runs Node. Wiring is file copying and two generated text files.
 """
@@ -31,13 +31,13 @@ import shutil
 
 logger = logging.getLogger("imio.recipe.emailkit")
 
-#: SPEC §4's ``emails/.kit/`` -- "gitignored, materialized by the recipe".
+#: ``emails/.kit/`` -- gitignored, materialized by the recipe.
 KIT_DIRNAME = ".kit"
 
 #: The file a consumer's Maizzle config imports, in either mode.
 BASE_CONFIG = "maizzle.config.base.js"
 
-#: The kit's Tailwind entry (§3, amended: a CSS entry, not a JS preset).
+#: The kit's Tailwind entry: a CSS entry, not a JS preset.
 CSS_ENTRY = "tailwind.css"
 
 #: Written next to the wiring so `check-emails` and a puzzled human can both see
@@ -66,7 +66,7 @@ def wire(project, kit_dir, mode="path"):
     if not project.compilable:
         raise KitError(
             f"{project.package} ships no Maizzle project, so there is nothing to "
-            f"wire the kit into. `emails/` is pruned from the sdist (SPEC §4), so "
+            f"wire the kit into. `emails/` is pruned from the sdist, so "
             f"this is normal for an installed egg and means 'not compilable here'."
         )
     kit_dir = Path(kit_dir).resolve()
@@ -124,7 +124,7 @@ def _shim(kit_dir, target):
     ``kitBaseConfig()``'s ``kitDir`` -- derived from ``import.meta.url`` of the
     *real* module -- stays the egg's kit directory. That is what makes
     ``components.source`` an absolute path outside the Maizzle project root, i.e.
-    §10.1's zero-copy mode, rather than a copy wearing its name.
+    zero-copy mode, rather than a copy wearing its name.
 
     ``export *`` does not carry ``default``, hence the second pair of lines.
     """
@@ -134,7 +134,7 @@ def _shim(kit_dir, target):
         "//\n"
         "// Re-exports the kit that ships inside the installed imio.emailkit egg,\n"
         "// so a consumer's maizzle.config.js imports './.kit/maizzle.config.base.js'\n"
-        "// in either kit-mode and never vendors kit files (SPEC §3).\n"
+        "// in either kit-mode and never vendors kit files.\n"
         f"export * from {source}\n"
         f"import kitDefaultConfig from {source}\n"
         "export default kitDefaultConfig\n",

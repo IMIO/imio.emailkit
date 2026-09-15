@@ -4,7 +4,7 @@
  *
  * Two sanctioned forms, both of which must stay silent:
  *
- *   1. `tal:attributes="style string:..."` -- the amended SPEC §3 form. The
+ *   1. `tal:attributes="style string:..."` -- the amended sanctioned form. The
  *      placeholder is in a TAL expression, so juice never parses it as CSS.
  *   2. `bgcolor="${...}"` -- what the kit actually uses for background colours,
  *      because `bgcolor` is never parsed as CSS at all and is the most reliable

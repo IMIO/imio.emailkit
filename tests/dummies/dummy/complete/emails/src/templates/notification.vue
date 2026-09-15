@@ -3,8 +3,8 @@
  * `dummy.complete:notification` -- the everyday transactional template.
  *
  * Same basename as `dummy.minimal:notification` and as
- * `imio.emailkit:notification`, and there is no clash: SPEC §4 namespaces every
- * lookup by the package the ZCML registration belongs to.
+ * `imio.emailkit:notification`, and there is no clash: every lookup is namespaced
+ * by the package the ZCML registration belongs to.
  *
  * Context keys (see `tests/fixtures/notification.py`):
  *   title     -- heading
@@ -13,8 +13,8 @@
  *   cta_url   -- optional; the button only renders when it is set
  *   cta_label -- button label
  *
- * `tal:condition` goes on a plain `<div>`, never on `<KitButton>`: SPEC §3 rule 1
- * forbids `tal:`/`i18n:` attributes on kit components, because Vue attribute
+ * `tal:condition` goes on a plain `<div>`, never on `<KitButton>`: `tal:`/`i18n:`
+ * attributes are forbidden on kit components, because Vue attribute
  * fallthrough lands them on whichever element happens to be the component's root
  * and that is not part of any contract.
  */

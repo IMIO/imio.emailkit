@@ -4,7 +4,7 @@
 # `<emailkit:templates>` in its own ZCML, so the recipe is exercised against
 # something it does not own. Two things it proves that `imio.emailkit` cannot:
 #
-#  1. SPEC §4's **in-package** layout -- `emails/` and `templates/` as siblings
+#  1. The **in-package** layout -- `emails/` and `templates/` as siblings
 #     inside the package directory. `imio.emailkit` keeps its Maizzle project at
 #     the repository root instead, so without this addon the other branch of
 #     `find_emails_dir` would be untested.

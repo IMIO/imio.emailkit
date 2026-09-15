@@ -1,7 +1,7 @@
 # Two dummy consumer add-ons
 
-SPEC §7 asks for "discovery tests with two dummy addons (**also serving as living
-documentation**)". This is them. They are the smallest complete answer to *"how do
+Discovery needs tests with two dummy add-ons that also serve as living
+documentation. This is them. They are the smallest complete answer to *"how do
 I ship an email template from my add-on?"*, and they are executed by CI, so they
 cannot rot into a stale README.
 
@@ -10,7 +10,7 @@ cannot rot into a stale README.
 | templates | 1 | 2 |
 | `directory` attribute | omitted (defaults to `templates`) | stated |
 | `preheader` msgid | none | on both templates |
-| `.txt.pt` twin | none — uses §4's fallback | hand-authored, both templates |
+| `.txt.pt` twin | none — falls back to automatic plaintext extraction | hand-authored, both templates |
 | golden languages | `fr` | `fr` + `en` |
 | kit components | `KitMain` only | `KitMain`, `KitPanel`, `KitButton`, `KitDataTable` |
 | runtime constructs | `${...}` only | `${...}`, `tal:condition`, `tal:repeat`, `${python: format_date(...)}`, `i18n:translate` |
@@ -33,8 +33,8 @@ dummy/complete/
 │   └── convocation.txt.pt
 └── tests/
     ├── test_complete_emails.py       # four lines; subclasses the shipped base class
-    ├── fixtures/convocation.py       # a CONTEXT dict (§7)
-    └── golden/convocation.fr.html    # snapshots (§7)
+    ├── fixtures/convocation.py       # a CONTEXT dict
+    └── golden/convocation.fr.html    # snapshots
 ```
 
 where `configure.zcml` is the whole registration:
@@ -76,7 +76,7 @@ prune src/dummy/complete/emails
 ## The same template basename in three distributions
 
 `notification` is registered by `dummy.minimal`, by `dummy.complete` **and** by
-`imio.emailkit` itself. There is no clash, because §4 namespaces every lookup by the
+`imio.emailkit` itself. There is no clash, because every lookup is namespaced by the
 registering package:
 
 ```python
@@ -113,7 +113,7 @@ A real add-on needs none of this. It is pip-installed, and its ZCML is simply ru
 
 ## Running their CI contract
 
-§7's contract, for these two as for any consumer:
+The same CI contract applies to these two as to any consumer:
 
 ```bash
 # gate 1 -- build output is not stale, and the authoring lint (needs Node)

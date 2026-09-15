@@ -1,4 +1,4 @@
-"""ZCML registration of **external** add-ons (SPEC §4's "any consumer addon").
+"""ZCML registration of **external** add-ons ("any consumer addon").
 
 ``tests/test_zcml_directive.py`` covers the directive itself and
 ``tests/test_discovery.py`` the registry behind it. This module covers what neither
@@ -18,7 +18,7 @@ registers" assertion is driven off that.
 
 **The collision case is the one that matters.** Three packages register a template
 whose basename is ``notification``: both dummies and ``imio.emailkit`` itself.
-§4's answer is that lookups are namespaced, so there is nothing to collide -- and
+The answer is that lookups are namespaced, so there is nothing to collide -- and
 the assertions below are written to fail if execution order ever started deciding
 which one you get.
 """
@@ -36,7 +36,7 @@ from imio.emailkit import render  # noqa: E402
 
 
 (TemplateNotFound,) = support.require_contract(
-    "imio.emailkit.interfaces", "§4", "TemplateNotFound"
+    "imio.emailkit.interfaces", "TemplateNotFound's docstring", "TemplateNotFound"
 )
 
 
@@ -46,8 +46,8 @@ from imio.emailkit import render  # noqa: E402
 #: detail.
 EMAILKIT_NS = "http://namespaces.imio.be/emailkit"
 
-#: The basename all three packages share, which is the whole point of §4's
-#: namespacing.
+#: The basename all three packages share, which is the whole point of
+#: namespacing lookups.
 SHARED_BASENAME = support.NOTIFICATION
 
 #: Every template name that must be registered while the dummies are installed:
@@ -133,7 +133,7 @@ class TestBothAddonsAreRegistered:
 
     @pytest.mark.parametrize("addon", dummyaddons.ADDONS, ids=lambda a: a.package)
     def test_names_are_namespaced_by_the_registering_package(self, templates, addon):
-        """§4: "Template names are namespaced at lookup".
+        """Template names are namespaced at lookup.
 
         The namespace is the package the ZCML file belongs to, never an attribute
         the consumer writes -- so it cannot disagree with where the files are.
@@ -147,7 +147,7 @@ class TestBothAddonsAreRegistered:
 
     @pytest.mark.parametrize("addon", dummyaddons.ADDONS, ids=lambda a: a.package)
     def test_the_files_come_from_the_addons_own_directory(self, templates, addon):
-        """§4 resolves ``<package>/<directory>/<name>.pt``.
+        """Resolves ``<package>/<directory>/<name>.pt``.
 
         ``dummy.minimal`` omits ``directory`` and relies on the documented
         ``templates`` default; ``dummy.complete`` states it. Both must land in
@@ -200,7 +200,7 @@ class TestBothAddonsAreRegistered:
 
 
 class TestNoCollisionOnASharedBasename:
-    """§4: two add-ons shipping the same template basename do not clash."""
+    """Two add-ons shipping the same template basename do not clash."""
 
     #: Every package that registers :data:`SHARED_BASENAME`.
     OWNERS = (
@@ -258,7 +258,7 @@ class TestNoCollisionOnASharedBasename:
             )
 
     def test_the_bare_basename_still_resolves_to_nothing(self, integration):
-        """§4, and now with three candidates instead of one.
+        """The same namespacing, now with three candidates instead of one.
 
         Accepting the bare name would make the answer depend on the order the three
         packages' ZCML happens to execute in, which is exactly the bug the
@@ -269,7 +269,7 @@ class TestNoCollisionOnASharedBasename:
 
 
 class TestAvailableListsEveryAddon:
-    """§4: ``TemplateNotFound(name, available=[...])``."""
+    """``TemplateNotFound(name, available=[...])``."""
 
     UNKNOWN = "dummy.minimal:no_such_template"
 
@@ -300,7 +300,7 @@ class TestAvailableListsEveryAddon:
 
 
 class TestRegistrationMetadata:
-    """§4: the subject and the optional preheader live in the registration."""
+    """The subject and the optional preheader live in the registration."""
 
     @pytest.mark.parametrize("addon", dummyaddons.ADDONS, ids=lambda a: a.package)
     def test_the_subject_msgid_reaches_the_template(self, templates, addon):
@@ -335,7 +335,7 @@ class TestRegistrationMetadata:
             assert domain != support.PACKAGE_NAME
 
     def test_the_preheader_is_optional(self, templates):
-        """§4: "Omitted -> the div collapses to nothing"."""
+        """The preheader: "Omitted -> the div collapses to nothing"."""
         minimal = templates[dummyaddons.MINIMAL.qualified("notification")]
 
         assert "preheader" not in declared(dummyaddons.MINIMAL)["notification"], (
@@ -357,7 +357,7 @@ class TestRegistrationMetadata:
 
 
 class TestPlaintextTwins:
-    """§4: the ``.txt.pt`` twin is primary; its absence is a warned fallback.
+    """The ``.txt.pt`` twin is primary; its absence is a warned fallback.
 
     The two dummies are on opposite sides of this on purpose, so both paths are
     exercised by a *registered* add-on rather than by moving a file aside.
@@ -376,7 +376,7 @@ class TestPlaintextTwins:
         assert template.text_path is None
 
     def test_both_addons_still_render_a_plaintext_part(self, integration):
-        """Twin or fallback, ``render()`` returns text either way (§6.1)."""
+        """Twin or fallback, ``render()`` returns text either way."""
         for addon in dummyaddons.ADDONS:
             for basename in addon.templates:
                 html, text = render(
@@ -397,7 +397,7 @@ class TestPlaintextTwins:
                 )
 
     def test_the_twin_carries_what_the_fallback_loses(self, integration):
-        """Why §4 makes the twin primary, asserted rather than asserted-about.
+        """Why the twin is made primary, asserted rather than asserted-about.
 
         ``dummy.complete:convocation`` has a hand-authored twin and its plaintext
         part contains the CTA **URL**; ``dummy.minimal`` has none and the naive

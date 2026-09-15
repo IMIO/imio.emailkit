@@ -1,8 +1,8 @@
-"""SPEC §5 gate 2 -- the authoring lint (``docs/plans/phase-4.md`` §5, §6 gate 5).
+"""The authoring lint.
 
-Plan §6 gate 5: "authoring lint: one fixture per rule in §5 above, each caught;
+"Authoring lint: one fixture per rule, each caught;
 and a clean file passing." That is the shape of this module, and the *clean* half
-is the half that matters most. Plan §8's risk register says it outright: "The lint
+is the half that matters most. The risk register says it outright: "The lint
 produces false positives and gets disabled -- prefer a missed case to a false
 alarm; every rule needs a passing-clean fixture too." A lint that cries wolf is
 switched off, and then ``style-placeholder`` and ``comment-double-dash`` ship to
@@ -100,7 +100,7 @@ def ids_in(path):
 
 
 # ---------------------------------------------------------------------------
-# One violating fixture per rule, each caught -- plan §6 gate 5
+# One violating fixture per rule, each caught
 # ---------------------------------------------------------------------------
 
 
@@ -149,7 +149,7 @@ def test_violations_carry_a_file_and_a_line():
 def test_the_report_explains_the_consequence_and_the_escape_hatch():
     """These failures are invisible at build time, so the rule name teaches nobody.
 
-    docs/plans/phase-4.md §5 is a table of *evidence*; the report has to carry
+    The rules are documented as a table of *evidence*; the report has to carry
     enough of it that an author who has never read that table understands why a
     green build is not proof of anything.
     """
@@ -199,7 +199,7 @@ def test_a_build_time_class_binding_is_not_a_runtime_class():
 
 
 def test_the_sanctioned_theme_token_form_is_not_a_style_placeholder():
-    """`tal:attributes="style string:..."` is the amended SPEC §3 form, not a bug."""
+    """`tal:attributes="style string:..."` is the amended, correct form, not a bug."""
     good = (
         '<template><td tal:attributes="style string:background-color: '
         '${theme/primary_color}">x</td></template>'

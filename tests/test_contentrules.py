@@ -1,10 +1,10 @@
-"""SPEC §8.3 -- the *"Send styled email"* content-rule action.
+"""The *"Send styled email"* content-rule action.
 
 > **Content rules:** a new action type *"Send styled email"* -- edit form offers
 > the registered template names (vocabulary from discovery) + recipient sources;
 > executor delegates to ``Email(...)``. The stock mail action is left untouched.
 
-The nine gates of ``docs/plans/phase-5.md`` §4, one class each, in order.
+Nine gates, one class each, in order.
 
 Three things shape every assertion here.
 
@@ -16,7 +16,7 @@ module for the wrong reason.
 
 **Never assert on a marker string.** Without the ``IPageTemplateEngine`` utility
 zope.pagetemplate falls back to zope.tal, where ``${...}`` reaches the inbox
-verbatim and nothing raises (``docs/DECISIONS.md``). Gate 5 therefore asserts on
+verbatim and nothing raises. Gate 5 therefore asserts on
 *substituted values* -- the triggering object's real title, its real URL, and a
 CTA label whose FR and NL translations differ -- and runs
 ``support.assert_message_is_clean`` over both MIME parts.
@@ -76,7 +76,7 @@ from imio.emailkit.vocabularies import TEMPLATES as TEMPLATES_VOCABULARY  # noqa
 
 Email = support.require_builder()
 
-#: The one template this package registers (§4), which is what a rule points at.
+#: The one template this package registers, which is what a rule points at.
 TEMPLATE = support.qualified(support.NOTIFICATION)
 
 #: A name nothing is registered under. Gate 7: a rule may hold a template name
@@ -260,10 +260,10 @@ class TestTheActionTypeIsRegistered:
         )
         assert element.editview == EDIT_VIEW_NAME
 
-    def test_it_is_titled_the_way_SPEC_8_3_names_it(self, mail_portal):
-        """§8.3 names the action type verbatim: *"Send styled email"*. That string
-        is what a Manager picks out of the panel's list, so it is spec text rather
-        than a label somebody chose."""
+    def test_it_is_titled_send_styled_email(self, mail_portal):
+        """The action type's title is fixed verbatim: *"Send styled email"*. That
+        string is what a Manager picks out of the panel's list, so it is
+        deliberately fixed text rather than a label somebody chose."""
         element = getUtility(IRuleAction, name=ELEMENT_NAME)
 
         assert element.title == "Send styled email"
@@ -284,7 +284,7 @@ class TestTheActionTypeIsRegistered:
         )
 
         assert globally is not None, (
-            f"no global IRuleAction utility named {ELEMENT_NAME!r}; SPEC §8.3's "
+            f"no global IRuleAction utility named {ELEMENT_NAME!r}; the "
             f"action type is not registered in ZCML"
         )
         assert locally is globally, (
@@ -424,7 +424,7 @@ class TestTheVocabularyComesFromDiscovery:
     def test_a_template_from_another_addon_appears_without_touching_this_package(
         self, vocabulary
     ):
-        """§8.3's point, and the reason the vocabulary reads discovery rather than
+        """The whole point, and the reason the vocabulary reads discovery rather than
         a list: two unrelated add-ons' templates have to show up in the form of a
         package that has never heard of them."""
         outside = set(vocabulary().by_token)
@@ -576,7 +576,7 @@ class TestTheAddAndEditForms:
         assert support.translated(stored.summary, "fr")
 
     def test_the_schema_has_no_body_and_no_subject_field(self):
-        """§1 rules out TTW template markup editing and §4 puts the subject in
+        """TTW template markup editing is ruled out, and the subject lives in
         the registration so it is translated per recipient language. Both would
         be tempting fields on this form, and both are the wrong answer."""
         names = set(IStyledMailAction.names())
@@ -623,7 +623,7 @@ class TestFiringTheRuleSends:
         fr_member,
         nl_member,
     ):
-        """§6.2's per-language sending, reached from a rule.
+        """The builder's per-language sending, reached from a rule.
 
         The recipients are **userids**, which is why the action takes them: a
         bare address resolves with no language and lands in the site-default
@@ -643,7 +643,7 @@ class TestFiringTheRuleSends:
 
         assert len(mailhost.sent) == 2, (
             f"{len(mailhost.sent)} message(s) for two recipients in two "
-            "languages; SPEC §6.2 emits one message per language group"
+            "languages; the builder emits one message per language group"
         )
         # Keyed by language rather than by position: several queued deliveries
         # are separate transaction data managers and the order `tpc_finish`
@@ -668,8 +668,8 @@ class TestFiringTheRuleSends:
         fr_member,
         nl_member,
     ):
-        """Proof that the mail went through §6.2 and not through some second
-        assembly path: the subject is the *registration's* msgid (§4), translated
+        """Proof that the mail went through the builder and not through some second
+        assembly path: the subject is the *registration's* msgid, translated
         per group. Nothing but the builder does that."""
         make_rule(
             make_action(
@@ -693,7 +693,7 @@ class TestFiringTheRuleSends:
             "nl": support.translated(subject, "nl"),
         }
 
-    def test_the_message_has_the_shape_SPEC_6_2_builds(
+    def test_the_message_has_the_shape_the_builder_builds(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
         """``set_content(text)`` + ``add_alternative(html)``, i.e. plaintext then
@@ -716,7 +716,7 @@ class TestFiringTheRuleSends:
     def test_the_sender_is_the_site_sender(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """§6.2: "``From`` defaults to the site's configured sender". The action
+        """"``From`` defaults to the site's configured sender". The action
         offers no source field, so this is the only ``From`` it can have."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
@@ -730,7 +730,7 @@ class TestFiringTheRuleSends:
 
 
 class TestTheOwnerRecipientSource:
-    """SPEC §8.3's second recipient source, and the only one that is computed."""
+    """The second recipient source, and the only one that is computed."""
 
     def test_the_owner_receives_the_mail(
         self,
@@ -765,7 +765,7 @@ class TestTheOwnerRecipientSource:
     ):
         """The reason the executor passes a **userid**: the member adapter then
         supplies the display name and the preferred language, which is what makes
-        §6.2's per-language sending work from a rule at all."""
+        the builder's per-language sending work from a rule at all."""
         make_member(mail_portal)
 
         make_rule(make_action(send_to_owner=True))
@@ -862,7 +862,7 @@ class TestTheMailIsTheStyledTemplate:
     def test_it_is_the_kit_template_and_not_a_bare_body(self, sent_html):
         """Styled means the compiled kit output: a real document with inlined
         styles, not the text somebody typed. Counted rather than pattern-matched
-        on a class name, because §3 fixes the CSS at build time and the class
+        on a class name, because the CSS is fixed at build time and the class
         names are not the contract."""
         assert sent_html.lstrip().lower().startswith("<!doctype html")
         assert support.count_inline_styles(sent_html) >= support.MIN_INLINE_STYLES
@@ -880,7 +880,7 @@ class TestTheMailIsTheStyledTemplate:
     ):
         """The one context value the action supplies as a **msgid** rather than a
         string, and the reason it has to be one: ``.with_context()`` runs once,
-        before §6.2 groups by language, so a value translated in the executor
+        before the builder groups by language, so a value translated in the executor
         would reach a Dutch recipient in French.
 
         Non-vacuous because the two translations are asserted to differ first --
@@ -916,8 +916,8 @@ class TestTheMailIsTheStyledTemplate:
     def test_the_plaintext_part_carries_the_same_values(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """Half the message, and the half nobody looks at. §4 makes the
-        hand-authored ``.txt.pt`` twin the primary plaintext path, and it reads
+        """Half the message, and the half nobody looks at. The hand-authored
+        ``.txt.pt`` twin is the primary plaintext path, and it reads
         the same names -- so a context key the HTML happens to tolerate shows up
         here."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
@@ -975,7 +975,7 @@ class TestAnUnresolvableRecipientRaises:
     ):
         """A rule saved with an empty recipient list and the owner box unticked
         would otherwise be a rule that fires and mails nobody, forever, quietly.
-        §6.2 already treats "no recipients" as a ``RecipientError``.
+        The builder already treats "no recipients" as a ``RecipientError``.
 
         Both shapes the field can store: ``[]`` from an emptied multi-widget and
         ``None``, the field's ``missing_value``, from one never filled in.
@@ -991,7 +991,7 @@ class TestAnUnresolvableRecipientRaises:
     ):
         """The owner is the one recipient the *action* computes, so it is the one
         place a silent drop could be introduced here rather than inherited from
-        §6.2. The test user has no email address unless a fixture gives them
+        the builder. The test user has no email address unless a fixture gives them
         one."""
         action = make_action(recipients=[support.PLAIN_ADDRESS], send_to_owner=True)
 
@@ -1054,7 +1054,7 @@ class TestAStaleTemplateNameFailsLoudly:
 
         assert caught.value.name == STALE_TEMPLATE
         assert TEMPLATE in caught.value.available, (
-            "TemplateNotFound must carry the available names (SPEC §4); that "
+            "TemplateNotFound must carry the available names; that "
             "list is what tells a manager whether they have a typo or a missing "
             "add-on"
         )
@@ -1107,13 +1107,13 @@ class TestAStaleTemplateNameFailsLoudly:
 
 
 class TestTheStockMailActionIsUntouched:
-    """§8.3, verbatim: "The stock mail action is left untouched"."""
+    """"The stock mail action is left untouched"."""
 
     def test_it_is_still_registered_globally(self, mail_portal):
         # ``mail_portal`` is not used, but it is what sets the layer up: without
         # a layer fixture the ZCML has not been loaded for this test and the
         # global registry is the bare, cleaned-up one, so the assertion below
-        # would fail for a reason that has nothing to do with §8.3.
+        # would fail for a reason that has nothing to do with the stock mail action.
         element = getGlobalSiteManager().queryUtility(
             IRuleAction, name="plone.actions.Mail"
         )
@@ -1147,8 +1147,8 @@ class TestTheStockMailActionIsUntouched:
         assert {"plone.actions.Mail", ELEMENT_NAME} <= offered, sorted(offered)
 
     def test_it_still_sends(self, folder, item, mailhost, site_sender):
-        """Executed for real. §8.3 says untouched, and "the utility is still
-        registered" is not the same claim as "it still puts mail on the wire" --
+        """Executed for real. "Untouched" does not just mean "the utility is still
+        registered" -- it also means "it still puts mail on the wire", and
         this package installs a MailHost double and a browser layer, either of
         which could have broken it."""
         action = MailAction()
@@ -1179,7 +1179,7 @@ class TestTheStockMailActionIsUntouched:
 
 
 class TestTransactionAbortSendsNothing:
-    """§6.2's guarantee, checked *through* the executor.
+    """The builder's guarantee, checked *through* the executor.
 
     The builder's own abort test (``tests/test_send_transaction.py``) proves the
     guarantee for a direct caller. It would still be possible for a rule action
@@ -1198,7 +1198,7 @@ class TestTransactionAbortSendsNothing:
 
         assert mailhost.sent == [], (
             "the rule action delivered before the transaction ended, so it is "
-            "not using SPEC §6.2's queued send"
+            "not using the builder's queued send"
         )
 
     def test_abort_leaves_nothing_delivered(
@@ -1253,15 +1253,15 @@ class TestTransactionAbortSendsNothing:
 
 
 # ---------------------------------------------------------------------------
-# The executor stays a caller of SPEC §6.2
+# The executor stays a caller of the builder
 # ---------------------------------------------------------------------------
 
 
 class TestTheExecutorOnlyDelegates:
     def test_it_adds_no_builder_method(self):
-        """§6.2 is frozen and ``docs/plans/phase-5.md`` §3 lists "no new builder
-        methods" as a non-goal. ``tests/test_builder.py`` keeps the set closed;
-        this asserts that importing the content-rule module did not widen it."""
+        """The ``Email`` API is frozen and adding no new builder methods is a
+        non-goal here. ``tests/test_builder.py`` keeps the set closed; this
+        asserts that importing the content-rule module did not widen it."""
         public = {
             name
             for name in dir(Email)
@@ -1273,7 +1273,7 @@ class TestTheExecutorOnlyDelegates:
     def test_it_does_not_send_immediately(
         self, make_action, execute, item, mailhost, site_sender, deliver
     ):
-        """``.send()`` with no argument, i.e. §6.2's default. Restated as an
+        """``.send()`` with no argument, i.e. the builder's default. Restated as an
         assertion because ``immediate=True`` is exactly the shortcut somebody
         reaches for when a rule "does not seem to send"."""
         action = make_action(recipients=[support.PLAIN_ADDRESS])
@@ -1295,7 +1295,7 @@ class TestTheExecutorOnlyDelegates:
         assert isinstance(executor, StyledMailActionExecutor)
 
     def test_the_render_context_is_the_documented_set(self, item):
-        """§8.3 says nothing about what a rule-triggered mail renders against, so
+        """There is no fixed rule for what a rule-triggered mail renders against, so
         the action fixes a small set and documents it. Pinned here because
         widening it silently is how a documented contract stops being one, and
         because a template author has nothing else to write against."""
@@ -1353,7 +1353,7 @@ class TestTheExecutorLogsEnoughToDiagnose:
 
 
 # ---------------------------------------------------------------------------
-# SPEC §8.2 level 3 -- a ``:base`` site keeps the action type, deliberately
+# Level 3 -- a ``:base`` site keeps the action type, deliberately
 # ---------------------------------------------------------------------------
 #
 # Its own class, at the end of the module. `zope.pytestlayer` keeps a layer up for
@@ -1369,11 +1369,11 @@ class TestTheExecutorLogsEnoughToDiagnose:
 class TestABaseOnlySiteStillHasTheActionType:
     """The registration is plain global ZCML, so ``:base`` has it too.
 
-    This is the intended behaviour and not a leak. §8.2 level 3's opt-out is about
+    This is the intended behaviour and not a leak. Level 3's opt-out is about
     Plone's **stock transactional mails**: ``:base`` ships "the runtime (API,
     discovery, kit) without the Plone-default overrides". An action type is not an
     override of anything -- it is inert until a Manager creates a rule that uses
-    it, and the templates it can send come from §4 discovery either way. Gating it
+    it, and the templates it can send come from discovery either way. Gating it
     would mean a per-site local utility whose stored copy drifts from the ZCML with
     no symptom, which is the silent-failure class this project exists to avoid.
     """
@@ -1407,7 +1407,7 @@ class TestABaseOnlySiteStillHasTheActionType:
             getSiteManager(base_portal).queryUtility(IRuleAction, name=ELEMENT_NAME)
             is not None
         ), (
-            "SPEC §8.3's action type is missing on a :base site; it is registered "
+            "the action type is missing on a :base site; it is registered "
             "in ZCML, so it should be there whichever profile was applied"
         )
 

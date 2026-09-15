@@ -1,10 +1,10 @@
 """Render every registered template with its committed fixture, and serve it.
 
-The two-stage dev loop of SPEC §5, in its Phase 1 Makefile form (§9's sequencing
-note). Run it through ``make preview-emails``, which supplies the Zope
-configuration this script needs.
+The two-stage dev loop, in its Makefile form. Run it through
+``make preview-emails``, which supplies the Zope configuration this script
+needs.
 
-**Why not ``maizzle --watch``.** §5 rejects it outright: Maizzle's dev server
+**Why not ``maizzle --watch``.** It's rejected outright: Maizzle's dev server
 shows *build-time* output -- raw ``${item/title}``, unexpanded ``tal:repeat`` --
 which is "a miserable authoring loop". What a developer needs to look at is the
 mail a citizen receives, which only exists after ``render()`` has run inside a
@@ -141,7 +141,7 @@ def write_source(short, template):
 
 
 def write_index(rows):
-    """A language switcher and a link per part -- §5's "and a language switcher"."""
+    """A language switcher and a link per part."""
     templates = {}
     for name, language, error in rows:
         templates.setdefault(name.split(":", 1)[-1], []).append((language, error))

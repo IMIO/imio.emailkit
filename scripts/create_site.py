@@ -28,9 +28,9 @@ def asbool(s):
 
 DELETE_EXISTING = asbool(os.getenv("DELETE_EXISTING"))
 
-# SPEC §8.2 level 3: ``:base`` installs the runtime without the Plone default
-# mail overrides. ``PROFILE=base make create-site`` builds a site to check the
-# opt-out by hand; ``:default`` stays the default, as §8 requires.
+# ``:base`` installs the runtime without the Plone default mail overrides.
+# ``PROFILE=base make create-site`` builds a site to check the opt-out by
+# hand; ``:default`` stays the default.
 PROFILE = os.getenv("PROFILE", "default")
 
 app = makerequest(globals()["app"])

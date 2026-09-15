@@ -2,7 +2,7 @@
 
 ``imio.emailkit.testing`` is part of the egg and consumers reuse it, so it must
 not import anything from ``tests/``. The one layer that needs a test-only package
--- the site/client stand-in for SPEC §8.2 level 1 -- therefore lives here.
+-- the site/client stand-in for a jbot override -- therefore lives here.
 """
 
 from imio.emailkit.testing import FIXTURE
@@ -18,10 +18,10 @@ import sitelayer
 class SendingLayer(EmailkitLayer):
     """``imio.emailkit:default`` on a site with the Dexterity content types.
 
-    The one layer every SPEC §6.2/§6.3 test in this suite runs on. Two reasons
+    The one layer every builder/render test in this suite runs on. Two reasons
     it is not the Phase 1 ``FIXTURE``:
 
-    1. **Content types.** §6.2 lists "a Plone File/Image content object" among
+    1. **Content types.** The builder accepts "a Plone File/Image content object" among
        the attachment sources, and there is no way to build one without the
        ``File``/``Image`` FTIs. ``imio.emailkit.testing.Layer`` bases on the bare
        ``PLONE_FIXTURE`` on purpose -- Phase 1 renders against fixture *data*,
@@ -31,7 +31,7 @@ class SendingLayer(EmailkitLayer):
        fixtures carry content objects, so it doubles as a worked example.
     2. **Commits.** ``plone.testing``'s integration lifecycle replaces
        ``transaction.commit`` with a hard error to protect test isolation, and
-       §6.2's default delivery is *queued*: the message only reaches the MTA in
+       the builder's default delivery is *queued*: the message only reaches the MTA in
        the mail data manager's ``tpc_finish``. Reading a queued message
        therefore needs a real commit, which only a functional layer allows -- and
        the alternative, poking at ``transaction.get()._resources`` to run that

@@ -1,4 +1,4 @@
-"""``dummy.minimal``'s entire email test suite (SPEC §7).
+"""``dummy.minimal``'s entire email test suite.
 
 This is the file a consumer add-on writes, in full. Two class attributes, no
 imports beyond the base class, no harness of its own:
@@ -8,7 +8,7 @@ imports beyond the base class, no harness of its own:
 * ``templates`` -- the basenames, which the base class namespaces for you.
 
 The base class finds ``fixtures/`` and ``golden/`` beside this file, renders every
-(template x language x part) through §6.1's ``render()`` and diffs against the
+(template x language x part) through ``render()`` and diffs against the
 committed snapshot. It also audits the *committed* snapshot for unresolved
 ``${...}`` -- a snapshot taken while the render engine was broken would otherwise
 be confirmed for ever.

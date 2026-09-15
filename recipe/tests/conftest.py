@@ -34,7 +34,7 @@ NPX_LOG = "npx.log"
 
 @pytest.fixture
 def kit(tmp_path):
-    """A directory shaped like ``imio/emailkit/kit`` (SPEC §3), with real files."""
+    """A directory shaped like ``imio/emailkit/kit``, with real files."""
     root = tmp_path / "egg" / "imio" / "emailkit" / "kit"
     (root / "layouts").mkdir(parents=True)
     (root / "components").mkdir(parents=True)
@@ -58,11 +58,11 @@ def kit(tmp_path):
 
 @pytest.fixture
 def consumer(tmp_path):
-    """A consumer addon in SPEC §4's **in-package** layout, with one built ``.pt``.
+    """A consumer addon in the **in-package** layout, with one built ``.pt``.
 
-    ``emails/`` and ``templates/`` are siblings inside the package directory, which
-    is what §4 draws. The other layout -- ``emails/`` at the checkout root, which
-    ``imio.emailkit`` itself uses -- is covered by ``root_layout_consumer``.
+    ``emails/`` and ``templates/`` are siblings inside the package directory. The
+    other layout -- ``emails/`` at the checkout root, which ``imio.emailkit``
+    itself uses -- is covered by ``root_layout_consumer``.
     """
     package_dir = tmp_path / "site-packages" / "acme" / "notifications"
     emails = package_dir / "emails"

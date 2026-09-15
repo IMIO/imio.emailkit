@@ -1,15 +1,15 @@
-"""SPEC §6.2/§7 -- transaction safety, and the one escape hatch.
+"""Transaction safety, and the one escape hatch.
 
 > **Transaction safety by default:** delivery via ``IMailHost`` queued send -- an
 > aborted transaction sends nothing. ``.send(immediate=True)`` is the escape
 > hatch.
 
-§7 names the test outright: "Transaction abort test: ``.send()`` + abort ->
+The contract names the test outright: "Transaction abort test: ``.send()`` + abort ->
 MailHost queue empty."
 
 **An empty queue proves nothing on its own.** A builder that never queued
 anything, a MailHost double that swallows messages, a ``.send()`` that raised and
-was caught -- all three leave the queue empty and turn §7's headline test green
+was caught -- all three leave the queue empty and turn the headline test green
 for the wrong reason. So every assertion here is paired with its opposite:
 
 * abort -> nothing delivered **and** the queued delivery was actively cancelled
@@ -44,7 +44,7 @@ class TestQueuedIsTheDefault:
     def test_nothing_is_delivered_before_the_transaction_ends(self, queued):
         """ "Queued" has to mean *not yet sent*. A builder that opened an SMTP
         connection inside ``.send()`` would pass every content assertion in this
-        suite and make §6.2's guarantee unimplementable."""
+        suite and make the transaction guarantee unimplementable."""
         assert queued.sent == [], (
             f"{len(queued.sent)} message(s) already delivered before commit: "
             "the send was not queued"
@@ -67,14 +67,14 @@ class TestQueuedIsTheDefault:
 
 
 class TestAbortSendsNothing:
-    """§7's named test."""
+    """The named test."""
 
     def test_abort_leaves_the_queue_empty(self, queued):
         transaction.abort()
 
         assert queued.sent == [], (
             f"{len(queued.sent)} message(s) delivered after transaction.abort(); "
-            "SPEC §6.2: 'an aborted transaction sends nothing'"
+            "an aborted transaction sends nothing"
         )
 
     def test_abort_after_several_language_groups_sends_none_of_them(
@@ -138,7 +138,7 @@ class TestCommitSends:
 
 
 class TestImmediateIsTheEscapeHatch:
-    """§6.2: ``.send(immediate=True)`` "is the escape hatch"."""
+    """``.send(immediate=True)`` is the escape hatch."""
 
     def test_immediate_delivers_without_a_commit(self, mail, mailhost, site_sender):
         mail().to(support.PLAIN_ADDRESS).send(immediate=True)
@@ -198,7 +198,7 @@ class TestImmediateIsTheEscapeHatch:
         )
 
     def test_immediate_is_not_the_default(self, mail, mailhost, site_sender):
-        """Restating §6.2's word "default" as an assertion, because the two
+        """Restating the word "default" as an assertion, because the two
         behaviours differ only in a flag and a wrong default would be invisible
         until the first failed transaction sent a mail it should not have."""
         mail().to(support.PLAIN_ADDRESS).send()
@@ -210,9 +210,8 @@ class TestNothingIsSentWithoutSend:
     def test_a_builder_that_is_never_sent_queues_nothing(
         self, mail, mailhost, site_sender, fr_member
     ):
-        """§6.2: the builder "holds data, it does not grow behavior".
-        ``docs/plans/phase-2.md`` §6 gate 8: "no method does I/O before
-        ``.send()``"."""
+        """The builder "holds data, it does not grow behavior".
+        "No method does I/O before ``.send()``"."""
         (
             mail()
             .to(fr_member)

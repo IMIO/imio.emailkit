@@ -14,10 +14,10 @@ _ = MessageFactory(PACKAGE_NAME)
 logger = logging.getLogger(PACKAGE_NAME)
 
 
-# SPEC §6.1 spells the public API as ``from imio.emailkit import render``, and
-# §6.2 spells it as ``from imio.emailkit import Email``. §9 phase 3 adds
-# ``render_shell`` -- a ``render()`` sibling, deliberately *not* a builder method,
-# so it belongs in the same namespace as ``render``.
+# The public API is ``from imio.emailkit import render`` and
+# ``from imio.emailkit import Email``, plus ``render_shell`` -- a ``render()``
+# sibling, deliberately *not* a builder method, so it belongs in the same
+# namespace as ``render``.
 #
 # These imports are LAST on purpose and must stay last: ``render`` -> ``discovery``
 # -> ``interfaces`` imports ``_`` back from this module, so every name above has

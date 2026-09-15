@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Plone's "an account has been created for you" mail, restyled (SPEC §8.1).
+ * Plone's "an account has been created for you" mail, restyled.
  *
  * An ordinary template in the ordinary dialect; see the note in
  * `mail_password_template.vue` for what changed and why.

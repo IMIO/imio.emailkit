@@ -1,4 +1,4 @@
-"""SPEC §6.3 ``@@emailkit-preview`` -- every registered template, rendered.
+"""``@@emailkit-preview`` -- every registered template, rendered.
 
 Manager-only, deliberately plain, and made of two views rather than one:
 
@@ -15,7 +15,7 @@ UI flatter it, so the one thing this view exists to show would be the one thing
 it shows wrongly. An iframe is the boring browser-level answer and costs one
 extra registration.
 
-**Fixtures.** §6.3 renders "committed fixture data (see §7)", and §7 puts it in
+**Fixtures.** The preview renders committed fixture data, which lives in
 ``tests/fixtures/<name>.py`` -- inside the *checkout* of whichever addon ships
 the template, not inside the installed package (``tests/`` is not shipped, and
 must not be: it is not importable from a released egg). So the fixture is
@@ -35,8 +35,8 @@ stands where the value would be and every ``tal:condition`` branch shows at once
 -- so it answers "what does this layout look like", never "does this template
 render".
 
-**Send test.** §6.3's whole point is that "browser previews lie, Outlook
-doesn't". The button goes through the §6.2 ``Email`` builder unchanged -- same
+**Send test.** The whole point here is that "browser previews lie, Outlook
+doesn't". The button goes through the ``Email`` builder unchanged -- same
 code path as a production mail -- and always to
 ``getAuthenticatedMember()``'s own address. There is deliberately no address
 field: a Manager-only form that mails arbitrary rendered HTML to an
@@ -66,10 +66,10 @@ import traceback
 
 logger = logging.getLogger("imio.emailkit.preview")
 
-#: Languages the switcher offers. SPEC §1 makes FR/NL/DE first-class and the
+#: Languages the switcher offers. FR/NL/DE are first-class and the
 #: package ships those three catalogs plus the English msgid defaults. A site's
 #: own ``plone.available_languages`` is ``['en']`` on a stock install, which
-#: would leave §6.3's language switcher with a single entry on exactly the
+#: would leave the language switcher with a single entry on exactly the
 #: machine a developer previews on. Site languages are appended, not substituted.
 PREVIEW_LANGUAGES = ("fr", "nl", "de", "en")
 
@@ -97,7 +97,7 @@ MODE_HINTS = {
     ),
 }
 
-#: Where SPEC §7 puts a fixture, relative to the checkout root of the addon that
+#: Where a fixture lives, relative to the checkout root of the addon that
 #: ships the template.
 FIXTURE_SUBPATH = ("tests", "fixtures")
 
@@ -108,7 +108,7 @@ FIXTURE_SUBPATH = ("tests", "fixtures")
 FIXTURE_SEARCH_DEPTH = 6
 
 NO_FIXTURE = (
-    "No committed fixture for {name}. SPEC §7 puts it at "
+    "No committed fixture for {name}. Fixtures live at "
     "tests/fixtures/{basename}.py in the checkout of the addon that ships the "
     "template, and tests/ is not part of the installed distribution -- so this "
     "is expected when {package} is installed as a released egg rather than as a "
@@ -116,7 +116,7 @@ NO_FIXTURE = (
 )
 
 NO_BUILDER = (
-    "Cannot send: imio.emailkit.Email is not importable. SPEC §6.2's builder is "
+    "Cannot send: imio.emailkit.Email is not importable. The Email builder is "
     "what the send test uses, and the preview deliberately has no second way to "
     "put a message on the wire."
 )
@@ -129,20 +129,20 @@ NO_ADDRESS = (
 
 SENT = (
     "Queued a test of {name} ({language}) to your own address, {address}. "
-    "Delivery is a queued IMailHost send (SPEC §6.2), so it leaves with this "
+    "Delivery is a queued IMailHost send, so it leaves with this "
     "transaction."
 )
 
 SEND_LANGUAGE_MISMATCH = (
     "The preview below is {previewed}, but the mail will be sent in {sending}: "
-    "SPEC §6.2 renders per *recipient* language and the builder takes no language "
+    "the builder renders per *recipient* language and takes no language "
     "argument, so the send follows your own preferred language (or the site "
     "default when you have none). Set yours to {previewed} to send that one."
 )
 
 
 def email_builder():
-    """SPEC §6.2's ``Email``, or ``None`` when it is not importable yet.
+    """The ``Email`` builder, or ``None`` when it is not importable yet.
 
     Imported here rather than at module scope so a missing builder degrades to a
     disabled button instead of an unimportable view: this module is loaded by
@@ -169,7 +169,7 @@ def preview_languages():
 def fixture_path(template):
     """Locate ``tests/fixtures/<basename>.py`` for ``template``, or ``None``.
 
-    Resolved per *template*, not per repository: §7 makes fixtures a
+    Resolved per *template*, not per repository: fixtures are a
     per-consumer-addon artifact, so a site with three addons shipping templates
     has three ``tests/fixtures`` directories and each template's own checkout is
     the only place its fixture can be.
@@ -212,7 +212,7 @@ class PreviewBase(BrowserView):
     # -- the current selection ------------------------------------------------
 
     def templates(self):
-        """Every registered template, sorted. SPEC §4's discovery, verbatim."""
+        """Every registered template, sorted, verbatim from discovery."""
         registered = get_templates()
         return [registered[name] for name in sorted(registered)]
 
@@ -359,7 +359,7 @@ class PreviewBase(BrowserView):
 
 
 class EmailkitPreview(PreviewBase):
-    """SPEC §6.3's preview page. Registered Manager-only on ``IEmailkitLayer``."""
+    """The preview page. Registered Manager-only on ``IEmailkitLayer``."""
 
     #: A ``Products.Five`` template, so the preview page is itself jbot-overridable
     #: -- free, and consistent with how everything else in this package renders.
@@ -389,7 +389,7 @@ class EmailkitPreview(PreviewBase):
         compute is a page template nobody can read, and the two flags below are
         the ones a developer actually wants at a glance -- whether a fixture
         exists (so the preview can render at all) and whether a plaintext twin
-        exists (SPEC §4: without one the text part is a deprecated fallback).
+        exists (without one the text part is a deprecated fallback).
         """
         selected = self.selected_name()
         rows = []
@@ -407,7 +407,7 @@ class EmailkitPreview(PreviewBase):
         return rows
 
     def language_rows(self):
-        """SPEC §6.3's language switcher."""
+        """The language switcher."""
         current = self.language()
         return [
             {
@@ -457,7 +457,7 @@ class EmailkitPreview(PreviewBase):
         return not self.display_error() and self.mode() == MODE_TEXT
 
     def theme_rows(self):
-        """SPEC §6.3's theme-token panel: the three §3 tokens as they render now.
+        """The theme-token panel: the theme tokens as they render now.
 
         Read through ``render.get_theme()`` -- the very function that injects
         them into the namespace -- so the panel cannot drift from what the iframe
@@ -474,7 +474,7 @@ class EmailkitPreview(PreviewBase):
         ]
 
     def registry_url(self):
-        """The registry control panel, filtered on our records -- §8.2 level 2."""
+        """The registry control panel, filtered on our records."""
         return (
             f"{api.portal.get().absolute_url()}/portal_registry"
             f"?{urlencode({'q': THEME_REGISTRY_PREFIX})}"
@@ -483,7 +483,7 @@ class EmailkitPreview(PreviewBase):
     def subject(self, template):
         """The registration's subject msgid, translated into the preview language.
 
-        SPEC §4 keeps the subject in the registration and §6.2 translates it per
+        The registration keeps the subject and the builder translates it per
         recipient language at send time, which makes it the one part of a mail a
         browser preview would otherwise never show.
         """
@@ -523,20 +523,21 @@ class EmailkitPreview(PreviewBase):
     def send_language(self):
         """The language the sent mail will actually be rendered in.
 
-        Not necessarily the one in the switcher, and this is where §6.3 and §6.2
-        pull against each other. §6.3 says the button mails "the currently
-        previewed template + fixture + **language**"; §6.2 gives the builder no
-        language argument at all, and has ``.send()`` group recipients by *their
-        own* resolved language, falling back to the site default. Both cannot be
-        true, and §6.2 is the frozen one.
+        Not necessarily the one in the switcher, and this is where the preview and
+        the builder pull against each other. The preview button is meant to mail
+        "the currently previewed template + fixture + **language**"; the builder
+        gives itself no language argument at all, and has ``.send()`` group
+        recipients by *their own* resolved language, falling back to the site
+        default. Both cannot be true, and the builder's behaviour is the frozen
+        one.
 
         So rather than fake it -- an inert ``request['LANGUAGE']`` was tried and
         does nothing, because ``recipients.default_language()`` deliberately reads
         the site default and not the request -- the view computes the truth from
-        §6.2's own public contract (the ``IEmailRecipient`` adapter) and says so
-        next to the button. A developer who wants the mail in Dutch sets Dutch as
-        their own preferred language, which is the mechanism §6.2 actually
-        provides. Mutating that property on their behalf was rejected: silently
+        the builder's own public contract (the ``IEmailRecipient`` adapter) and
+        says so next to the button. A developer who wants the mail in Dutch sets
+        Dutch as their own preferred language, which is the mechanism the builder
+        actually provides. Mutating that property on their behalf was rejected: silently
         rewriting a user's preferences because they clicked a preview button is
         not a thing a developer tool gets to do.
         """
@@ -585,7 +586,7 @@ class EmailkitPreview(PreviewBase):
         state = self.state()
         template = state["template"]
         try:
-            # SPEC §6.2 verbatim, and nothing else. `.to(member)` rather than
+            # The builder's contract verbatim, and nothing else. `.to(member)` rather than
             # `.to(address)` on purpose: it is the recipient the builder resolves
             # for itself, so no address this form received can reach the wire.
             email_builder()(template.name).to(self.member()).subject(
@@ -604,7 +605,7 @@ class EmailkitPreview(PreviewBase):
 
 
 class EmailkitPreviewBody(PreviewBase):
-    """The rendered mail alone, for the ``<iframe>`` of SPEC §6.3.
+    """The rendered mail alone, for the preview's ``<iframe>``.
 
     Returns the mail's own HTML unwrapped and unmodified: what a mail client
     would be handed, byte for byte, with none of the preview chrome's markup or
@@ -650,7 +651,7 @@ class EmailkitPreviewBody(PreviewBase):
             response.setHeader("Content-Type", "text/plain; charset=utf-8")
             return (
                 f"Could not read {path}: {exc}. The compiled output is committed, "
-                f"so this is a build or packaging problem (SPEC §5), not a runtime "
+                f"so this is a build or packaging problem, not a runtime "
                 f"one."
             )
         response.setHeader("Content-Type", "text/html; charset=utf-8")

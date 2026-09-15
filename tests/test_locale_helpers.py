@@ -1,6 +1,6 @@
-"""SPEC §6.1 -- locale-aware formatting helpers.
+"""Locale-aware formatting helpers.
 
-The spec's own justification is the test's: helpers exist "so no template ever
+The justification for these helpers is the test's own: they exist "so no template ever
 reinvents French date formatting (half would get it wrong)". Which means the
 assertion that matters is not "a string came back" but **"FR and EN come back
 different"**. A helper that ignores its language argument returns a perfectly
@@ -21,7 +21,7 @@ support.require_runtime()
 
 format_date, format_datetime, format_number = support.require_contract(
     "imio.emailkit.helpers",
-    "§6.1",
+    "the locale-helpers contract",
     "format_date",
     "format_datetime",
     "format_number",
@@ -85,12 +85,12 @@ class TestFormatDate:
 
     @pytest.mark.parametrize("language", LANGUAGES)
     def test_every_shipped_language_formats(self, integration, language):
-        """§1 promises FR/NL/DE; a helper that raises on one of them turns a
-        translated mail into a 500."""
+        """FR/NL/DE are the promised languages; a helper that raises on one of
+        them turns a translated mail into a 500."""
         assert format_date(PROBE_DATE, language)
 
     def test_de_is_supported(self, integration):
-        """German is in §1's first-class i18n list even though no catalog ships
+        """German is in the first-class i18n list even though no catalog ships
         yet -- the *formatting* side has no catalog to ship."""
         assert format_date(PROBE_DATE, "de")
 
@@ -132,7 +132,7 @@ class TestFormatNumber:
 
 
 class TestHelpersAreBoundToTheRenderLanguage:
-    """§6.1: the helpers are "bound to the render language".
+    """The helpers are bound to the render language.
 
     The helpers being correct and the *render* handing them the right language
     are two independent failures. This is the second one.

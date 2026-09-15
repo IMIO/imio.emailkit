@@ -1,7 +1,7 @@
 /**
  * Maizzle project config for `imio.emailkit`'s own templates.
  *
- * `imio.emailkit` is its own first consumer (SPEC §4), so this file is also the
+ * `imio.emailkit` is its own first consumer, so this file is also the
  * worked example every consumer addon copies: spread the kit's base config,
  * then set only the two things a base config cannot know -- where the compiled
  * `.pt` goes.
@@ -24,7 +24,7 @@ const pkg = resolve(here, '..', 'src', 'imio', 'emailkit')
 
 /**
  * A consumer resolves this directory from the installed `imio.emailkit` egg
- * (`kit-mode = path`, SPEC §5/§10.1). Here the kit is a sibling in the same
+ * (`kit-mode = path`). Here the kit is a sibling in the same
  * checkout, so `kitBaseConfig()` derives it from its own file location.
  */
 const kit = kitBaseConfig()
@@ -34,7 +34,7 @@ export default defineConfig({
 
   output: {
     ...kit.output,
-    /** Committed build output, discovered at runtime through §4's entry point. */
+    /** Committed build output, discovered at runtime through the entry point. */
     path: resolve(pkg, 'templates'),
   },
 
@@ -42,7 +42,7 @@ export default defineConfig({
     ...kit.emailkit,
     /**
      * The kit's Tailwind entry, reached through this project's own CSS file.
-     * Nothing is added there -- the kit is locked (SPEC §3) -- but it is the
+     * Nothing is added there -- the kit is locked -- but it is the
      * seam a consumer would use, and it keeps the absolute kit path out of
      * committed CSS.
      */

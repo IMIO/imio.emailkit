@@ -3,8 +3,7 @@
  * CLEAN counterpart to `violating/runtime_class.vue`, and the fixture that keeps
  * this rule honest.
  *
- * Runtime styling goes through `tal:attributes="style ..."` with literal values,
- * which is what SPEC §3 rule 2 prescribes.
+ * Runtime styling goes through `tal:attributes="style ..."` with literal values.
  *
  * The two `:class` bindings must NOT be reported. Vue resolves them at *build*
  * time and every complete utility name is present verbatim in this file, so

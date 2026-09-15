@@ -19,7 +19,7 @@
  *       </KitDataList>
  *     </KitCard>
  *
- * `tal:` may not go on the component (SPEC §3 rule 1), so a translated overline
+ * `tal:` may not go on the component, so a translated overline
  * is a `<span tal:omit-tag="">` inside the slot, exactly as for `KitPill`.
  *
  * ---------------------------------------------------------------------------

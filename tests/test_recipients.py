@@ -1,4 +1,4 @@
-"""SPEC §6.2 -- recipient resolution and the address headers.
+"""Recipient resolution and the address headers.
 
 > ``.to() / .cc() / .bcc()`` accept, in any mix: an email string, a Plone member
 > object, a userid, or an iterable of those. Resolution goes through a single
@@ -34,7 +34,7 @@ def one_language_group(set_default_language):
     """Pin the site default to the test members' language.
 
     This module is about the *grammar* of ``.to()/.cc()/.bcc()`` -- which forms
-    resolve, which fail, who ends up in the envelope. §6.2 groups by resolved
+    resolve, which fail, who ends up in the envelope. The builder groups by resolved
     language, and a bare address has none ("may be ``None``"), so mixing a French
     member with a plain address correctly yields **two** messages. Without this
     fixture every assertion below would quietly become a grouping assertion and
@@ -71,28 +71,28 @@ def envelope(mail, deliver, sent):
 
 
 class TestTheAdapterContract:
-    """§6.2 pins ``IEmailRecipient`` itself, not just its effects."""
+    """The recipient contract pins ``IEmailRecipient`` itself, not just its effects."""
 
     def test_the_interface_declares_the_three_attributes(self):
-        """``email`` / ``fullname`` / ``language``, verbatim from §6.2.
+        """``email`` / ``fullname`` / ``language`` are the three required attributes.
 
         Named here because the whole polymorphism story rests on them: the
         address goes in the envelope, the fullname in the display name, and the
         language is what ``.send()`` groups by. An interface missing one of the
-        three cannot support the feature the spec builds on it.
+        three cannot support the per-language grouping built on top of it.
         """
         names = set(IEmailRecipient.names())
 
         assert {"email", "fullname", "language"} <= names, (
-            f"IEmailRecipient is missing attributes from §6.2: {sorted(names)}"
+            f"IEmailRecipient is missing required attributes: {sorted(names)}"
         )
 
     def test_a_string_adapts_to_a_recipient(self, mail_portal):
-        """§6.2: "Default adapters ship for ``str`` and Plone members"."""
+        """"Default adapters ship for ``str`` and Plone members"."""
         recipient = IEmailRecipient(support.PLAIN_ADDRESS, None)
 
         assert recipient is not None, (
-            "no IEmailRecipient adapter for str; §6.2 requires one"
+            "no IEmailRecipient adapter for str; one is required"
         )
         assert recipient.email.lower() == support.PLAIN_ADDRESS
 
@@ -100,7 +100,7 @@ class TestTheAdapterContract:
         recipient = IEmailRecipient(fr_member, None)
 
         assert recipient is not None, (
-            "no IEmailRecipient adapter for a Plone member; §6.2 requires one"
+            "no IEmailRecipient adapter for a Plone member; one is required"
         )
         assert recipient.email.lower() == support.FR_MEMBER["email"]
 
@@ -108,7 +108,7 @@ class TestTheAdapterContract:
         """The attribute ``.send()`` groups by. A member adapter that returned
         ``None`` here would collapse every language group into the site default
         and ship French to Dutch communes -- silently, which is precisely what
-        §6.2's per-language sending exists to prevent."""
+        the per-language sending exists to prevent."""
         assert IEmailRecipient(fr_member, None).language == "fr"
 
 
@@ -128,7 +128,7 @@ class TestSingleRecipientForms:
     def test_a_userid(self, mail, fr_member, envelope):
         """A ``str`` that is not an address must resolve through the member.
 
-        §6.2 lists "a userid" as an accepted form while shipping default
+        The recipient grammar lists "a userid" as an accepted form while shipping default
         adapters for ``str`` and members only -- so the ``str`` adapter carries
         both readings. Getting this wrong is not a crash: a userid treated as a
         literal address produces ``fr_member@`` nothing, accepted by MailHost and
@@ -139,7 +139,7 @@ class TestSingleRecipientForms:
         assert addresses == [support.FR_MEMBER["email"]]
 
     def test_a_member_contributes_its_display_name(self, mail, fr_member, one_message):
-        """§6.2's adapter carries ``fullname`` -- "display name, may be empty".
+        """The adapter carries ``fullname`` -- "display name, may be empty".
 
         The address header is the only thing a display name can be *for*; if the
         builder never uses it the attribute is dead weight in a frozen
@@ -165,7 +165,7 @@ class TestIterablesAndMixtures:
         assert addresses == sorted([support.PLAIN_ADDRESS, support.OTHER_ADDRESS])
 
     def test_a_mixed_iterable(self, mail, fr_member, envelope):
-        """§6.2: "accept, in any mix" -- one call, three different forms."""
+        """"accept, in any mix" -- one call, three different forms."""
         addresses = envelope(
             mail().to([fr_member, support.PLAIN_ADDRESS, support.FR_MEMBER["userid"]])
         )
@@ -173,7 +173,7 @@ class TestIterablesAndMixtures:
         assert addresses == sorted([support.FR_MEMBER["email"], support.PLAIN_ADDRESS])
 
     def test_repeated_calls_accumulate(self, mail, fr_member, envelope):
-        """§6.2's own example calls ``.to()`` twice, so the second must not
+        """The grammar's own example calls ``.to()`` twice, so the second must not
         replace the first."""
         addresses = envelope(
             mail().to(fr_member).to(support.PLAIN_ADDRESS).to(support.OTHER_ADDRESS)
@@ -186,7 +186,7 @@ class TestIterablesAndMixtures:
         ])
 
     def test_a_generator_is_accepted_and_consumed_once(self, mail, envelope):
-        """§6.2 says "an iterable", and ``.send()`` may render several language
+        """"An iterable" is what's accepted, and ``.send()`` may render several language
         groups from the same recipient set. A generator stored unflattened is
         empty by the second group -- one message with recipients, the rest
         silently addressed to nobody."""
@@ -197,10 +197,10 @@ class TestIterablesAndMixtures:
         assert addresses == sorted([support.PLAIN_ADDRESS, support.OTHER_ADDRESS])
 
     def test_a_nested_iterable_loses_nobody(self, mail, deliver, sent):
-        """Nesting is not in §6.2's grammar -- so the rule that applies is the
-        one §6.2 *does* state: never a silent drop.
+        """Nesting is not in the grammar -- so the rule that applies is the
+        one it *does* state: never a silent drop.
 
-        ``meeting_managers`` in the spec's own example is whatever the caller
+        ``meeting_managers`` in the original example is whatever the caller
         happens to have, and a list of groups-of-people is the obvious shape to
         pass by accident. Either the builder flattens it or it raises
         ``RecipientError``. What it must not do is send a message to the first
@@ -226,7 +226,7 @@ class TestIterablesAndMixtures:
 class TestDuplicates:
     """The same person named twice is still one person.
 
-    §6.2 emits "one message per group", and a group is a set of people rather
+    The builder emits "one message per group", and a group is a set of people rather
     than a bag of mentions. The realistic way to hit this is not typing an
     address twice: it is ``.to(member)`` in one place and ``.to(SOME_ADDRESS)``
     in another, where both happen to be the same human.
@@ -272,8 +272,8 @@ class TestCcAndBcc:
         )
 
     def test_cc_is_polymorphic_too(self, mail, fr_member, deliver, sent):
-        """§6.2 gives ``.to()``, ``.cc()`` and ``.bcc()`` the same grammar; the
-        spec's own example passes a *collection* to ``.cc()``."""
+        """``.to()``, ``.cc()`` and ``.bcc()`` share the same grammar; the
+        canonical example passes a *collection* to ``.cc()``."""
         email = mail().to(support.PLAIN_ADDRESS).cc([fr_member, support.OTHER_ADDRESS])
 
         email.send()
@@ -316,13 +316,13 @@ class TestReplyToAndSender:
         assert support.addresses(message, "Reply-To") == [support.REPLY_TO]
 
     def test_from_defaults_to_the_site_sender(self, mail, site_sender, one_message):
-        """§6.2: "``From`` defaults to the site's configured sender"."""
+        """"``From`` defaults to the site's configured sender"."""
         message = one_message(mail().to(support.PLAIN_ADDRESS))
 
         assert support.addresses(message, "From") == [site_sender]
 
     def test_sender_overrides_the_default(self, mail, site_sender, one_message):
-        """§6.2: ".sender(...) overrides"."""
+        """".sender(...) overrides"."""
         message = one_message(
             mail().to(support.PLAIN_ADDRESS).sender(support.OVERRIDE_SENDER)
         )
@@ -331,13 +331,12 @@ class TestReplyToAndSender:
 
 
 class TestUnresolvable:
-    """§6.2: "fail loud, not silent drop"."""
+    """"Fail loud, not silent drop"."""
 
     def test_collecting_an_unresolvable_recipient_does_not_raise(self, mail):
-        """§6.2 puts the error at ``.send()`` time, and
-        ``docs/plans/phase-2.md`` §4 says why: "resolution at ``.send()`` time so
-        errors surface together". A builder that validated eagerly would report
-        the first bad recipient and hide the rest."""
+        """The builder puts the error at ``.send()`` time: "resolution at
+        ``.send()`` time so errors surface together". A builder that validated
+        eagerly would report the first bad recipient and hide the rest."""
         mail().to(support.UNRESOLVABLE)  # must not raise
 
     def test_send_raises_recipient_error(self, mail):
@@ -375,8 +374,8 @@ class TestUnresolvable:
         assert support.UNRESOLVABLE in str(exc_info.value)
 
     def test_all_the_offending_values_surface_together(self, mail):
-        """``docs/plans/phase-2.md`` §4: "resolution at ``.send()`` time so
-        errors surface together". Reporting one bad recipient per run turns a
+        """Resolution happens at ``.send()`` time so errors surface together.
+        Reporting one bad recipient per run turns a
         typo-ridden list into a fix-and-rerun loop."""
         email = mail().to([support.UNRESOLVABLE, support.OTHER_UNRESOLVABLE])
 
@@ -391,7 +390,7 @@ class TestUnresolvable:
         )
 
     def test_an_unadaptable_object_raises_recipient_error(self, mail):
-        """§6.2 routes everything through one adapter, so "no adapter" is the
+        """Everything routes through one adapter, so "no adapter" is the
         same failure as "adapter could not resolve" and must not surface as a
         ``ComponentLookupError`` or a ``TypeError`` from deep inside assembly."""
         email = mail().to(object())
@@ -445,7 +444,7 @@ class TestUnresolvable:
 
 
 class TestAMemberWithTwoAddresses:
-    """§6.2: "fail loud, not silent drop" -- on the member path too.
+    """"Fail loud, not silent drop" -- on the member path too.
 
     Regression cover for a real defect. The ``str`` adapter refused a
     multi-address value from the start; the member adapter did not, so a member

@@ -1,4 +1,4 @@
-"""SPEC §6.2 -- the MIME shape of an assembled message.
+"""The MIME shape of an assembled message.
 
 > Message assembly: ``email.message.EmailMessage``, ``set_content(text)`` +
 > ``add_alternative(html, subtype="html")``, correct headers and encoding.
@@ -6,12 +6,12 @@
 
 That sentence pins an *order*, not just a set of parts. In
 ``multipart/alternative`` the **last** part is the one a client prefers, which is
-why the spec's two calls are in that order: ``set_content(text)`` puts plaintext
+why the two calls are in that order: ``set_content(text)`` puts plaintext
 first and ``add_alternative(html, ...)`` appends the HTML. Reverse them and every
 modern client shows the plaintext -- a mail that is technically valid, passes any
 "has both parts" assertion, and looks like the styling silently stopped working.
 
-``docs/plans/phase-2.md`` §8 also parks a Phase 0 question here: "the stock mails'
+This also parks a Phase 0 question here: "the stock mails'
 ``Content-Type`` question from Phase 0 resurfaces [...] settle the MIME shape with
 a real queued message as evidence". These are that evidence.
 """
@@ -36,7 +36,7 @@ class TestTheAlternativeStructure:
     def test_the_message_is_multipart_alternative(self, message):
         """Top level, because there are no attachments to wrap it."""
         assert message.get_content_type() == "multipart/alternative", (
-            f"the message is {message.get_content_type()!r}; SPEC §6.2's "
+            f"the message is {message.get_content_type()!r}; "
             "set_content + add_alternative produces multipart/alternative"
         )
 
@@ -47,7 +47,7 @@ class TestTheAlternativeStructure:
             "text/plain",
             "text/html",
         ], (
-            "SPEC §6.2's two calls produce text/plain then text/html, in that "
+            "The two calls produce text/plain then text/html, in that "
             f"order: got {[p.get_content_type() for p in parts]}"
         )
 
@@ -152,19 +152,19 @@ class TestHeaders:
 
 
 class TestNothingIsHandBuilt:
-    """§6.2: "Nothing hand-built by callers, ever" -- and, by the same token,
+    """Nothing hand-built by callers, ever -- and, by the same token,
     nothing hand-built inside the builder either."""
 
     def test_the_body_is_render_output_verbatim(
         self, mail, set_default_language, deliver, sent, notification_context
     ):
-        """The strongest statement of the seam: the parts are §6.1's
-        ``render()`` output, unedited.
+        """The strongest statement of the seam: the parts are ``render()``'s
+        output, unedited.
 
         A builder that post-processed the HTML -- to inline something, to rewrite
-        a URL, to append a footer -- would break §6.1's purity guarantee and, with
-        it, §7's golden files: the snapshots would then pin something no mail
-        actually contains.
+        a URL, to append a footer -- would break ``render()``'s purity guarantee
+        and, with it, the golden files: the snapshots would then pin something no
+        mail actually contains.
         """
         from imio.emailkit import render
 

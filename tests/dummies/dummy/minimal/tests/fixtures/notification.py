@@ -1,4 +1,4 @@
-"""Context data for ``dummy.minimal:notification`` (SPEC §7).
+"""Context data for ``dummy.minimal:notification``.
 
 One key per ``${...}`` in the template and nothing else. This dict *is* the
 contract between the template and the test suite: add a placeholder to the

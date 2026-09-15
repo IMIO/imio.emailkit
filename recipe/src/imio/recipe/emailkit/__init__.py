@@ -1,4 +1,4 @@
-"""``imio.recipe.emailkit`` -- the buildout recipe of SPEC §5.
+"""``imio.recipe.emailkit`` -- the buildout recipe.
 
     [emails]
     recipe = imio.recipe.emailkit
@@ -7,15 +7,14 @@
     # kit-mode = path | copy       (default: path)
     # node-bin = node
 
-What it does, per §5: resolves the part's eggs, collects the packages whose ZCML
+What it does: resolves the part's eggs, collects the packages whose ZCML
 registers ``<emailkit:templates>``, records ``(package, emails_dir,
 templates_dir)`` for each, resolves the design kit from the ``imio.emailkit``
 egg, and generates three scripts.
 
-**What it does not do, and must never do by default: compile.** §5's "Explicitly
-rejected" section is unambiguous -- "compiling at buildout time by default ... would
-make Node a production dependency across ~350 applications and couple deployments
-to npm availability". So ``compile-on-install`` defaults to false, and with that
+**What it does not do, and must never do by default: compile.** Compiling at
+buildout time by default would make Node a production dependency across ~350
+applications and couple deployments to npm availability. So ``compile-on-install`` defaults to false, and with that
 default this module imports nothing that knows Node exists, touches no ``emails/``
 directory, and runs no subprocess. It does not even *import* the consumer's code:
 discovery at install time greps each dist's ZCML for the emailkit marker on the
@@ -31,7 +30,7 @@ __version__ = "1.0.0b3.dev0"
 
 logger = logging.getLogger("imio.recipe.emailkit")
 
-#: The three scripts of §5, as ``(script name, module, callable)``.
+#: The three scripts this recipe generates, as ``(script name, module, callable)``.
 SCRIPTS = (
     ("compile-emails", "imio.recipe.emailkit.compile_emails", "main"),
     ("check-emails", "imio.recipe.emailkit.check_emails", "main"),
@@ -45,7 +44,7 @@ SCRIPTS = (
 SELF = "imio.recipe.emailkit"
 
 DEFAULTS = {
-    # SPEC §5's defaults, spelled out so `.installed.cfg` records them and a
+    # Defaults spelled out so `.installed.cfg` records them and a
     # `buildout -v` run shows what is in force.
     "compile-on-install": "false",
     "kit-mode": "path",
@@ -65,7 +64,7 @@ class Recipe:
         if options["kit-mode"] not in ("path", "copy"):
             raise user_error(
                 f"[{name}] kit-mode must be `path` or `copy`, not "
-                f"{options['kit-mode']!r} (SPEC §5)."
+                f"{options['kit-mode']!r}."
             )
         # `eggs` defaults to the part name in zc.recipe.egg, which for a part
         # called `emails` would try to resolve a distribution named `emails`. An
@@ -74,7 +73,7 @@ class Recipe:
             raise user_error(
                 f"[{name}] needs an `eggs` option naming the distributions to "
                 f"scan for `emailkit:templates` ZCML registrations. "
-                f"SPEC §5's example is `eggs = ${{instance:eggs}}`."
+                f"For example: `eggs = ${{instance:eggs}}`."
             )
         # Imported here rather than at module scope so that the import error, if
         # zc.recipe.egg is somehow absent, names this part.
@@ -93,7 +92,7 @@ class Recipe:
         generated = list(self._scripts(working_set, kit_dir))
 
         if compile_on_install(self.options):
-            # Opt-in, never the default (§5 step 3). Reached only when the
+            # Opt-in, never the default. Reached only when the
             # deployment has explicitly said it accepts Node at deploy time.
             self._compile(found, kit_dir)
 
@@ -107,7 +106,7 @@ class Recipe:
     # -- pieces -----------------------------------------------------------
 
     def _record(self, found, kit_dir):
-        """SPEC §5 step 1's record, in the log and in ``.installed.cfg``.
+        """The discovery record, written to the log and to ``.installed.cfg``.
 
         Written into the options so ``.installed.cfg`` carries it: when a mail
         turns out to be missing in production, "which packages did this buildout
@@ -174,7 +173,7 @@ class Recipe:
         return f"config={config!r}"
 
     def _compile(self, found, kit_dir):
-        """``compile-on-install = true``. Opt-in; §5 makes it never the default."""
+        """``compile-on-install = true``. Opt-in; never the default."""
         # Imported *here*, inside the opt-in branch, so that a default buildout
         # run never even loads the module that knows how to spawn npm.
         from imio.recipe.emailkit import compile_emails
@@ -190,7 +189,7 @@ class Recipe:
             return
         logger.warning(
             "%s: compile-on-install = true, so buildout is about to run Node. "
-            "SPEC §5 makes this opt-in for a reason; a deployment that cannot "
+            "This is opt-in for a reason; a deployment that cannot "
             "guarantee npm availability should leave it false.",
             self.name,
         )
@@ -219,7 +218,7 @@ def compile_on_install(options):
         return False
     raise user_error(
         f"compile-on-install must be a boolean, not {value!r}. It defaults to "
-        f"false, and SPEC §5 requires that it stay false unless a deployment "
+        f"false, and it must stay false unless a deployment "
         f"deliberately accepts Node at deploy time."
     )
 

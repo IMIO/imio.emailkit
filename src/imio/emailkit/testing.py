@@ -1,13 +1,13 @@
 """Test layers for ``imio.emailkit`` -- shipped in the egg, not in ``tests/``.
 
 Consumer add-ons reuse :data:`FIXTURE` as a base for their own sandbox layer, so
-these live inside the distribution (SPEC §7: "a provided test base class"). The
+these live inside the distribution as a provided test base class. The
 same reasoning puts :func:`install_recording_mailhost` here: every consumer that
 sends through the ``Email`` builder needs to assert on queued messages, and the
 stock Plone mock cannot tell a queued send from an immediate one (see the long
 comment above it).
 
-Two fixtures, on purpose (SPEC §8.2):
+Two fixtures, on purpose:
 
 * :data:`FIXTURE` applies ``imio.emailkit:default`` -- the profile that installs
   ``IEmailkitLayer`` and therefore the restyled Plone default mails.
@@ -108,12 +108,12 @@ BASE_FUNCTIONAL_TESTING = FunctionalTesting(
 
 
 # ---------------------------------------------------------------------------
-# A transaction-honest MailHost stand-in (SPEC §6.2, §7)
+# A transaction-honest MailHost stand-in
 # ---------------------------------------------------------------------------
 #
-# SPEC §6.2 makes transaction safety a *guarantee*: "delivery via ``IMailHost``
-# queued send -- an aborted transaction sends nothing", with
-# ``.send(immediate=True)`` the only escape. §7 names the test explicitly.
+# Transaction safety is a *guarantee*: "delivery via ``IMailHost`` queued
+# send -- an aborted transaction sends nothing", with
+# ``.send(immediate=True)`` the only escape, and the test names it explicitly.
 #
 # The usual Plone test double, ``Products.CMFPlone.tests.utils.MockMailHost``,
 # **cannot test that**, and would report a pass no matter what. It overrides
@@ -167,7 +167,7 @@ class RecordingMailer:
 
     The three methods are the whole contract ``DirectMailDelivery`` needs --
     ``send`` for ``tpc_finish``, ``vote`` for ``tpc_vote`` and ``abort`` for
-    ``MailDataManager.abort``. Counting aborts is what makes the §7 abort test
+    ``MailDataManager.abort``. Counting aborts is what makes the abort test
     a *positive* assertion: an empty inbox proves nothing on its own (a builder
     that never queued anything also has an empty inbox), while
     ``sent == [] and aborted == 1`` proves a delivery was really queued and
@@ -201,7 +201,7 @@ class RecordingMailHost(MailHost):
     #: ``MailBase.smtp_queue`` default, restated because it selects the delivery
     #: strategy: ``False`` means ``DirectMailDelivery``, i.e. joined to the
     #: transaction. ``True`` would write a maildir to ``smtp_queue_directory``
-    #: and start a processor thread -- a real queue on disk, not what §6.2's
+    #: and start a processor thread -- a real queue on disk, not what
     #: "queued send" means here.
     smtp_queue = False
 

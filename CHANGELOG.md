@@ -16,38 +16,36 @@
 
 - Add `imio.recipe.emailkit`, generating `bin/compile-emails`, `bin/check-emails`
   and `bin/preview-emails` from a buildout part, with `kit-mode = path | copy` and
-  `compile-on-install` off by default so a plain buildout run invokes no Node.
-  SPEC §5. 
+  `compile-on-install` off by default so a plain buildout run invokes no Node. 
 - Add `render(name, context, language)`, entry-point template discovery, the
   locale-aware `format_date`/`format_datetime`/`format_number` helpers, the three
-  `imio.emailkit.theme.*` registry tokens and FR/NL/DE catalogs. SPEC §4, §6.1. 
+  `imio.emailkit.theme.*` registry tokens and FR/NL/DE catalogs. 
 - Add `render_shell(subject, body_html, language=None)`, a `render()` sibling that
   wraps an existing HTML mail body in the kit shell with no template redesign.
-  `${...}` inside the injected body is emitted literally, never evaluated. SPEC §9
-  phase 3. 
+  `${...}` inside the injected body is emitted literally, never evaluated. 
 - Add dark-mode support to the kit shell, keyed on `data-dark` attribute selectors so
   the rules survive `css.purge`. Verified structurally; real-client verification needs
   the send-test button. 
 - Add the *"Send styled email"* content-rule action: the edit form offers every
-  template SPEC §4 discovery knows about, through a new
+  template discovery knows about, through a new
   `imio.emailkit.templates` vocabulary, plus two recipient sources (an explicit
   list of addresses or user ids, and the triggering content's owner). The executor
   delegates to the `Email` builder, so per-language sending, the registration's
   subject and transaction-safe delivery come for free, and it never swallows an
-  error. The stock mail action is untouched. SPEC §8.3. 
+  error. The stock mail action is untouched. 
 - Add the Manager-only `@@emailkit-preview` view: template listing, iframe rendering
   from the committed fixtures, a language switcher, a theme-token panel and a
-  send-test button that mails the logged-in user's own address. SPEC §6.3. 
+  send-test button that mails the logged-in user's own address. 
 - Add the `Email` builder with `IEmailRecipient` adapters, polymorphic attachments,
   per-language sending (one message per recipient-language group) and
-  transaction-safe queued delivery through `IMailHost`. SPEC §6.2. 
+  transaction-safe queued delivery through `IMailHost`. 
 - Add the authoring lint (`imio.emailkit.lint`), the second gate of
-  `check-emails`: eight regex rules for the SPEC §3 authoring rules, each one
+  `check-emails`: eight regex rules for the authoring rules, each one
   covering a failure mode that otherwise compiles cleanly and breaks at runtime. 
 - Add the built-in design kit (`Main.vue`, `Button`, `Panel`, `DataTable`, the
   Tailwind `@theme` entry) with accessibility defaults, `lang`, `i18n:domain` and the
   preheader slot baked in, plus the restyled Plone password-reset and registration
-  mails installed by the `default` profile and opt-out-able via `base`. SPEC §3, §8. 
+  mails installed by the `default` profile and opt-out-able via `base`. 
 - Render Plone's password-reset and registration mails through `render()` like every
   other template, by owning their views instead of overriding their page templates
   with `z3c.jbot`.
@@ -73,7 +71,7 @@
   date through the kit's `format_datetime`, bound to the *recipient's* language;
   stock followed the request's, so a Dutch member could get a French date. And a
   site package now overrides `imio.emailkit.templates.mail_password_template.pt`
-  rather than the CMFPlone file -- SPEC 8.2 level 1 is unchanged in mechanism, with
+  rather than the CMFPlone file -- the override mechanism is unchanged, with
   one filename convention for every template the package ships.
 
   The `:base` opt-out is untouched: the views are bound to `IEmailkitLayer`, so a
@@ -89,7 +87,7 @@
   Note that Plone only shows the "Get your username" form when `use_email_as_login`
   is off; on sites that log in by email this mail is never sent. 
 - Ship the golden-file test base class as `imio.emailkit.golden`, so consumer
-  add-ons get the SPEC §7 harness from the egg instead of copying it. 
+  add-ons get the harness from the egg instead of copying it. 
 - Templates from consumer add-ons are now registered with the
   `<emailkit:templates>` ZCML directive instead of the
   `imio.emailkit.templates` entry point + dict. Duplicate names become
@@ -156,23 +154,22 @@
   the `render_shell` migration routes and the three override levels. Adding a page is an
   MDX file plus one line in the navigation array; search, the per-page section nav and
   the previous/next links all follow from that. `README.md` is now the pitch and a link
-  to the site, so no topic has two homes; `SPEC.md` and `docs/DECISIONS.md` remain the
-  authority on *why*. 
+  to the site, so no topic has two homes. 
 
 
 ### Tests
 
-- Test suite for Phase 2's API, written from SPEC §6.2/§6.3: recipient resolution (string,
+- Test suite for Phase 2's API: recipient resolution (string,
   member, userid, mixed and nested iterables, duplicates, `RecipientError`), every
   attachment source and its filename/mimetype inference, per-language sending (one message
   per group, each with its own subject translation and its own rendered body), the subject
-  default and both override forms, the `multipart/alternative` shape, and §7's named
+  default and both override forms, the `multipart/alternative` shape, and the named
   transaction-abort test. `imio.emailkit.testing` now ships
   `install_recording_mailhost()`, a MailHost double that replaces `_makeMailer` rather than
   `_send` so a queued delivery can be told apart from an immediate one — which is what
   makes "abort → queue empty" a real assertion instead of a constant. 
 - Test suite, golden-file harness and CI for Phase 1: `imio.emailkit.testing` layers for
   both the `:default` and `:base` profiles, discovery / `render()` / locale-helper /
-  theme-token tests, the §8.2 override matrix (restyled defaults, opt-out, site-layer
+  theme-token tests, the override matrix (restyled defaults, opt-out, site-layer
   precedence), and a GitHub Actions job that fails when the committed `.pt` files differ
   from a fresh Maizzle build.

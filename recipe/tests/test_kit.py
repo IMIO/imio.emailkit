@@ -1,4 +1,4 @@
-"""SPEC §3/§5: wiring the design kit into a consumer, in both modes (§10.1)."""
+"""Wiring the design kit into a consumer, in both modes."""
 
 from imio.recipe.emailkit import kit as kit_module
 
@@ -7,7 +7,7 @@ import pytest
 
 
 class TestPathMode:
-    """§10.1's zero-copy mode, which Phase 0 settled as viable and §5 defaults to."""
+    """The zero-copy mode, settled as viable and used as the default."""
 
     def test_it_writes_a_shim_and_copies_nothing(self, project, kit):
         target = kit_module.wire(project, kit, "path")
@@ -98,7 +98,7 @@ class TestHousekeeping:
     def test_the_wiring_ignores_itself_rather_than_editing_a_gitignore(
         self, project, kit
     ):
-        """§4 calls ``.kit/`` gitignored; the recipe must not touch a consumer's file."""
+        """``.kit/`` is gitignored; the recipe must not touch a consumer's file."""
         target = kit_module.wire(project, kit, "path")
         assert (target / ".gitignore").read_text(encoding="utf-8").strip().endswith("*")
 

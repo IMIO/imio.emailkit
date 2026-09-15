@@ -1,8 +1,9 @@
-"""``imio.emailkit``'s own binding of the shipped golden harness (SPEC §7).
+"""``imio.emailkit``'s own binding of the shipped golden harness.
 
 The harness itself now lives in the egg, at :mod:`imio.emailkit.golden`, because
-§7 promises consumers "a provided test base class" and a base class nobody can
-import is not provided (Phase 4; ``docs/plans/phase-4.md`` §4). This module is
+the package promises consumers "a provided test base class" and a base class
+nobody can import is not provided (Phase 4). This
+module is
 what is left: the four lines that bind it to *this* package's suite.
 
 Keeping the shim rather than editing every subclass is deliberate -- it is the
@@ -24,8 +25,8 @@ class GoldenTemplateTests(ShippedGoldenTemplateTests):
     """The shipped harness, bound to ``imio.emailkit``'s own paths and languages.
 
     Every value below happens to equal the shipped default -- ``tests/test_golden.py``
-    sits next to ``tests/fixtures/`` and ``tests/golden/``, which is exactly §7's
-    layout. They are stated anyway, because ``tests/support.py`` is where this suite
+    sits next to ``tests/fixtures/`` and ``tests/golden/``, which is exactly the
+    shipped layout. They are stated anyway, because ``tests/support.py`` is where this suite
     keeps the contract it was written against, and a default that silently starts
     resolving somewhere else should show up as a diff here.
     """

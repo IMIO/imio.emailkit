@@ -1,4 +1,4 @@
-"""The golden-file test base class SPEC §7 promises consumer add-ons.
+"""The golden-file test base class provided to consumer add-ons.
 
 > A provided test base class renders each registered template against its fixture
 > and diffs against the golden file. Catches the two real regressions: a Tailwind
@@ -15,11 +15,11 @@ A consumer add-on's whole email test suite is this::
         templates = ("item_published", "meeting_convocation")
 
 with ``tests/fixtures/<template>.py`` and ``tests/golden/<template>.<lang>.<ext>``
-next to it -- the layout §7 draws. That is one test per
+next to it -- that layout. That is one test per
 (template x language x part), so a failure names exactly one file.
 
-**Why this lives in the egg and not in a test directory.** §7 says *provided*, and
-a base class a consumer cannot import is not provided. Phases 1-3 kept it in
+**Why this lives in the egg and not in a test directory.** This class is meant to
+be *provided*, and a base class a consumer cannot import is not provided. Phases 1-3 kept it in
 ``tests/golden_harness.py`` with a note that shipping it was Phase 4 work; this is
 that move. ``tests/golden_harness.py`` is now a thin subclass that binds this
 class to ``imio.emailkit``'s own suite, so the export is a move rather than a fork.
@@ -61,7 +61,7 @@ import re
 #: Environment variable that turns a verification run into a regeneration run.
 UPDATE_GOLDEN_ENV = "EMAILKIT_UPDATE_GOLDEN"
 
-#: §7's example ships ``fr``; ``en`` is the source language, and having both means
+#: The default ships ``fr``; ``en`` is the source language, and having both means
 #: a translation that stops resolving shows up as a diff rather than as nothing at
 #: all. Override ``languages`` on the subclass to trim or extend.
 DEFAULT_LANGUAGES = ("fr", "en")
@@ -116,13 +116,12 @@ def load_fixture(path):
     """Return the ``CONTEXT`` dict of a ``tests/fixtures/<template>.py`` file.
 
     Loaded *by path* rather than imported, so ``tests/fixtures/`` stays a
-    directory of data files -- which is what §7 describes -- instead of having to
-    become an importable package.
+    directory of data files instead of having to become an importable package.
     """
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
-            f"No fixture at {path}. SPEC §7 requires one per template: a module "
+            f"No fixture at {path}. Each template requires one: a module "
             "with a CONTEXT dict of the data the template renders against."
         )
     spec = importlib.util.spec_from_file_location(
@@ -134,7 +133,7 @@ def load_fixture(path):
         context = module.CONTEXT
     except AttributeError:
         raise AssertionError(
-            f"{path} defines no CONTEXT. A §7 fixture is a module-level dict "
+            f"{path} defines no CONTEXT. A fixture is a module-level dict "
             "named CONTEXT holding the render context."
         ) from None
     return dict(context)
@@ -166,7 +165,7 @@ class GoldenTemplateTests:
 
     #: Namespace of the add-on whose templates these are -- the package part of
     #: the ``<package>:<template>`` lookup name its ``<emailkit:templates>`` ZCML
-    #: registration gives them (SPEC §4). The harness namespaces :attr:`templates`
+    #: registration gives them. The harness namespaces :attr:`templates`
     #: with it.
     package = None
 
@@ -180,7 +179,7 @@ class GoldenTemplateTests:
     parts = (("html", 0), ("txt", 1))
 
     #: ``tests/fixtures`` and ``tests/golden``, absolute. ``None`` means "beside
-    #: the module this subclass is defined in", which is §7's layout.
+    #: the module this subclass is defined in", which is the expected layout.
     fixtures_dir = None
     golden_dir = None
 
@@ -228,9 +227,9 @@ class GoldenTemplateTests:
 
     @classmethod
     def qualified(cls, template):
-        """``item_published`` -> ``imio.pm.notifications:item_published`` (§4)."""
+        """``item_published`` -> ``imio.pm.notifications:item_published``."""
         assert cls.package, (
-            f"{cls.__name__} sets no `package`. SPEC §4 namespaces template names "
+            f"{cls.__name__} sets no `package`. Template names are namespaced "
             "as <package>:<template>, so the harness cannot look anything up "
             "without the package name the add-on's ZCML registered them under."
         )
@@ -280,7 +279,7 @@ class GoldenTemplateTests:
 
         # `import imio.emailkit.render` yields the render FUNCTION, because
         # `imio/emailkit/__init__.py` rebinds the name to it -- that is the public
-        # API §6.1 documents. The module itself is only reachable this way, and
+        # API. The module itself is only reachable this way, and
         # patching the function object instead is the mistake that made
         # `bin/preview-emails` silently drop every image once already.
         module = importlib.import_module("imio.emailkit.render")
@@ -360,7 +359,7 @@ class GoldenTemplateTests:
         self.assert_clean(path.read_text(encoding="utf-8"), f"golden {path.name}")
 
     def test_every_template_has_a_fixture(self, template):
-        """§7: "each template ships a fixture and a snapshot". The fixture is the
+        """Each template ships a fixture and a snapshot. The fixture is the
         harness's input, so a missing one is a hard failure, not a skip."""
         assert self.fixture_path(template).exists(), (
             f"no fixture at {self.fixture_path(template)}"

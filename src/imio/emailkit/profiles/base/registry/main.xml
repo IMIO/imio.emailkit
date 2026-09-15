@@ -3,7 +3,7 @@
           i18n:domain="imio.emailkit"
 >
 
-  <!-- SPEC §3's three theme tokens, as `imio.emailkit.theme.<token>`.
+  <!-- The three theme tokens, as `imio.emailkit.theme.<token>`.
 
        No <value> elements on purpose. `plone.app.registry` builds each record
        from the interface and seeds it with the field's own default, so the

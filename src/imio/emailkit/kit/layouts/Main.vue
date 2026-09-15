@@ -1,6 +1,6 @@
 <script setup>
 /**
- * `KitMain` -- the single canonical iMio email shell (SPEC §3).
+ * `KitMain` -- the single canonical iMio email shell.
  *
  * It owns exactly the document: the `<html>` namespace declarations, the a11y
  * defaults, the preheader, and the four bands of the v3 design -- white logo
@@ -76,14 +76,14 @@
  * ---------------------------------------------------------------------------
  * The two hosts, and why the `tal:define` on `<html>` looks like that
  * ---------------------------------------------------------------------------
- * Our own templates render through SPEC §6.1 `render()`, whose context is flat
+ * Our own templates render through `render()`, whose context is flat
  * (`lang`, `theme`, `preheader`). A consumer's template may instead be rendered
  * by a *stock view*, whose kwargs land in `options`. TAL's `|` operator lets the
  * shell serve both without the author knowing which host is which.
  *
  * The chain for `theme` ends at `context/@@emailkit_theme`, the view that returns
- * the three registry-backed branding tokens as a mapping. That is what makes
- * SPEC §8.2 level 2 ("adjust branding only, via theme tokens") reach a template
+ * the three registry-backed branding tokens as a mapping. That is what lets a
+ * branding-only override ("adjust branding only, via theme tokens") reach a template
  * that cannot see `render()`'s context at all. If the view is absent the path
  * raises, `|` falls through to `nothing`, and the shell degrades to the brand
  * defaults instead of failing.
@@ -312,7 +312,7 @@ const hiddenPreheader =
   </head>
 
   <body class="m-0 w-full bg-imio-grey-canvas p-0 [word-break:break-word]" xml:lang="${lang}" dir="ltr" data-dark="page">
-    <!-- SPEC §3 preheader slot, fed by the optional `preheader` msgid (§4).
+    <!-- Preheader slot, fed by the optional `preheader` msgid.
          The named slot is the build-time fallback for templates a stock view
          renders: they never see `render()`'s preheader, so they supply the
          msgid as markup instead. Runtime always wins when it has a value. -->
@@ -551,9 +551,8 @@ const hiddenPreheader =
               </template>
 
               <!-- 3. Content well. Authored markup goes in the slot; `body_html`
-                   is the one sanctioned `structure` injection point (§3 rule 4)
-                   and the seam SPEC §9 phase 3's `render_shell()` hands its body
-                   to. -->
+                   is the one sanctioned `structure` injection point and the seam
+                   `render_shell()` hands its body to. -->
               <tr>
                 <td class="px-10 pb-6 pt-[30px] text-[15px] leading-6 text-imio-black sm:px-5" data-dark="body">
                   <slot />
@@ -608,7 +607,7 @@ const hiddenPreheader =
                 </td>
               </tr>
 
-              <!-- 4. Negative footer: `footer_html` unescaped (§3 rule 4), or a
+              <!-- 4. Negative footer: `footer_html` unescaped, or a
                    neutral default, then the iMio logo. No `data-dark`: this band
                    is already black in the light rendering. -->
               <tr>

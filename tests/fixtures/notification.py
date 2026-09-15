@@ -1,20 +1,20 @@
-"""Context data for ``imio.emailkit:notification`` (SPEC §7).
+"""Context data for ``imio.emailkit:notification``.
 
 The fixture is the *contract* between the template author and the test suite: a
 placeholder added to the template without a matching key here makes the golden
 test fail loudly, which is the point. It is also what ``make preview-emails``
-(§5) and ``@@emailkit-preview`` (§6.3) render, so keeping it realistic is not
+and ``@@emailkit-preview`` render, so keeping it realistic is not
 cosmetic -- it is the data every developer will look at.
 
 Four names are deliberately **absent**, because ``render()`` supplies them and a
 fixture that pinned them would hide a broken injection:
 
-* ``lang`` -- the render language (§6.1). Hardcoding it would pin every golden
+* ``lang`` -- the render language. Hardcoding it would pin every golden
   file to one language and make a broken ``language=`` argument invisible.
 * ``theme`` / ``logo_url`` / ``primary_color`` / ``footer_html`` -- injected from
-  ``plone.app.registry`` (§3), which is exactly what
+  ``plone.app.registry``, which is exactly what
   ``tests/test_theme_tokens.py`` varies.
-* ``preheader`` -- comes from the *registration* (§4), not from the caller.
+* ``preheader`` -- comes from the *registration*, not from the caller.
 
 Plain strings rather than objects: ``render()``'s context is a flat mapping, and
 Zope path traversal enforces security declarations, so a plain Python instance

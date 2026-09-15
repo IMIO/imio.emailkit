@@ -1,13 +1,13 @@
-"""``docs/plans/phase-3.md`` §4 gate 8 -- sending a shell-rendered body.
+"""Gate 8 -- sending a shell-rendered body.
 
 > ``Email(...)`` can send a shell-rendered body with no builder change.
 
-Plan §2's reasoning: ``render_shell`` "returns the same ``(html, text)`` pair and
+The reasoning: ``render_shell`` "returns the same ``(html, text)`` pair and
 shares ``render()``'s code path […] so ``Email`` sends its output with no change at
-all", and §5 makes "no new builder methods -- §6.2 stays frozen" a non-goal.
+all", and "no new builder methods -- the builder stays frozen" is a non-goal.
 
 **What this module found.** The compatibility claim holds -- shell output goes out
-through §6.2's own assembly and the real ``MailHost``, and arrives as a correct
+through the builder's own assembly and the real ``MailHost``, and arrives as a correct
 message. The literal claim does not: ``Email.send()`` renders from a *template
 name* (``render(self.name, …)``), and ``render_shell`` deliberately has no name --
 ``imio.emailkit.render`` resolves the shell by path and documents why it is not
@@ -25,7 +25,7 @@ which a caller hands ``Email`` a pre-rendered pair, and:
 The two together are the honest form of gate 8: the mechanism is proven, the last
 mile is named. Closing it is a maintainer decision (register the shell for
 discovery, or document a recipe), and either way it is one line of code plus a
-decision entry -- not a change to §6.2.
+decision entry -- not a change to the builder.
 """
 
 import pytest
@@ -54,9 +54,9 @@ def shell_parts(mail_portal, legacy):
 class TestTheObviousBuilderPath:
     """Gate 8 read literally: ``Email(...)`` sends the shell, no builder change.
 
-    With the shell registered under §4 like any other template, this is the whole
+    With the shell registered like any other template, this is the whole
     migration recipe -- ``.with_context(subject=…, body_html=…)`` and nothing else,
-    every §6.2 feature (per-language grouping, attachments, transaction safety,
+    every builder feature (per-language grouping, attachments, transaction safety,
     ``RecipientError``) included for free. It is also the only reading in which the
     words "``Email(...)`` can send" are literally true.
     """
@@ -115,7 +115,7 @@ class TestTheFrozenSurfaceStillCarriesShellOutput:
         assert "<html" not in text.lower()
 
     def test_the_builder_grew_no_shell_method(self, mail_portal):
-        """§6.2 is frozen (``docs/plans/phase-3.md`` §5).
+        """The builder is frozen.
 
         ``tests/test_builder.py`` already asserts the closed set of nine methods;
         this names the Phase 3 temptations specifically, so a
@@ -127,8 +127,8 @@ class TestTheFrozenSurfaceStillCarriesShellOutput:
         grew = [name for name in forbidden if hasattr(Email, name)]
 
         assert grew == [], (
-            f"Email grew {grew} for the shell; §9 phase 3 makes render_shell a "
-            "render() sibling precisely so that §6.2 stays frozen"
+            f"Email grew {grew} for the shell; render_shell is meant to be a "
+            "render() sibling precisely so that the builder stays frozen"
         )
 
     def test_a_shell_body_goes_out_through_the_builders_own_assembly(
@@ -138,7 +138,7 @@ class TestTheFrozenSurfaceStillCarriesShellOutput:
 
         ``build_message`` is the function ``Email.send()`` calls, and
         ``mailhost.send(message)`` without ``immediate`` is the call it makes -- so
-        this is §6.2's delivery, byte for byte, with a shell-rendered body in it.
+        this is the builder's delivery, byte for byte, with a shell-rendered body in it.
         """
         from imio.emailkit.email import build_message
         from imio.emailkit.recipients import resolve
@@ -232,7 +232,7 @@ class TestTheFrozenSurfaceStillCarriesShellOutput:
     def test_an_aborted_transaction_sends_no_shell_mail(
         self, mail_portal, mailhost, site_sender, sent, shell_parts, legacy
     ):
-        """§6.2's transaction guarantee is not the builder's, it is the delivery
+        """The transaction guarantee is not the builder's, it is the delivery
         path's -- so it has to hold for a shell body too. A notification queued in
         a transaction that then fails must not arrive: the item was never
         published.

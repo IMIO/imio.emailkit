@@ -55,7 +55,7 @@ class TestJbotPatchesAreLoaded:
     took the two stock views over, so there is no directory of ours to wire. The
     include is still required, and in the less obvious direction: the patches
     below are what ``render()._page_template`` invokes so that a *consumer* can
-    override one of our resolved ``.pt`` files (§4's last bullet), which is what
+    override one of our resolved ``.pt`` files, which is what
     ``tests/test_layer_override.py`` exercises end to end.
     """
 
@@ -80,10 +80,9 @@ class TestJbotPatchesAreLoaded:
     def test_products_page_template_file_is_patched(self, portal):
         """The class ``render()`` loads our own templates with.
 
-        ``docs/DECISIONS.md``: ``render()`` uses
-        ``Products.PageTemplates.PageTemplateFile`` precisely because it is both
-        jbot-patched and has TAL path expressions. If this patch is absent, §4's
-        "z3c.jbot works on the resolved ``.pt`` files" is false.
+        ``render()`` uses ``Products.PageTemplates.PageTemplateFile`` precisely
+        because it is both jbot-patched and has TAL path expressions. If this
+        patch is absent, "z3c.jbot works on the resolved ``.pt`` files" is false.
         """
         from Products.PageTemplates.PageTemplateFile import PageTemplateFile
 

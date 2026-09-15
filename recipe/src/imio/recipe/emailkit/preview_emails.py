@@ -1,33 +1,32 @@
-"""``bin/preview-emails`` (SPEC §5) -- the two-stage dev loop.
+"""``bin/preview-emails`` -- the two-stage dev loop.
 
     bin/preview-emails [--package NAME] [--watch]
 
-§5, verbatim: "The two-stage dev loop -- the flagship DX feature. Maizzle's own
-``--watch`` shows *build-time* output: raw ``${item/title}`` placeholders and
-unexpanded ``tal:repeat`` -- a miserable authoring loop. This script watches the
-``.vue`` sources, compiles, pipes the result through Chameleon (``render()``)
-**with the committed fixtures (§7)**, and serves the result with live reload and a
-language switcher."
+The flagship DX feature. Maizzle's own ``--watch`` shows *build-time* output: raw
+``${item/title}`` placeholders and unexpanded ``tal:repeat`` -- a miserable
+authoring loop. This script watches the ``.vue`` sources, compiles, pipes the
+result through Chameleon (``render()``) **with the committed fixtures**, and
+serves the result with live reload and a language switcher.
 
-This is ``scripts/preview_emails.py`` generalised, per §9's sequencing note: same
-steps, no hardcoded paths, and one thing the precursor could not do.
+This is ``scripts/preview_emails.py`` generalised: same steps, no hardcoded
+paths, and one thing the precursor could not do.
 
 **The precursor needed a ZODB connection, and this does not.** That was recorded as
 the reason live reload was deferred ("wiring a watcher to a process that has to
 hold a ZODB connection open is the part with real design in it"). Measured while
 building this: ``render()`` is a pure function of (template, context, registry
-state) exactly as §6.1 claims, so a minimal ZCML load -- ``Products.PageTemplates``
+state), so a minimal ZCML load -- ``Products.PageTemplates``
 for the ``IPageTemplateEngine`` utility, plus each package's translation catalogs
 -- is enough to render with real placeholder substitution and real FR/NL/DE
 translations. No ``zope.conf``, no database, no site. The watcher is therefore an
 ordinary polling loop, and live reload is ~30 lines.
 
 What is *not* real without a site, stated plainly rather than left to be
-discovered: the §3 theme tokens come from :class:`IEmailkitTheme`'s own defaults
+discovered: the theme tokens come from :class:`IEmailkitTheme`'s own defaults
 (seeded into an in-memory registry) rather than from a site's
-``plone.app.registry``. ``--theme token=value`` overrides them, which is the §6.3
+``plone.app.registry``. ``--theme token=value`` overrides them, which is the
 token panel in its command-line form. For a preview against a *real* site's
-branding, use ``@@emailkit-preview`` (§6.3) -- that is what it is for.
+branding, use ``@@emailkit-preview`` -- that is what it is for.
 
 ``portal_url`` **is** real, and has to be. It is what the kit shell builds
 ``asset_base`` from, and every image in the design is gated on that being
@@ -86,11 +85,11 @@ WATCH_INTERVAL = 0.6
 class NotShipped(str):
     """A row note that is a plain fact rather than a failure.
 
-    An installed egg prunes both ``emails/`` and ``tests/`` (SPEC §4's
-    ``MANIFEST.in``), so the fixture §7 asks for cannot be there and no consumer
+    An installed egg prunes both ``emails/`` and ``tests/`` (per
+    ``MANIFEST.in``), so the expected fixture cannot be there and no consumer
     buildout could put it there: it lives in that package's own checkout.
     ``@@emailkit-preview`` already reports that absence as a fact rather than an
-    error (§6.3); this is the same judgement in the command line's vocabulary.
+    error; this is the same judgement in the command line's vocabulary.
 
     A ``str`` subclass so every consumer of a row keeps working unchanged, and
     distinguished by *type* rather than by matching the message, so
@@ -142,7 +141,7 @@ def parser():
         metavar="TOKEN=VALUE",
         action="append",
         default=[],
-        help="override a §3 theme token, e.g. --theme primary_color=#e6007e.",
+        help="override a theme token, e.g. --theme primary_color=#e6007e.",
     )
     return parsed
 
@@ -224,8 +223,8 @@ def seed_portal_url(base_url):
     Paired with :func:`resource_dirs` and the handler's ``++resource++`` route,
     which is what actually serves the bytes.
 
-    ``import_module`` and not ``from imio.emailkit import render``: §6.1 spells the
-    public API as the latter, so ``imio/emailkit/__init__.py`` rebinds the name to
+    ``import_module`` and not ``from imio.emailkit import render``: the public API
+    is spelled as the latter, so ``imio/emailkit/__init__.py`` rebinds the name to
     the ``render`` FUNCTION and shadows the submodule of the same name. Written the
     obvious way this assigns an unused attribute to a function object, patches
     nothing, and the preview goes on silently dropping every image -- which is how
@@ -285,8 +284,8 @@ def configure(projects):
 
     ``Products.PageTemplates`` is not optional and not a detail. It registers the
     ``IPageTemplateEngine`` utility; without it ``zope.pagetemplate`` falls back to
-    ``zope.tal``, where ``${...}`` passes through **verbatim and with no error**
-    (``docs/DECISIONS.md``). A preview built on that fallback would render raw
+    ``zope.tal``, where ``${...}`` passes through **verbatim and with no error**.
+    A preview built on that fallback would render raw
     placeholders and look like a template bug. :func:`render_all` asserts on the
     output for the same reason.
     """
@@ -343,7 +342,7 @@ def _importable(package):
 
 
 def seed_theme(overrides):
-    """Register an in-memory ``plone.app.registry`` holding the §3 theme tokens.
+    """Register an in-memory ``plone.app.registry`` holding the theme tokens.
 
     Without a registry, ``render()``'s ``get_theme()`` collapses every token to the
     empty string, so a preview would show an unbranded shell and an empty
@@ -483,14 +482,15 @@ def _write_source(name, template, output):
     stands where its value would be and every ``tal:condition`` branch shows at
     once.
 
-    **This is the build-time output §5 threw out, and that is deliberate.** §5's
-    objection to ``maizzle --watch`` is to an authoring loop whose *only* output
-    is unsubstituted markup -- one you can work in all day without ever learning
-    that ``${item/created}`` renders nothing. Here it is one labelled part of
-    three, next to the two that do render, and it is never substituted for them:
-    a template with no fixture still reports FAILED and still exits non-zero. It
-    answers "what does this layout look like"; the parts beside it answer "does
-    this template render", which is the question §5 is protecting.
+    **This is the build-time output the two-stage loop exists to get away from,
+    and showing it here is deliberate.** The objection to ``maizzle --watch`` is
+    to an authoring loop whose *only* output is unsubstituted markup -- one you
+    can work in all day without ever learning that ``${item/created}`` renders
+    nothing. Here it is one labelled part of three, next to the two that do
+    render, and it is never substituted for them: a template with no fixture
+    still reports FAILED and still exits non-zero. It answers "what does this
+    layout look like"; the parts beside it answer "does this template render",
+    which is the question this whole tool is protecting.
 
     One file per template rather than one per language: there is no render, so
     there is nothing for a language to change.
@@ -522,7 +522,7 @@ def _render_one(name, context, language, output):
             name,
             language,
             "unsubstituted ${...} in the output: the page-template engine is not "
-            "the Chameleon one (see docs/DECISIONS.md)",
+            "the Chameleon one",
         )
     (output / f"{stem}.html").write_text(html, encoding="utf-8")
     (output / f"{stem}.txt").write_text(text, encoding="utf-8")
@@ -533,26 +533,26 @@ def _no_fixture(project, basename):
     """Why there is no fixture for ``basename``, as a failure or as a fact.
 
     A package that ships neither ``emails/`` nor ``tests/`` is an installed egg
-    whose sdist pruned both (§4). Its fixtures are in its own checkout and
+    whose sdist pruned both. Its fixtures are in its own checkout and
     nothing here can conjure them, so reporting FAILED would be telling the
     person running the preview to fix something that is not theirs -- and would
     exit non-zero on a buildout that is working exactly as intended.
 
     Anywhere else -- any checkout, which is where this script is meant to run --
-    a missing fixture is the omission §7 wants caught, and still fails.
+    a missing fixture is a real omission that should be caught, and still fails.
     """
     wanted = project.tests_dir / "fixtures" / f"{basename}.py"
     if project.emails_dir is None and not project.tests_dir.is_dir():
         return NotShipped(
             f"no fixture, and none possible: {project.package} is installed as an "
-            f"egg, whose sdist prunes tests/ (SPEC §4). Its fixtures live in its "
+            f"egg, whose sdist prunes tests/. Its fixtures live in its "
             f"own checkout. The .pt part below needs none."
         )
-    return f"no fixture; SPEC §7 wants one at {wanted}"
+    return f"no fixture; expected one at {wanted}"
 
 
 def find_fixture(project, basename):
-    """``<tests>/fixtures/<basename>.py``, per SPEC §7, or ``None``."""
+    """``<tests>/fixtures/<basename>.py``, or ``None``."""
     candidates = [project.tests_dir / "fixtures" / f"{basename}.py"]
     if project.root is not None:
         candidates.append(project.root / "tests" / "fixtures" / f"{basename}.py")
@@ -567,8 +567,8 @@ def load_fixture(path):
     """The ``CONTEXT`` dict of a fixture module, loaded **by path**.
 
     By path rather than by import, so ``tests/fixtures/`` stays a directory of data
-    files -- which is what §7 describes -- and so the preview and the golden test
-    can never disagree about what the fixture says.
+    files and so the preview and the golden test can never disagree about what the
+    fixture says.
     """
     spec = importlib.util.spec_from_file_location(
         f"_emailkit_fixture_{path.stem}", path
@@ -577,7 +577,7 @@ def load_fixture(path):
     spec.loader.exec_module(module)
     context = getattr(module, "CONTEXT", None)
     if not isinstance(context, dict):
-        raise ValueError("a fixture module must define a dict named CONTEXT (SPEC §7)")
+        raise ValueError("a fixture module must define a dict named CONTEXT")
     return context
 
 
@@ -717,7 +717,7 @@ def write_index(rows, output, languages, generation, watch=False):
         f"<style>{INDEX_CSS}</style></head><body>"
         "<aside><h1>imio.emailkit preview</h1>"
         "<p class='hint'>Rendered through <code>render()</code> with the committed "
-        "fixtures (SPEC §7). This is the mail, not the build output -- except in "
+        "fixtures. This is the mail, not the build output -- except in "
         "the <code>.pt</code> part, which is the committed file itself, needs no "
         "fixture and substitutes nothing."
         + ("<br>Watching sources; the page reloads itself." if watch else "")
@@ -771,7 +771,7 @@ def watch_loop(projects, pass_once, stop, interval=WATCH_INTERVAL):
     """Poll mtimes; re-run a pass when anything changed.
 
     Polling rather than inotify: no dependency, works on every platform, and the
-    file count here is tens, not thousands. §5 asks for the loop, not for a
+    file count here is tens, not thousands. A loop is what is needed here, not a
     filesystem-event framework.
     """
     previous = _fingerprint(projects)

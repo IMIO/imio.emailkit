@@ -1,6 +1,6 @@
 <script setup>
 /**
- * Plone's password-reset mail, restyled (SPEC §8.1).
+ * Plone's password-reset mail, restyled.
  *
  * An ordinary template in the ordinary dialect. It used to be a `z3c.jbot`
  * override rendered by a stock Plone view, which forced `options/member`,

@@ -32,7 +32,7 @@
  * ---------------------------------------------------------------------------
  * Rows may be a component here; in `KitDataTable` they may not
  * ---------------------------------------------------------------------------
- * SPEC §3 rule 1 forbids `tal:` on a kit component, because Vue attribute
+ * `tal:` is forbidden on a kit component, because Vue attribute
  * fallthrough lands it on whichever element happens to be the component's root.
  * A `tal:repeat` therefore has to live on an author's own `<tr>`. That binds
  * `KitDataTable`, whose whole purpose is repeated rows; it does not bind this

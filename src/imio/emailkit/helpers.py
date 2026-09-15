@@ -1,19 +1,19 @@
-"""SPEC §6.1's locale-aware formatting helpers, as plain functions.
+"""Locale-aware formatting helpers, as plain functions.
 
 ``render()`` injects these into the template namespace *already bound* to the
-render language, which is what §6.1 asks for and what lets a template write
+render language, which is what lets a template write
 ``${python: format_date(item/created)}`` without repeating the language on every
 call. They live here as free functions taking the language explicitly so they can
 be tested, and reused, without a render.
 
 Every pattern comes from the CLDR data ``zope.i18n`` ships, so the answer depends
 on the *render* language rather than on the current request. That is the whole
-point: per-language sending (§6.2) renders the same template once per language
+point: per-language sending renders the same template once per language
 group, and a helper reading the request would format all of them identically.
 
 Deliberately **not** ``plone.api.portal.get_localized_time``: it formats in the
 language the current request negotiated, and needs a request, a portal and the
-``translation_service`` tool. All three contradict §6.1's "pure function", and
+``translation_service`` tool. All three contradict the "pure function" design, and
 none of them can be pointed at another language. The trade-off, worth knowing: a
 site's date-format overrides in the Plone control panel do not reach mails.
 """
@@ -115,8 +115,8 @@ def as_datetime(value):
 def bind(language):
     """Return the three helpers bound to ``language``, for a template namespace.
 
-    SPEC §6.1: "locale-aware formatting helpers [...] bound to the render
-    language, so no template ever reinvents French date formatting".
+    Locale-aware formatting helpers bound to the render language, so no
+    template ever reinvents French date formatting.
     """
 
     def bound_format_date(value, length=DEFAULT_DATE_LENGTH):

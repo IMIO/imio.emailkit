@@ -1,17 +1,17 @@
-"""SPEC §6.2 recipient resolution -- one adapter, no ``isinstance`` in the builder.
+"""Recipient resolution -- one adapter, no ``isinstance`` in the builder.
 
 ``.to()``/``.cc()``/``.bcc()`` accept "an email string, a Plone member object, a
 userid, or an iterable of those". This module is where that polymorphism lives, so
-:class:`~imio.emailkit.email.Email` can stay the plain data holder §6.2 requires:
+:class:`~imio.emailkit.email.Email` can stay the plain data holder it is meant to be:
 the builder flattens what it is handed and calls :func:`resolve` at ``.send()``.
 
 Three things are deliberate and worth reading before changing anything here.
 
-* **Failures are collected, not raised one at a time.** §6.2 puts resolution at
+* **Failures are collected, not raised one at a time.** Resolution happens at
   ``.send()`` precisely so every bad value surfaces in one
   :class:`~imio.emailkit.interfaces.RecipientError`.
 * **An adapter returns ``None`` rather than a placeholder.** "Fail loud, not
-  silent drop" (§6.2) means the *absence* of an answer has to travel; an adapter
+  silent drop" means the *absence* of an answer has to travel; an adapter
   that guessed an address would send a real mail to the wrong person.
 * **A ``str`` containing ``@`` is an address, full stop -- no member lookup.**
   See :func:`recipient_from_string` for why.
@@ -34,7 +34,7 @@ from zope.interface import implementer
 @implementer(IEmailRecipient)
 @dataclass(frozen=True)
 class Recipient:
-    """A resolved recipient: exactly SPEC §6.2's three attributes and nothing else.
+    """A resolved recipient: exactly three attributes and nothing else.
 
     Frozen and hashable so :func:`resolve` can de-duplicate without inventing a
     key, and immutable so a resolved list cannot be edited into disagreeing with
@@ -49,7 +49,7 @@ class Recipient:
 @adapter(str)
 @implementer(IEmailRecipient)
 def recipient_from_string(value):
-    """SPEC §6.2's default ``str`` adapter: an address, or a userid.
+    """The default ``str`` adapter: an address, or a userid.
 
     ``"@" in value`` decides, and it decides *for* the address reading. That is a
     real choice, because a userid can look like an email address when a site runs
@@ -60,7 +60,7 @@ def recipient_from_string(value):
     A wrong address is much worse than a missing display name.
 
     Consequence, and it is the documented trade-off: a bare address resolves with
-    no ``fullname`` and no ``language``, so it lands in §6.2's default-language
+    no ``fullname`` and no ``language``, so it lands in the default-language
     group. Pass the member object (or its userid) when the language matters.
 
     ``"Greffe <greffe@commune.be>"`` is accepted too, and the display name is
@@ -70,7 +70,7 @@ def recipient_from_string(value):
 
     A string carrying *several* addresses is refused rather than silently reduced
     to its first: ``getaddresses`` would hand back only one and the rest would
-    vanish, which is the silent drop §6.2 forbids. Pass a list.
+    vanish, which is the silent drop this module forbids. Pass a list.
     """
     value = value.strip()
     if not value:
@@ -92,15 +92,15 @@ def recipient_from_string(value):
 @adapter(IMember)
 @implementer(IEmailRecipient)
 def recipient_from_member(member):
-    """SPEC §6.2's default Plone-member adapter.
+    """The default Plone-member adapter.
 
     ``getProperty`` rather than attribute access because ``MemberData`` is not
-    path- or attribute-traversable for its properties (the same Phase 0 finding
+    path- or attribute-traversable for its properties (the same finding
     that shapes the default-mail templates), and because a site is free to drop
     the ``language`` property from ``portal_memberdata`` -- hence the default.
 
     An empty ``language`` property, which is what Plone stores for "no
-    preference", becomes ``None``: §6.2's attribute is documented as "may be
+    preference", becomes ``None``: the attribute is documented as "may be
     ``None``", and ``""`` would otherwise become its own language group.
 
     A member whose ``email`` property holds *several* addresses is refused, for
@@ -109,8 +109,8 @@ def recipient_from_member(member):
     ``"a@b.be, c@d.be"`` returns ``('', '')``, so the header came out as
     ``Full Name <>`` and the recipient simply vanished from the envelope while
     every other recipient in the same call was delivered -- exactly the silent
-    drop §6.2 forbids. Returning ``None`` here turns it into a ``RecipientError``
-    naming the member.
+    drop this module forbids. Returning ``None`` here turns it into a
+    ``RecipientError`` naming the member.
 
     A ``"Zoe <z@b.be>"`` shaped property is parsed rather than passed through, so
     the address never ends up nested inside another display name. That is the same
@@ -232,7 +232,7 @@ def describe_failure(value):
 
 
 def group_by_language(fields, default_language):
-    """SPEC §6.2's per-language grouping: one entry per distinct language.
+    """Per-language grouping: one entry per distinct language.
 
     :param fields: mapping of field name (``"to"``/``"cc"``/``"bcc"``) to its
         resolved recipients
@@ -242,14 +242,14 @@ def group_by_language(fields, default_language):
 
     A group holds only *its own* recipients in every field, so a French To and a
     Dutch Cc produce two messages, the second with no ``To`` header. That is the
-    honest consequence of §6.2 ("renders once per language group, and emits one
-    message per group"): the alternative -- repeating the full header lists in
+    honest consequence of rendering once per language group and emitting one
+    message per group: the alternative -- repeating the full header lists in
     every message -- would put the French body in front of the Dutch reader,
     which is the exact failure per-language sending exists to prevent.
 
     Languages are grouped on the string as resolved, with no normalisation. ``fr``
     and ``fr-BE`` are therefore two groups: they are two different renders as far
-    as the locale helpers are concerned (§6.1 -- Belgian French groups thousands
+    as the locale helpers are concerned (Belgian French groups thousands
     differently from French French), so merging them would be wrong, not thrifty.
     """
     groups = {}

@@ -3,8 +3,6 @@
 A `zc.buildout` recipe that gives every `imio.emailkit` consumer three scripts:
 `bin/compile-emails`, `bin/check-emails` and `bin/preview-emails`.
 
-`SPEC.md` §5 in the repository root is the specification. This README is how to use it.
-
 ## Usage
 
 ```ini
@@ -20,16 +18,16 @@ eggs = ${instance:eggs}
 ```
 
 The part resolves the eggs, collects every distribution whose ZCML registers
-`<emailkit:templates>` (§4), records each one's `emails/` and `templates/`
-directory, resolves the design kit out of the `imio.emailkit` egg (§3), and
+`<emailkit:templates>`, records each one's `emails/` and `templates/`
+directory, resolves the design kit out of the `imio.emailkit` egg, and
 writes the three scripts.
 
 **A plain buildout run invokes no Node, touches no `emails/` directory, and imports
-no consumer code.** That is not a happy accident, it is the point: §5's "Explicitly
-rejected" section rules out compiling at buildout time because it "would make Node a
-production dependency across ~350 applications and couple deployments to npm
-availability". `compile-on-install` exists for deployments that deliberately accept
-Node at deploy time, and it defaults to false.
+no consumer code.** That is not a happy accident, it is the point: compiling at
+buildout time is explicitly rejected because it would make Node a production
+dependency across ~350 applications and couple deployments to npm availability.
+`compile-on-install` exists for deployments that deliberately accept Node at
+deploy time, and it defaults to false.
 
 ## Options
 
@@ -53,8 +51,8 @@ any failure, and every package is attempted before it gives up, so one broken ad
 does not hide the state of the others.
 
 There is no rename step and no move step: Maizzle 6's `output.extension` emits `.pt`
-directly and the consumer's own `output.path` writes into `templates/`
-(`docs/DECISIONS.md`, §10.2). What *is* copied is `emails/twins/*.txt.pt`, because
+directly and the consumer's own `output.path` writes into `templates/`.
+What *is* copied is `emails/twins/*.txt.pt`, because
 `maizzle build` empties its output directory and would otherwise delete a committed
 twin.
 
@@ -64,7 +62,7 @@ you actually want.
 
 `--new NAME` scaffolds the four files a template needs — a `.vue` skeleton, a fixture,
 a golden placeholder and a registration stub to paste — and refuses to overwrite
-anything without `--force`. The skeleton starts on the right side of every §3
+anything without `--force`. The skeleton starts on the right side of every
 authoring rule.
 
 ### `bin/check-emails [--package NAME]`
@@ -73,7 +71,7 @@ authoring rule.
 
 1. *Staleness.* Snapshot the committed `.pt`, build in place, diff, restore. Exit 1
    with a per-file diff. Every `.pt` under the package is covered, not just
-   `templates/` — `imio.emailkit`'s own build also emits §8's jbot overrides
+   `templates/` — `imio.emailkit`'s own build also emits its jbot overrides
    elsewhere — while directories the build never wrote into are left alone.
 2. *The authoring lint*, `python -m imio.emailkit.lint <paths>`. **Called, not
    reimplemented**: the rules are about the templates, so they live with the runtime
@@ -85,7 +83,7 @@ authoring rule.
 ### `bin/preview-emails [--package NAME] [--watch]`
 
 Compile, render every registered template through `render()` with its committed
-fixture (§7), and serve the result with a language switcher and live reload. What you
+fixture, and serve the result with a language switcher and live reload. What you
 look at is the mail, not the build output.
 
 It needs **no ZODB and no `zope.conf`**: `render()` is a pure function of (template,
@@ -93,7 +91,7 @@ context, registry state), so a minimal ZCML load is enough for real placeholder
 substitution and real FR/NL/DE translations. Two things are therefore not real —
 `portal_url` is empty, and the theme tokens come from the kit's own defaults, which
 `--theme token=value` overrides. For a preview against a real site's branding, use
-`@@emailkit-preview` (§6.3).
+`@@emailkit-preview`.
 
 `--no-compile` renders the committed `.pt` as they are, which is a fast way to see
 what is actually in git.
@@ -102,7 +100,7 @@ what is actually in git.
 
 Three things, once.
 
-**1. Lay the addon out as §4 describes.** `emails/` may sit inside the package or at
+**1. Lay the addon out as follows.** `emails/` may sit inside the package or at
 the checkout root; both are found.
 
 ```
@@ -139,15 +137,15 @@ export default defineConfig({
 identical in shape in both `kit-mode`s, so a consumer's config never mentions the
 mode. In `path` mode it holds a two-line re-export of the kit inside the installed
 `imio.emailkit` egg, so Maizzle resolves components straight out of site-packages
-(§10.1's zero-copy mode); in `copy` mode it holds the kit itself. Consumers never
-vendor kit files (§3).
+(a zero-copy mode); in `copy` mode it holds the kit itself. Consumers never
+vendor kit files.
 
 Do not add `"type": "module"` to `emails/package.json`. Without it Maizzle loads the
 config through jiti, which transpiles the ESM syntax in the kit file — a file that,
 in `path` mode, lives outside any npm tree and has no `package.json` of its own to
 declare its module type.
 
-**3. Register in ZCML and run the gates in CI** (§4, §7):
+**3. Register in ZCML and run the gates in CI:**
 
 ```xml
 <configure
@@ -170,19 +168,19 @@ bin/check-emails --package acme.notifications
 
 `path` unless something forces you off it. It is zero-copy, it cannot go stale, and
 Phase 0 verified that Maizzle resolves `components.source` from an absolute path
-outside the project root. `copy` exists as §5's documented fallback and is verified
+outside the project root. `copy` exists as a documented fallback and is verified
 to produce **byte-identical** output; reach for it if a future Maizzle or a packaging
 environment stops resolving files outside the npm tree.
 
 ## Development
 
-This distribution lives in the `imio.emailkit` repository as a sibling directory
-(`docs/DECISIONS.md`), released separately. Its tests run in two environments,
+This distribution lives in the `imio.emailkit` repository as a sibling directory,
+released separately. Its tests run in two environments,
 because no single one has both buildout and the Plone runtime:
 
 ```
 make recipe-test      # both runs; the union covers every test
-make buildout-test    # the SPEC §9 phase 4 acceptance test, end to end
+make buildout-test    # the Phase 4 acceptance test, end to end
 make buildout-clean   # remove everything that writes
 ```
 

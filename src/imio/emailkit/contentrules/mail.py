@@ -1,4 +1,4 @@
-"""SPEC §8.3 -- the *"Send styled email"* content-rule action.
+"""The *"Send styled email"* content-rule action.
 
 Four objects, which is what ``plone.contentrules`` asks any action for:
 
@@ -16,12 +16,12 @@ Four objects, which is what ``plone.contentrules`` asks any action for:
 
 Three things are deliberate and are the reason this module is short.
 
-**The executor delegates and does not decide.** §6.2 is frozen and this is a
-caller of it. There is no retry, no queue, no digest, no "skip if" -- a content
-rule fires (§1 non-goals). Per-language rendering, subject translation, message
-assembly and transaction-bound delivery are all the builder's, already, and
-reimplementing any of them here would be a second code path for the mails
-somebody automated.
+**The executor delegates and does not decide.** The builder is frozen and this
+is a caller of it. There is no retry, no queue, no digest, no "skip if" -- a
+content rule fires, and that is deliberately all it does. Per-language
+rendering, subject translation, message assembly and transaction-bound delivery
+are all the builder's, already, and reimplementing any of them here would be a
+second code path for the mails somebody automated.
 
 **Nothing is swallowed.** A content rule that quietly does not send is
 indistinguishable from no rule at all, so every failure travels: an unknown
@@ -30,22 +30,23 @@ template raises ``TemplateNotFound``, an unresolvable recipient raises
 ``except`` in this module logs which rule context, which template and which
 recipients, and then re-raises. ``plone.contentrules``' executor does not catch
 exceptions either, so the failure surfaces on the operation that triggered the
-rule and the transaction rolls back -- which is also why §6.2's queued delivery
-means nothing was sent.
+rule and the transaction rolls back -- which is also why the builder's queued
+delivery means nothing was sent.
 
-**Exactly two recipient sources** (§8.3: "recipient sources"): the explicit list
-a manager types, and the triggering content's owner. Both are handed to
-``.to()`` as values, never resolved here: §6.2 already accepts "an email string,
-a Plone member object, a userid, or an iterable of those" through one adapter, and
-resolving an address in this module would be the second implementation that
-eventually disagrees with the first. The owner is passed as a **userid** for that
+**Exactly two recipient sources**: the explicit list a manager types, and the
+triggering content's owner. Both are handed to ``.to()`` as values, never
+resolved here: the builder already accepts "an email string, a Plone member
+object, a userid, or an iterable of those" through one adapter, and resolving
+an address in this module would be the second implementation that eventually
+disagrees with the first. The owner is passed as a **userid** for that
 reason -- the member adapter then supplies the display name *and* the preferred
-language, which is what makes §6.2's per-language sending work from a rule.
+language, which is what makes the builder's per-language sending work from a
+rule.
 
 The render context, for template authors
 ----------------------------------------
 
-§8.3 says nothing about what a rule-triggered mail renders against, and a content
+Nothing says what a rule-triggered mail renders against, and a content
 rule cannot know what an arbitrary template wants -- so the set is **fixed, small
 and closed**, and this is its authoritative definition. It is
 :data:`RENDER_CONTEXT_NAMES`, built by :func:`render_context`:
@@ -62,16 +63,16 @@ and closed**, and this is its authoritative definition. It is
 ==============  =============================================================
 
 Those are exactly the four scalars the kit's own ``notification`` template
-consumes (§4), plus the object. A template that wants a name this does not supply
+consumes, plus the object. A template that wants a name this does not supply
 fails loudly at render time, which is the right outcome: the fix is to pick a
 template written for a content rule, not to have the rule invent data.
 
 **Why ``cta_label`` is a msgid and not a string.** ``.with_context()`` is called
-once, *before* ``.send()`` groups recipients by language (§6.2), so a value
+once, *before* ``.send()`` groups recipients by language, so a value
 translated in this module would be one language for every group -- a Dutch
 recipient would get a French button. A ``zope.i18nmessageid`` message is left
 untranslated in the context and translated by the page template at render time,
-against the ``target_language`` ``render()`` injects (§6.1), so the single context
+against the ``target_language`` ``render()`` injects, so the single context
 value yields the right label in each language group. Anything else a future
 context name needs to say in the recipient's language must be a msgid for the same
 reason; a plain string here is a silent per-language bug.
@@ -114,21 +115,21 @@ EDIT_VIEW_NAME = "edit"
 
 #: The label of the CTA button in the kit's ``notification`` template, as an i18n
 #: **msgid** rather than a translated string. That is not a detail: ``.send()``
-#: renders once per language group (§6.2) and ``.with_context()`` is called once,
+#: renders once per language group and ``.with_context()`` is called once,
 #: before any grouping, so a string translated here would reach a Dutch recipient
 #: in French. A message object is translated by the page template at render time,
-#: against the ``target_language`` ``render()`` injects (§6.1) -- so one context
+#: against the ``target_language`` ``render()`` injects -- so one context
 #: value yields the right label in every group.
 CTA_LABEL = _("email_cta_view_item", default="View this item")
 
 
 class IStyledMailAction(Interface):
-    """SPEC §8.3's configuration: one template, and who gets it.
+    """The action's configuration: one template, and who gets it.
 
-    Deliberately **no body field**. §1 rules out "TTW template markup editing"
-    and the markup is dev-owned and versioned in git (§4); choosing a registered
+    Deliberately **no body field**. TTW template markup editing is out of scope
+    and the markup is dev-owned and versioned in git; choosing a registered
     template from a vocabulary is a selection, not an edit. Deliberately no
-    subject field either: §4 puts the subject in the template's registration as a
+    subject field either: the template's registration keeps the subject as a
     msgid so it is translated per recipient language, and a subject typed into a
     rule would be one language for every commune.
     """
@@ -239,9 +240,9 @@ class StyledMailAction(SimpleItem):
 @implementer(IExecutable)
 @adapter(Interface, IStyledMailAction, Interface)
 class StyledMailActionExecutor:
-    """SPEC §8.3: "executor delegates to ``Email(...)``".
+    """The executor delegates to ``Email(...)`` and decides nothing else.
 
-    That sentence is the specification of this class, and the body of
+    That is the whole specification of this class, and the body of
     :meth:`__call__` is meant to read as one statement plus a log line.
     """
 
@@ -257,14 +258,15 @@ class StyledMailActionExecutor:
         ``False``, which makes ``False`` the quiet way to fail -- so this method
         never returns it. A problem is an exception, it reaches the operation
         that triggered the rule, and the transaction that would have delivered
-        the mail rolls back (§6.2).
+        the mail rolls back.
         """
         item = self.triggering_object()
         recipients = self.recipient_values(item)
         try:
-            # SPEC §6.2, and nothing else. Note the absence of `.subject()`:
-            # §4 keeps the subject in the registration so it is translated per
-            # recipient language, and a rule has no business overriding that.
+            # The builder's contract, and nothing else. Note the absence of
+            # `.subject()`: the registration keeps the subject so it is
+            # translated per recipient language, and a rule has no business
+            # overriding that.
             messages = (
                 Email(self.element.template)
                 .to(recipients)
@@ -309,11 +311,11 @@ class StyledMailActionExecutor:
         return aq_inner(item)
 
     def recipient_values(self, item):
-        """SPEC §8.3's two recipient sources, as values for ``.to()``.
+        """The action's two recipient sources, as values for ``.to()``.
 
         Not resolved, not validated, not deduplicated: ``.to()`` accepts exactly
         these shapes and ``.send()`` reports every one it cannot resolve in a
-        single ``RecipientError`` (§6.2). Doing any of it here would mean two
+        single ``RecipientError``. Doing any of it here would mean two
         implementations of one rule.
         """
         values = list(self.element.recipients or ())
@@ -326,7 +328,7 @@ def owner_userid(item):
     """The userid of ``item``'s owner, as a ``.to()`` value.
 
     A **userid** rather than an address on purpose: the member adapter then
-    supplies the display name and the preferred language too (§6.2), so a rule
+    supplies the display name and the preferred language too, so a rule
     that mails owners mails a Dutch owner in Dutch with no configuration.
 
     :raises RecipientError: when no owner userid can be found.
@@ -355,9 +357,9 @@ RENDER_CONTEXT_NAMES = ("item", "title", "intro", "cta_label", "cta_url")
 
 
 def render_context(item):
-    """The names this action puts in the render namespace (§6.1).
+    """The names this action puts in the render namespace.
 
-    §8.3 does not say what a rule-triggered mail renders against, and a content
+    Nothing says what a rule-triggered mail renders against, and a content
     rule cannot know what an arbitrary template wants -- so the set is fixed and
     small (:data:`RENDER_CONTEXT_NAMES`). It is exactly the four scalars the
     kit's own ``notification`` template consumes, plus the object:

@@ -1,4 +1,4 @@
-"""§7's CI contract, run against the two dummy consumer add-ons (Phase 4 gate 10).
+"""The CI contract, run against the two dummy consumer add-ons (Phase 4 gate 10).
 
 > **CI contract for every consumer addon**
 > 1. ``bin/check-emails --package <self>`` -- build output is not stale.
@@ -17,7 +17,7 @@ Layout of this module:
 * ``TestGoldenGate`` -- gate 2, red. The green half is the dummies' own suites under
   ``tests/dummies/``, which run in the same pytest session; re-running them here
   would be a copy of them rather than a check on them.
-* ``TestTheBaseClassIsShipped`` -- §7 says "a provided test base class", so the
+* ``TestTheBaseClassIsShipped`` -- a provided test base class means the
   thing a consumer imports has to come out of the *egg*.
 
 The Node-dependent tests skip loudly when the toolchain is absent (installing and
@@ -38,7 +38,7 @@ support.require_runtime()
 
 
 NODE_MISSING = (
-    "Node is not available (npx and/or emails/node_modules). Gate 1 of §7's CI "
+    "Node is not available (npx and/or emails/node_modules). Gate 1 of the CI "
     "contract compiles the add-on and diffs against the committed output, so it "
     "cannot run without the Maizzle toolchain. The red-side assertions below do "
     "not need Node and still run."
@@ -62,7 +62,7 @@ def require_node():
 
 
 class TestTheContractIsWiredUp:
-    """Every artifact §7's two gates consume, present for every registered template.
+    """Every artifact the two gates consume, present for every registered template.
 
     Driven off the templates the add-on declares, so one added without its fixture,
     its snapshot or its `.vue` source fails here -- rather than being quietly absent
@@ -93,7 +93,7 @@ class TestTheContractIsWiredUp:
         ]
 
         assert missing == [], (
-            f"{addon.package}: registered but not committed: {missing}. §4's "
+            f"{addon.package}: registered but not committed: {missing}. The "
             "compiled output is committed to git; a registration without it is "
             "skipped at discovery with a warning nobody reads."
         )
@@ -105,7 +105,7 @@ class TestTheContractIsWiredUp:
             if not (addon.fixtures_dir / f"{name}.py").is_file()
         ]
 
-        assert missing == [], f"{addon.package}: no §7 fixture for {missing}"
+        assert missing == [], f"{addon.package}: no fixture for {missing}"
 
     def test_every_snapshotted_template_has_a_complete_set(self, addon):
         """Whatever is snapshotted is snapshotted completely.
@@ -135,7 +135,7 @@ class TestTheContractIsWiredUp:
         ]
 
         assert missing == [], (
-            f"{addon.package}: incomplete §7 snapshot set, missing {missing}. "
+            f"{addon.package}: incomplete snapshot set, missing {missing}. "
             "Re-run EMAILKIT_UPDATE_GOLDEN=1, or delete the partial set."
         )
 
@@ -284,9 +284,9 @@ class TestStalenessGate:
 
 
 class TestAuthoringLintGate:
-    """Gate 2 of ``bin/check-emails`` (SPEC §5), run over the dummies' sources.
+    """Gate 2 of ``bin/check-emails``, run over the dummies' sources.
 
-    Not part of §7's two-gate contract, but it is the other half of what CI runs on
+    Not part of the two-gate contract, but it is the other half of what CI runs on
     a consumer add-on, and pointing it at the dummies is what proves the documented
     ``.vue`` sources actually obey the rules they document. Driven through the CLI
     rather than the Python API: the exit code is the stable contract, and it is what
@@ -314,7 +314,7 @@ class TestAuthoringLintGate:
         result = self.lint(addon.emails_dir)
 
         assert result.returncode == 0, (
-            f"{addon.package}'s .vue sources violate §3's authoring rules -- which "
+            f"{addon.package}'s .vue sources violate the authoring rules -- which "
             "would make them documentation of how to get it wrong:\n"
             f"{result.stdout}\n{result.stderr}"
         )
@@ -391,7 +391,7 @@ class TestGoldenGate:
         return make
 
     def test_the_gate_goes_red_when_a_snapshot_drifts(self, integration, harness):
-        """The regression §7 names first: a Tailwind class silently purged."""
+        """The first regression: a Tailwind class silently purged."""
         instance, snapshot = harness(
             lambda path: path.write_text(
                 path.read_text(encoding="utf-8").replace(
@@ -416,7 +416,7 @@ class TestGoldenGate:
     def test_the_gate_goes_red_when_a_placeholder_stops_resolving(
         self, integration, harness
     ):
-        """§7's other named regression: a ``${}`` that stopped resolving.
+        """The other named regression: a ``${}`` that stopped resolving.
 
         Simulated the way it really arrives -- in the *rendered* output, which no
         longer matches the snapshot. The snapshot is edited to hold the substituted
@@ -465,7 +465,7 @@ class TestGoldenGate:
         assert snapshot.name in message
 
     def test_the_gate_goes_red_when_a_fixture_disappears(self, tmp_path):
-        """§7: "each template ships a fixture and a snapshot"."""
+        """The contract: "each template ships a fixture and a snapshot"."""
         from imio.emailkit.golden import GoldenTemplateTests
 
         class NoFixture(GoldenTemplateTests):
@@ -510,7 +510,7 @@ class TestGoldenGate:
 
 
 class TestTheBaseClassIsShipped:
-    """§7 promises "a provided test base class" -- provided means importable.
+    """A provided test base class -- provided means importable.
 
     Phases 1-3 kept the harness in ``tests/golden_harness.py``, which does not ship
     in the egg; Phase 4 moved it to ``imio.emailkit.golden``. These assertions are

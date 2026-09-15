@@ -1,21 +1,22 @@
-"""SPEC §6.2 -- the builder holds data and does not grow behaviour.
+"""The builder holds data and does not grow behaviour.
 
 > The builder is a plain data holder; each method returns ``self``. **It holds
 > data, it does not grow behavior** -- no conditionals, no scheduling, no
 > retries.
 
-``docs/plans/phase-2.md`` §2 restates it as a boundary rather than a style note:
+This is restated elsewhere as a boundary rather than a style note:
 "Methods, and nothing beyond them [...] A signature change is a decision-log
-entry plus approval, never a quiet edit." §7 lists "no new builder methods beyond
-§6.2" among the non-goals.
+entry plus approval, never a quiet edit." "No new builder methods beyond the
+frozen set" is listed among the non-goals.
 
 A property nobody asserts is a property that erodes. So this module pins three
 things a reviewer would otherwise have to notice by eye:
 
 * the **closed set** of nine methods -- the tenth arrives as a red test, with
-  ``DECISIONS.md`` as the remedy rather than a merge;
+  a deliberate, recorded decision plus approval as the remedy rather than a
+  quiet merge;
 * **identity** on chaining, not merely truthiness -- returning a *new* builder
-  would keep §6.2's example working while silently discarding whatever the
+  would keep the chaining example working while silently discarding whatever the
   caller accumulated on a reference they kept;
 * **no I/O before ``.send()``**, which is what makes an unsent builder harmless
   and ``render()`` callable exactly once per language group.
@@ -27,7 +28,7 @@ import support
 
 Email = support.require_builder()
 (TemplateNotFound,) = support.require_contract(
-    "imio.emailkit.interfaces", "§4", "TemplateNotFound"
+    "imio.emailkit.interfaces", "TemplateNotFound's docstring", "TemplateNotFound"
 )
 
 
@@ -42,7 +43,7 @@ class TestTheMethodSet:
             name for name in support.BUILDER_METHODS if not hasattr(builder, name)
         ]
 
-        assert missing == [], f"SPEC §6.2 methods missing from Email: {missing}"
+        assert missing == [], f"builder methods missing from Email: {missing}"
 
     def test_every_spec_method_is_callable(self, builder):
         not_callable = [
@@ -56,16 +57,16 @@ class TestTheMethodSet:
     def test_there_are_no_methods_beyond_the_spec(self, builder):
         """The anti-drift assertion.
 
-        ``docs/plans/phase-2.md`` §7 makes "no new builder methods beyond §6.2" a
-        non-goal, and §8 anticipates the pressure: "``.send()`` grows conditionals
-        to handle a real case -- that is the §6.2 boundary; report instead of
+        "No new builder methods beyond the frozen set" is a
+        non-goal, and the pressure is anticipated: "``.send()`` grows conditionals
+        to handle a real case -- that is the boundary; report instead of
         absorbing it". A ``.schedule()``, a ``.retry()`` or a ``.when()`` is the
         visible form of that pressure, and it is much easier to decline before it
         has callers.
 
         Read off the *class* rather than the instance, so held data does not look
-        like API. A genuinely needed tenth method is a ``DECISIONS.md`` entry plus
-        approval -- then this list, and only then.
+        like API. A genuinely needed tenth method requires a deliberate, recorded
+        decision plus approval -- then this list, and only then.
         """
         public = {
             name
@@ -76,14 +77,14 @@ class TestTheMethodSet:
         extra = sorted(public - set(support.BUILDER_METHODS))
 
         assert extra == [], (
-            f"Email grew methods beyond SPEC §6.2's frozen set: {extra}. "
-            "A signature change is a decision-log entry plus approval "
-            "(docs/plans/phase-2.md §2), never a quiet edit."
+            f"Email grew methods beyond the frozen set: {extra}. "
+            "A signature change is a decision-log entry plus approval, "
+            "never a quiet edit."
         )
 
 
 class TestEveryMethodReturnsSelf:
-    """§6.2: "each method returns ``self``"."""
+    """"Each method returns ``self``"."""
 
     @pytest.mark.parametrize("name", support.CHAINING_METHODS)
     def test_returns_the_same_object(self, builder, fr_member, name, tmp_path):
@@ -107,11 +108,11 @@ class TestEveryMethodReturnsSelf:
         )
 
     def test_the_spec_example_chains(self, mail, fr_member, tmp_path):
-        """§6.2's own illustration, method for method, as one expression.
+        """The builder's own illustration, method for method, as one expression.
 
-        ``docs/DECISIONS.md`` records that a formatter once collapsed this chain
-        inside ``SPEC.md`` itself; having it as executable code means the shape is
-        pinned somewhere a formatter cannot quietly rewrite it.
+        A formatter once collapsed this exact chain; having it as executable
+        code means the shape is pinned somewhere a formatter cannot quietly
+        rewrite it.
         """
         pdf = tmp_path / "convocation.pdf"
         pdf.write_bytes(b"%PDF-1.7\n")
@@ -132,7 +133,7 @@ class TestEveryMethodReturnsSelf:
 
 class TestHeldData:
     def test_with_context_accumulates(self, mail, deliver, sent, set_default_language):
-        """§6.2 spells it ``with_context(**kw)`` and the example calls it once,
+        """The builder spells it ``with_context(**kw)`` and the example calls it once,
         but a builder assembled across a couple of helper functions calls it
         several times. A second call that replaced the first would drop context
         the template needs -- and the template's ``${}`` would then either raise
@@ -187,17 +188,17 @@ class TestHeldData:
 
 
 class TestNoIoBeforeSend:
-    """``docs/plans/phase-2.md`` §6 gate 8: "no method does I/O before
+    """"No method does I/O before
     ``.send()``"."""
 
     def test_an_unknown_template_never_sends_silently(
         self, mailhost, site_sender, deliver
     ):
-        """§4's ``TemplateNotFound`` has to reach the caller, whether the builder
+        """``TemplateNotFound`` has to reach the caller, whether the builder
         checks the name eagerly or at ``.send()``.
 
         *When* it raises is deliberately not pinned -- either reading is
-        defensible and the spec does not choose. What is pinned is that a typo in
+        defensible and no choice was made between them. What is pinned is that a typo in
         a template name cannot end with a mail going out, or with none going out
         and nobody told.
         """
@@ -215,7 +216,7 @@ class TestNoIoBeforeSend:
     def test_collecting_bad_data_does_not_raise(self, mail):
         """Every deferred failure in one builder, none of them raising until
         ``.send()``. This is what "errors surface together"
-        (``docs/plans/phase-2.md`` §4) requires of the collection phase."""
+        requires of the collection phase."""
         (
             mail()
             .to(support.UNRESOLVABLE)
@@ -228,8 +229,8 @@ class TestNoIoBeforeSend:
     def test_a_builder_that_is_never_sent_renders_nothing(
         self, mail, monkeypatch, fr_member, deliver
     ):
-        """Rendering is the expensive part and, per §6.2, it happens "once per
-        language group" -- inside ``.send()``.
+        """Rendering is the expensive part and, per the builder's contract, it
+        happens "once per language group" -- inside ``.send()``.
 
         The counter goes on **every** already-imported name that is bound to the
         real function, rather than on one chosen module. ``from ... import
@@ -264,7 +265,7 @@ class TestNoIoBeforeSend:
         email = mail().to(fr_member).subject(support.LITERAL_SUBJECT)
 
         assert calls == [], (
-            f"{len(calls)} render() call(s) before .send(); §6.2's builder holds "
+            f"{len(calls)} render() call(s) before .send(); the builder holds "
             "data, it does not do work"
         )
 

@@ -3,7 +3,7 @@
  * override.
  *
  * The kit is reached through `./.kit/maizzle.config.base.js`, which
- * `bin/compile-emails` materialises before every build (SPEC §3/§5). In
+ * `bin/compile-emails` materialises before every build. In
  * `kit-mode = path` that file is a two-line re-export of the kit inside the
  * installed `imio.emailkit` egg, so components resolve straight out of
  * site-packages; in `kit-mode = copy` it is the kit itself, copied in. This file
@@ -32,7 +32,7 @@ export default defineConfig({
 
   output: {
     ...kit.output,
-    /** SPEC §4: the committed build output, a sibling of `emails/`. */
+    /** The committed build output, a sibling of `emails/`. */
     path: resolve(here, '..', 'templates'),
   },
 })

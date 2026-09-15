@@ -1,32 +1,32 @@
 """Shared constants and helpers for the test suite.
 
 This module is also the single place where the suite states the **API contract it
-was written against**. The tests were derived from ``SPEC.md`` and
-``docs/plans/phase-1.md``, not from the implementation -- so where the spec names
-a behaviour but not a symbol, the name is chosen here, once. If the runtime ends
-up exporting a different name, this file is the only edit, and the mismatch is a
-finding to reconcile rather than a test to weaken.
+was written against**. The tests were derived from the original design, not
+from the implementation -- so where a behaviour is named but not a symbol, the
+name is chosen here, once. If the runtime ends up exporting a different name,
+this file is the only edit, and the mismatch is a finding to reconcile rather
+than a test to weaken.
 
-Contract encoded (spec reference in brackets):
+Contract encoded:
 
 ===============================================  ==========================
-``imio.emailkit.render(name, context, language)`` [§6.1] returns ``(html, text)``
-``imio.emailkit.interfaces.TemplateNotFound``     [§4] ``.name`` + ``.available``
-``imio.emailkit.helpers.format_date`` etc.        [§6.1] locale helpers, ``(value, language)``
-``imio.emailkit.interfaces.IEmailkitLayer``       [§8.1] browser layer
-template name ``imio.emailkit:notification``      [§4] the one ``render()``-able template
-``imio.emailkit.Email``                           [§6.2] the builder, spelled verbatim in the spec
-``imio.emailkit.interfaces.IEmailRecipient``      [§6.2] ``email`` / ``fullname`` / ``language``
-``imio.emailkit.interfaces.RecipientError``       [§6.2] raised at ``.send()``
-``imio.emailkit.interfaces.AttachmentError``      [§6.2] raised at ``.send()``
-view name ``emailkit-preview``                    [§6.3] spelled ``@@emailkit-preview``
-``imio.emailkit.render_shell(subject, body_html)`` [§9 phase 3] ``render()``'s sibling
+``imio.emailkit.render(name, context, language)`` returns ``(html, text)``
+``imio.emailkit.interfaces.TemplateNotFound``     ``.name`` + ``.available``
+``imio.emailkit.helpers.format_date`` etc.        locale helpers, ``(value, language)``
+``imio.emailkit.interfaces.IEmailkitLayer``       browser layer
+template name ``imio.emailkit:notification``      the one ``render()``-able template
+``imio.emailkit.Email``                           the builder, spelled verbatim
+``imio.emailkit.interfaces.IEmailRecipient``      ``email`` / ``fullname`` / ``language``
+``imio.emailkit.interfaces.RecipientError``       raised at ``.send()``
+``imio.emailkit.interfaces.AttachmentError``      raised at ``.send()``
+view name ``emailkit-preview``                    spelled ``@@emailkit-preview``
+``imio.emailkit.render_shell(subject, body_html)`` ``render()``'s sibling
 ===============================================  ==========================
 
-Of those, four are **guesses this file owns** rather than spec quotations, and
-they are listed again next to the code that makes them, so a wrong guess is one
-edit here: which module the two new exceptions and the recipient interface live
-in (:data:`INTERFACES_MODULE`), the preview view's language parameter
+Of those, four are **guesses this file owns** rather than quotations, and they
+are listed again next to the code that makes them, so a wrong guess is one edit
+here: which module the two new exceptions and the recipient interface live in
+(:data:`INTERFACES_MODULE`), the preview view's language parameter
 (:data:`PREVIEW_LANGUAGE_PARAM`) and its send-test trigger
 (:data:`SEND_TEST_FORM`).
 """
@@ -46,7 +46,7 @@ FIXTURES_DIR = HERE / "fixtures"
 GOLDEN_DIR = HERE / "golden"
 
 # ---------------------------------------------------------------------------
-# Template names (SPEC §4: names are namespaced ``<package>:<template>``)
+# Template names (namespaced ``<package>:<template>``)
 # ---------------------------------------------------------------------------
 
 # The suppression below is for S105: this is a template name, not a credential.
@@ -59,7 +59,7 @@ MAIL_PASSWORD = "mail_password_template"  # noqa: S105
 REGISTERED_NOTIFY = "registered_notify_template"
 
 #: The two Plone default mails whose *views* this package owns
-#: (``imio.emailkit.browser.default_mails``), §8.1.
+#: (``imio.emailkit.browser.default_mails``).
 #:
 #: They were jbot overrides once, and the cost of that was a foreign dialect and
 #: no discovery. Owning the view makes them ordinary registered templates, so they
@@ -68,7 +68,7 @@ REGISTERED_NOTIFY = "registered_notify_template"
 #: (``test_default_mails.py``, ``test_optout.py``).
 DEFAULT_MAIL_TEMPLATES = (MAIL_PASSWORD, REGISTERED_NOTIFY)
 
-#: Every template this package registers: the §3 flat-context dialect, one set of
+#: Every template this package registers: the flat-context dialect, one set of
 #: authoring rules, one preview list. Driven off discovery in the tests that can;
 #: this tuple is for parametrisation, which needs values at import time.
 #:
@@ -126,14 +126,13 @@ STOCK_BODY_MARKERS = {
 
 
 # ---------------------------------------------------------------------------
-# Kit-output markers -- every one of them is mandated by SPEC §3, so they hold
-# whatever markup the kit author chooses.
+# Kit-output markers -- these hold whatever markup the kit author chooses.
 # ---------------------------------------------------------------------------
 
-#: §3 "accessibility defaults: ``role="presentation"`` on all layout tables".
+#: Accessibility default: ``role="presentation"`` on all layout tables.
 A11Y_TABLE_MARKER = 'role="presentation"'
 
-#: §3 "the layout emits ``lang="${lang}"`` on ``<html>``".
+#: The layout emits ``lang="${lang}"`` on ``<html>``.
 LANG_ATTRIBUTE = re.compile(r"<html[^>]*\blang=\"([a-zA-Z-]+)\"")
 
 #: An inline ``style`` attribute carrying at least one CSS declaration.
@@ -146,7 +145,7 @@ INLINE_STYLE = re.compile(r'style="[^"]*[a-z-]+\s*:[^"]+"')
 MIN_INLINE_STYLES = 10
 
 #: The placeholder and TAL-residue patterns, and the assertion built on them, now
-#: live in the **shipped** ``imio.emailkit.golden`` module: SPEC §7's base class is
+#: live in the **shipped** ``imio.emailkit.golden`` module: the base class is
 #: exported for consumers as of Phase 4, and the audit is the half of it a consumer
 #: needs most. They are reached through the thin delegations further down rather
 #: than restated here -- two copies of this regex is exactly how one of them ends
@@ -154,7 +153,7 @@ MIN_INLINE_STYLES = 10
 
 
 # ---------------------------------------------------------------------------
-# Registry records (SPEC §3 theming model)
+# Registry records (theming model)
 # ---------------------------------------------------------------------------
 
 THEME_RECORDS = {
@@ -177,7 +176,7 @@ _RUNTIME_PENDING = (
 
 _CONTRACT_PENDING = (
     "{target} is not available. tests/support.py documents the API contract "
-    "this suite encodes from SPEC {section}; if the runtime chose another name, "
+    "this suite encodes at {section}; if the runtime chose another name, "
     "reconcile there -- do not drop the assertion."
 )
 
@@ -198,7 +197,7 @@ def require_runtime():
 def require_contract(dotted, section, *names):
     """Import ``dotted`` and return ``names`` off it, or skip the module.
 
-    Used only where the spec pins a *behaviour* but not a *symbol*.
+    Used only where a *behaviour* is pinned but not a *symbol*.
     """
     import importlib
 
@@ -221,7 +220,7 @@ def require_contract(dotted, section, *names):
 
 
 # ---------------------------------------------------------------------------
-# Fixture data (SPEC §7: ``tests/fixtures/<template>.py``)
+# Fixture data (``tests/fixtures/<template>.py``)
 # ---------------------------------------------------------------------------
 
 
@@ -233,13 +232,13 @@ def load_fixture(template):
     """Return the ``CONTEXT`` dict of ``tests/fixtures/<template>.py``.
 
     Loaded by path rather than imported, so ``tests/fixtures/`` stays a
-    directory of data files -- which is what §7 describes -- instead of becoming
-    an importable package whose name would collide with the word "fixtures".
+    directory of data files instead of becoming an importable package whose
+    name would collide with the word "fixtures".
     """
     path = fixture_path(template)
     if not path.exists():
         raise FileNotFoundError(
-            f"No fixture for {template!r}. SPEC §7 requires one per template at {path}."
+            f"No fixture for {template!r}. One is required per template at {path}."
         )
     spec = importlib.util.spec_from_file_location(f"_emailkit_fixture_{template}", path)
     module = importlib.util.module_from_spec(spec)
@@ -265,7 +264,7 @@ def available_fixtures():
 
 
 # ---------------------------------------------------------------------------
-# Golden files (SPEC §7)
+# Golden files
 # ---------------------------------------------------------------------------
 
 #: Regeneration is **deliberate**, never a side effect of a failing comparison.
@@ -345,7 +344,7 @@ MEMBER_EMAIL = "zoe.testeuse@example.be"
 
 
 def registered_subject(template):
-    """The ``subject`` msgid a template's §4 registration declares.
+    """The ``subject`` msgid a template's registration declares.
 
     The subject of a default mail is now a msgid in ``configure.zcml`` like every
     other subject in the package, not markup in a hand-emitted ``Subject:`` line.
@@ -367,7 +366,7 @@ def stock_mail_view(portal, request, template):
     ``Products/CMFPlone/RegistrationTool.py`` calls
     ``getMultiAdapter((self, self.REQUEST), name=...)``. Looking it up on the
     portal instead would still work but would not be the production path, and
-    the whole point of §8 is that the *stock* view renders our file.
+    the whole point is that the *stock* view renders our file.
     """
     from zope.component import getMultiAdapter
 
@@ -417,7 +416,7 @@ def assert_render_is_clean(rendered, what="output"):
     raises -- so a test that only checks "our marker is present" ships raw
     placeholders to production and stays green.
 
-    Delegated to the shipped ``imio.emailkit.golden`` since Phase 4 exported §7's
+    Delegated to the shipped ``imio.emailkit.golden`` since Phase 4 exported the
     base class: consumers get the same audit this suite runs, and there is one
     copy of it. Imported inside the function so ``require_runtime()`` still gets
     to report a missing package rather than this module failing to import.
@@ -428,17 +427,16 @@ def assert_render_is_clean(rendered, what="output"):
 
 
 # ===========================================================================
-# Phase 2 -- SPEC §6.2 (``Email`` builder) and §6.3 (preview view)
+# Phase 2 -- the ``Email`` builder and the preview view
 # ===========================================================================
 #
-# Everything below was written against SPEC §6.2/§6.3 and
-# ``docs/plans/phase-2.md`` §6 while the builder and the preview view were being
-# written in parallel. Nothing here was derived from that code.
+# Everything below was written while the builder and the preview view were
+# being written in parallel. Nothing here was derived from that code.
 
-#: §6.2's frozen method set, verbatim, in the order the spec's own example
-#: chains them. ``docs/plans/phase-2.md`` §2: "Methods, and nothing beyond
-#: them", and §7 lists "no new builder methods beyond §6.2" as a non-goal --
-#: which is only enforceable if a test names the closed set.
+#: The frozen method set, verbatim, in the order the example chains them.
+#: "Methods, and nothing beyond them" is the rule, and "no new builder
+#: methods beyond the frozen set" is listed as a non-goal -- which is only
+#: enforceable if a test names the closed set.
 BUILDER_METHODS = (
     "to",
     "cc",
@@ -451,42 +449,42 @@ BUILDER_METHODS = (
     "send",
 )
 
-#: Every builder method except ``.send()`` returns ``self`` (§6.2: "each method
+#: Every builder method except ``.send()`` returns ``self`` ("each method
 #: returns ``self``"), so these are the ones an identity test can chain.
 CHAINING_METHODS = tuple(name for name in BUILDER_METHODS if name != "send")
 
-#: **GUESS.** §6.2 names ``RecipientError``, ``AttachmentError`` and
-#: ``IEmailRecipient`` but not their module. Phase 1 put ``TemplateNotFound``
+#: **GUESS.** ``RecipientError``, ``AttachmentError`` and
+#: ``IEmailRecipient`` are named but not their module. Phase 1 put ``TemplateNotFound``
 #: and ``IEmailkitLayer`` in ``imio.emailkit.interfaces`` ("Module where all
 #: interfaces, events and exceptions live"), so that is where these are looked
 #: for. If the runtime chose otherwise, change this one line.
 INTERFACES_MODULE = "imio.emailkit.interfaces"
 
-#: §6.3, verbatim: "``@@emailkit-preview`` (Manager-only)".
+#: Verbatim: "``@@emailkit-preview`` (Manager-only)".
 PREVIEW_VIEW = "emailkit-preview"
 
-#: §6.3 requires "a language switcher" but names no parameter. Guessed as
-#: ``language``, mirroring §6.1's ``render(..., language=...)``, and since
+#: A language switcher is required but no parameter is named. Guessed as
+#: ``language``, mirroring ``render(..., language=...)``, and since
 #: **confirmed** against the view.
 PREVIEW_LANGUAGE_PARAM = "language"
 
 #: Likewise for the template selector.
 PREVIEW_TEMPLATE_PARAM = "template"
 
-#: §6.3 requires "a **Send test** button" but names no form control. Guessed as
+#: A **Send test** button is required but no form control is named. Guessed as
 #: ``send_test``; the view spells it ``form.button.send_test``, which is the
 #: house convention, so this is the reconciled name rather than the guess.
 SEND_TEST_BUTTON = "form.button.send_test"
 
 SEND_TEST_FORM = {SEND_TEST_BUTTON: "Send test"}
 
-#: The send test only fires on ``POST``. Not a detail the spec mentions, and a
+#: The send test only fires on ``POST``. Not a detail mentioned elsewhere, and a
 #: good call the tests have to honour: a URL that sends mail when merely
 #: *fetched* is a URL a prefetcher, a link checker or somebody's browser history
 #: eventually fetches.
 SEND_TEST_METHOD = "POST"
 
-#: §6.3: the preview renders "each in an iframe using committed fixture data".
+#: The preview renders "each in an iframe using committed fixture data".
 IFRAME_SRC = re.compile(r"<iframe[^>]*\bsrc=[\"']([^\"']+)[\"']", re.IGNORECASE)
 
 
@@ -495,14 +493,14 @@ IFRAME_SRC = re.compile(r"<iframe[^>]*\bsrc=[\"']([^\"']+)[\"']", re.IGNORECASE)
 # ---------------------------------------------------------------------------
 
 #: A recipient that is only ever an address -- no member behind it, so
-#: :data:`IEmailRecipient`'s ``language`` is ``None`` for it and §6.2's grouping
-#: has to fall back to the site default (``docs/plans/phase-2.md`` §4).
+#: :data:`IEmailRecipient`'s ``language`` is ``None`` for it and grouping
+#: has to fall back to the site default.
 PLAIN_ADDRESS = "greffe@commune.example.be"
 
 #: A second one, for "two addresses land in one message" assertions.
 OTHER_ADDRESS = "secretariat@commune.example.be"
 
-#: Neither an address nor a userid. §6.2: unresolvable recipients "raise
+#: Neither an address nor a userid. Unresolvable recipients "raise
 #: ``RecipientError`` at ``.send()`` time (fail loud, not silent drop)".
 UNRESOLVABLE = "definitely-not-a-user-or-an-address"
 OTHER_UNRESOLVABLE = "also-not-a-user-or-an-address"
@@ -523,7 +521,7 @@ NL_MEMBER = {
     "language": "nl",
 }
 
-#: §6.2: "``From`` defaults to the site's configured sender". In Plone 6 that is
+#: "``From`` defaults to the site's configured sender". In Plone 6 that is
 #: the pair of ``plone.app.registry`` records below, which is what the site
 #: control panel writes.
 SENDER_ADDRESS_RECORD = "plone.email_from_address"
@@ -534,12 +532,12 @@ SITE_SENDER_NAME = "Commune de Test"
 #: An explicit ``.sender(...)`` override, distinct from the site default.
 OVERRIDE_SENDER = "convocations@commune.example.be"
 
-#: ``.reply_to(...)``, the address §6.2's own example uses.
+#: ``.reply_to(...)``, the address the builder's own example uses.
 REPLY_TO = "noreply@imio.be"
 
-#: The registry record Plone reads the site's default language from. §6.2 groups
-#: by "resolved language"; ``docs/plans/phase-2.md`` §4 makes the site default
-#: the fallback for a recipient that has none.
+#: The registry record Plone reads the site's default language from. Recipients
+#: group by "resolved language"; the site default is the fallback for a
+#: recipient that has none.
 DEFAULT_LANGUAGE_RECORD = "plone.default_language"
 
 
@@ -554,7 +552,7 @@ DEFAULT_LANGUAGE_RECORD = "plone.default_language"
 #: "passed through".
 OVERRIDE_SUBJECT_MSGID = "email_subject_mail_password_template"
 
-#: A literal ``.subject(...)`` override. §6.2: ``.subject()`` "accepts a msgid or
+#: A literal ``.subject(...)`` override. ``.subject()`` "accepts a msgid or
 #: literal string" -- a literal is not a msgid, so it must reach every language
 #: group unchanged.
 LITERAL_SUBJECT = "Convocation - seance du 12 aout"
@@ -570,8 +568,8 @@ def message_id(msgid, default=None):
 def translated(msgid, language):
     """Translate ``msgid`` for ``language`` the way a template would.
 
-    Expected subjects are computed rather than hardcoded on purpose: §6.2 says
-    the subject msgid is "translated per recipient language at send time", so
+    Expected subjects are computed rather than hardcoded on purpose: the subject
+    msgid is "translated per recipient language at send time", so
     the assertion has to be "equals the translation", not "equals this French
     string I typed". A hardcoded string would turn every catalog edit into a
     test failure and -- worse -- would still pass if the builder shipped the
@@ -583,9 +581,9 @@ def translated(msgid, language):
 
 
 def registration_subject(template=NOTIFICATION):
-    """The subject msgid the §4 registration declares for ``template``.
+    """The subject msgid the registration declares for ``template``.
 
-    Read out of discovery rather than restated here: §6.2 says the subject
+    Read out of discovery rather than restated here: the subject
     "comes from the template registration", so the test's expectation must be
     whatever the registration holds. Restating it would let the two drift apart
     and still pass.
@@ -600,20 +598,19 @@ def registration_subject(template=NOTIFICATION):
 # ---------------------------------------------------------------------------
 
 _BUILDER_PENDING = (
-    "{target} is not available. SPEC §6.2 freezes the Email builder's API and "
-    "this module encodes it; the builder itself is workstream W1 of "
-    "docs/plans/phase-2.md and is written in parallel with these tests. Every "
-    "assertion here is written and runs unchanged as soon as W1 lands -- "
-    "nothing was weakened to go green. If W1 chose a different name, reconcile "
-    "in tests/support.py ({hint})."
+    "{target} is not available. This module encodes the frozen Email builder "
+    "API; the builder itself was written in parallel with these tests. Every "
+    "assertion here is written and runs unchanged as soon as it lands -- "
+    "nothing was weakened to go green. If it chose a different name, "
+    "reconcile in tests/support.py ({hint})."
 )
 
 
 def require_builder():
     """Return ``imio.emailkit.Email`` or skip the calling module.
 
-    ``Email`` is one of the few names SPEC spells literally
-    (§6.2: ``from imio.emailkit import Email``), so there is nothing to guess --
+    ``Email`` is one of the few names spelled out literally
+    (``from imio.emailkit import Email``), so there is nothing to guess --
     only to wait for.
     """
     require_runtime()
@@ -624,7 +621,7 @@ def require_builder():
         pytest.skip(
             _BUILDER_PENDING.format(
                 target="imio.emailkit.Email",
-                hint="the name is quoted verbatim from §6.2, so this is W1 pending",
+                hint="the name is quoted verbatim, so this is W1 pending",
             ),
             allow_module_level=True,
         )
@@ -662,9 +659,9 @@ def require_preview(portal, request):
     view = queryMultiAdapter((portal, request), name=PREVIEW_VIEW)
     if view is None:
         pytest.skip(
-            f"@@{PREVIEW_VIEW} is not registered. SPEC §6.3's preview view is "
-            "workstream W2 of docs/plans/phase-2.md, written in parallel with "
-            "these tests; they run unchanged once it lands."
+            f"@@{PREVIEW_VIEW} is not registered. The preview view was "
+            "written in parallel with these tests; they run unchanged once "
+            "it lands."
         )
     return view
 
@@ -673,8 +670,8 @@ def require_preview(portal, request):
 # Reading a sent message
 # ---------------------------------------------------------------------------
 #
-# Every helper here works on the *parsed* message. SPEC §6.2 pins the MIME
-# shape (``set_content(text)`` + ``add_alternative(html, subtype="html")``), and
+# Every helper here works on the *parsed* message. The MIME shape is pinned
+# (``set_content(text)`` + ``add_alternative(html, subtype="html")``), and
 # Phase 0's lesson is that marker-string assertions pass while raw ``${}`` ships
 # -- so these return decoded content and structure, never a haystack to grep.
 
@@ -688,8 +685,8 @@ def sole(sent, what="message"):
 def alternative_part(message):
     """The ``multipart/alternative`` section of a message.
 
-    Returns the message itself when it *is* the alternative (§6.2's shape with
-    no attachments), or the nested one when ``add_attachment`` has wrapped it in
+    Returns the message itself when it *is* the alternative (the message shape
+    with no attachments), or the nested one when ``add_attachment`` has wrapped it in
     a ``multipart/mixed`` -- which is what ``EmailMessage`` does, and is correct.
     Written to accept both so the attachment tests can still assert on the body
     structure without re-deriving it.
@@ -700,8 +697,8 @@ def alternative_part(message):
         if part.get_content_type() == "multipart/alternative":
             return part
     raise AssertionError(
-        "no multipart/alternative section in the message; SPEC §6.2 requires "
-        f"set_content(text) + add_alternative(html): got {message.get_content_type()} "
+        "no multipart/alternative section in the message; "
+        f"set_content(text) + add_alternative(html) is required: got {message.get_content_type()} "
         f"with parts {[p.get_content_type() for p in message.walk()]}"
     )
 
@@ -715,7 +712,7 @@ def decoded(part):
     """A text part's content, decoded and with line endings normalised.
 
     ``\\r\\n`` is the on-the-wire line ending; comparing against ``render()``'s
-    output -- which is what §6.3's preview and §7's golden files also compare --
+    output -- which is what the preview and the golden files also compare --
     means normalising it. That is a transport detail, not a value.
     """
     content = part.get_content()
@@ -726,7 +723,7 @@ def bodies(message):
     """``(text, html)`` of one message, decoded."""
     parts = body_parts(message)
     assert len(parts) == 2, (
-        "SPEC §6.2's message has exactly two alternatives, text then html; got "
+        "The builder's message has exactly two alternatives, text then html; got "
         f"{[p.get_content_type() for p in parts]}"
     )
     return decoded(parts[0]), decoded(parts[1])
@@ -777,7 +774,7 @@ def envelope(record):
 
 
 def display_names(message, header):
-    """The display names in one header (``IEmailRecipient.fullname``, §6.2)."""
+    """The display names in one header (``IEmailRecipient.fullname``)."""
     from email.utils import getaddresses
 
     raw = message.get_all(header) or []
@@ -785,9 +782,9 @@ def display_names(message, header):
 
 
 def lang_of(message):
-    """The ``lang`` attribute the kit layout emits on ``<html>`` (§3)."""
+    """The ``lang`` attribute the kit layout emits on ``<html>``."""
     match = LANG_ATTRIBUTE.search(html_of(message))
-    assert match, "no lang attribute on <html> in the sent message (SPEC §3)"
+    assert match, "no lang attribute on <html> in the sent message"
     return match.group(1).lower()
 
 
@@ -808,23 +805,22 @@ def assert_message_is_clean(message):
 
 
 # ===========================================================================
-# Phase 3 -- SPEC §9 phase 3 (``render_shell``) and ``docs/plans/phase-3.md``
+# Phase 3 -- ``render_shell``
 # ===========================================================================
 #
-# Written against SPEC §9 phase 3, §6.1, §3 and ``docs/plans/phase-3.md`` §2/§4.
-# ``render_shell`` is the only new name, and the spec and the plan both spell it
+# ``render_shell`` is the only new name, and its signature is spelled
 # literally (``from imio.emailkit import render_shell``), so nothing below is a
 # guess about the API -- only about test-local fixture names.
 
-#: §9 phase 3, verbatim: ``render_shell(subject, body_html, language=None)``.
-#: A ``render()`` sibling, **not** a builder method -- ``docs/plans/phase-3.md``
-#: §5 lists "no new builder methods" as a non-goal, which is what
+#: Verbatim: ``render_shell(subject, body_html, language=None)``.
+#: A ``render()`` sibling, **not** a builder method -- "no new builder
+#: methods" is listed as a non-goal, which is what
 #: ``tests/test_builder.py::TestTheMethodSet`` already keeps closed.
 SHELL_ARGUMENTS = ("subject", "body_html", "language")
 
 #: Fixtures whose ``CONTEXT`` is a ``render_shell`` call rather than a template
 #: context: ``{"subject": ..., "body_html": ...}``. They live in the same
-#: directory and are loaded by the same :func:`load_fixture`, because §7's
+#: directory and are loaded by the same :func:`load_fixture`, because
 #: "fixture + snapshot per template" is the same contract -- the shell simply has
 #: its markup handed in instead of authored.
 SHELL_FIXTURES = ("shell_plonemeeting",)
@@ -834,9 +830,9 @@ def require_shell():
     """Return ``imio.emailkit.render_shell`` or skip the calling module.
 
     Coarse like :func:`require_builder`, and for the same reason: the name is
-    quoted verbatim from §9 phase 3 and ``docs/plans/phase-3.md`` §2, so there is
-    nothing to guess -- a missing name means the implementation is not there yet,
-    and every assertion in the Phase 3 modules runs unchanged once it is.
+    quoted verbatim, so there is nothing to guess -- a missing name means the
+    implementation is not there yet, and every assertion in the Phase 3 modules
+    runs unchanged once it is.
     """
     require_runtime()
     import imio.emailkit
@@ -844,10 +840,9 @@ def require_shell():
     function = getattr(imio.emailkit, "render_shell", None)
     if function is None:
         pytest.skip(
-            "imio.emailkit.render_shell is not available. SPEC §9 phase 3 and "
-            "docs/plans/phase-3.md §2 both spell it "
-            "`from imio.emailkit import render_shell`; these tests encode that "
-            "signature and were not weakened to go green.",
+            "imio.emailkit.render_shell is not available. Its signature is "
+            "spelled `from imio.emailkit import render_shell`; these tests "
+            "encode that signature and were not weakened to go green.",
             allow_module_level=True,
         )
     return function
@@ -868,14 +863,14 @@ def load_shell_fixture(name):
     return data["subject"], data["body_html"]
 
 
-#: The names ``render()`` puts in the template namespace, per SPEC §6.1 and §3:
+#: The names ``render()`` puts in the template namespace:
 #: the caller's context, the ``theme/*`` tokens, ``portal_url``, ``translate``,
-#: the three locale helpers, ``lang`` -- plus §4's ``preheader`` and the two names
+#: the three locale helpers, ``lang`` -- plus ``preheader`` and the two names
 #: ``render_shell`` itself binds. Used by the injection test: a ``${name}`` for
 #: **each** of them goes into an injected body, and every one has to come back out
-#: verbatim. Enumerated from the spec rather than read off the implementation, so
-#: a name the runtime added silently is simply not covered rather than
-#: rubber-stamped.
+#: verbatim. Enumerated from the original design rather than read off the
+#: implementation, so a name the runtime added silently is simply not covered
+#: rather than rubber-stamped.
 RENDER_NAMESPACE_NAMES = (
     "theme",
     "theme/primary_color",
@@ -918,8 +913,8 @@ def head_of(html):
     content, so their heads -- charset, viewport, colour-scheme meta, the
     dark-mode ``<style>``, the ``<html>`` attributes -- must be identical for the
     same language. Comparing the whole head rather than a handful of markers is
-    the only form of "exactly as for an authored template"
-    (``docs/plans/phase-3.md`` §4 gate 2) that a marker cannot fake.
+    the only form of "exactly as for an authored template" (gate 2) that a
+    marker cannot fake.
 
     ``<title>`` is the one exclusion, and it is the narrowing the gate's own
     docstring anticipated. A title is *content*: the layout emits one when the

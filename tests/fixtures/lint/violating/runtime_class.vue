@@ -1,6 +1,6 @@
 <script setup>
 /**
- * VIOLATING FIXTURE for `runtime-class` (SPEC §3 rule 2).
+ * VIOLATING FIXTURE for `runtime-class`.
  *
  * Three ways to end up with a class name that exists nowhere in the source at
  * build time, so Tailwind never generates the utility and `css.purge` never

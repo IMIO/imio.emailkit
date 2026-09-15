@@ -42,8 +42,7 @@ The inlined CSS, the accessibility defaults, `lang` on `<html>`, the header and 
 <Note>
   `${...}` inside `body_html` is emitted **literally**. It is not re-parsed as a
   template, so a body assembled by string concatenation cannot accidentally — or
-  deliberately — read the render namespace. That is verified, not assumed; see
-  [`docs/DECISIONS.md`](https://github.com/IMIO/imio.emailkit/blob/main/docs/DECISIONS.md).
+  deliberately — read the render namespace. That is verified, not assumed.
 </Note>
 
 ## The plaintext part

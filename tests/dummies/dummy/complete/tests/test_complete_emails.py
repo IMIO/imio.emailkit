@@ -1,4 +1,4 @@
-"""``dummy.complete``'s entire email test suite (SPEC §7).
+"""``dummy.complete``'s entire email test suite.
 
 Two languages instead of one, and otherwise the same four lines as
 ``dummy.minimal``. That is the point of a provided base class: the suite does not

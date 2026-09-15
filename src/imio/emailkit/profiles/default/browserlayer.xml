@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Installing this layer is the single act that switches SPEC §8's restyled
+<!-- Installing this layer is the single act that switches the restyled
      Plone default mails on: the jbot directory is bound to it in
      browser/configure.zcml and is inert without it. This file is why
      `:default` and `:base` differ. -->

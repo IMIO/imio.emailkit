@@ -1,4 +1,4 @@
-"""Context data for ``dummy.complete:notification`` (SPEC §7).
+"""Context data for ``dummy.complete:notification``.
 
 ``cta_url`` is deliberately **absent**: the template guards the button with
 ``tal:condition="cta_url | nothing"``, and this fixture is what exercises the

@@ -58,7 +58,7 @@ jobs:
       python-version: ${{ matrix.python-version }}
       plone-version: ${{ matrix.plone-version }}
 
-  # SPEC §5's staleness gate, in its Phase 1 Makefile form (§9's sequencing note).
+  # The staleness gate, in its Phase 1 Makefile form (see the sequencing note).
   #
   # This is the gate the whole two-stage architecture rests on: the compiled `.pt`
   # is the production artifact, Node never runs in production, and nothing else
@@ -149,16 +149,16 @@ jobs:
           fi
           echo "Email build output is up to date."
 
-  # SPEC §9 phase 4: `imio.recipe.emailkit`, the second distribution in this
+  # Phase 4: `imio.recipe.emailkit`, the second distribution in this
   # repository, and the acceptance criterion it exists to satisfy --
   # `git clone && buildout && bin/compile-emails` from a clean checkout.
   #
   # Two things this job is here to keep true, both of them hard boundaries:
   #
   #  1. **buildout invokes no Node.** `make buildout-test` runs the whole buildout
-  #     with node, npm and npx removed from PATH. SPEC §5's "Explicitly rejected"
-  #     section is the reason: compiling at buildout time would make Node a
-  #     production dependency across ~350 applications.
+  #     with node, npm and npx removed from PATH. Compiling at buildout time is
+  #     explicitly rejected: it would make Node a production dependency across
+  #     ~350 applications.
   #  2. **the generated scripts work**, which no unit test can establish -- a
   #     buildout-generated script builds its own `sys.path` from lines inside
   #     itself, so only a real buildout produces the thing under test.

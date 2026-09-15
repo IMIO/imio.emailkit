@@ -95,13 +95,7 @@ the sub-nav and the footer links, with no error.
 ## Where content belongs
 
 This site is the source of truth for **developer documentation** — how to use the
-package. Two files in the repository root are the source of truth for **why it is
-built this way**, and the site links to them rather than restating them:
-
-- [`SPEC.md`](../../SPEC.md) — goals, non-goals, architecture, phasing, and what was
-  explicitly rejected.
-- [`docs/DECISIONS.md`](../DECISIONS.md) — the decision record: measured findings,
-  reverted attempts, and the things that looked like they worked.
+package.
 
 The root [`README.md`](../../README.md) is deliberately short: badges, the pitch,
 `pip install`, and a link here. Prose that belongs on a page here should not be

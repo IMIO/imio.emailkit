@@ -21,12 +21,12 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
 ]
 # Deliberately NOT a dependency of this recipe: `imio.emailkit`. The recipe
-# consumes it through the part's own `eggs` option (SPEC §5's
-# `eggs = ${instance:eggs}`), so a buildout that has no emailkit consumer never
+# consumes it through the part's own `eggs` option
+# (`eggs = ${instance:eggs}`), so a buildout that has no emailkit consumer never
 # drags the runtime -- and therefore Plone -- into the buildout interpreter.
-# And deliberately not Node, npm or anything that implies them: SPEC §5's
-# "Explicitly rejected" section exists because Node must not become a
-# dependency of ~350 production deployments.
+# And deliberately not Node, npm or anything that implies them: this is
+# explicitly rejected because Node must not become a dependency of ~350
+# production deployments.
 dependencies = [
     "setuptools",
     "zc.buildout",

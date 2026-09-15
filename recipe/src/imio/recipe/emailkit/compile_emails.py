@@ -1,25 +1,23 @@
-"""``bin/compile-emails`` (SPEC §5).
+"""``bin/compile-emails``.
 
     bin/compile-emails [--package NAME] [--watch] [--new NAME]
 
-"For each discovered package (or the one selected): wire the kit (per
+For each discovered package (or the one selected): wire the kit (per
 ``kit-mode``) -> ``npm ci`` in ``emails/`` (only if ``node_modules`` is stale vs.
-lockfile) -> ``npx maizzle build`` -> ... move into ``templates/``. Exit non-zero
-on any build failure."
+lockfile) -> ``npx maizzle build`` -> copy the hand-authored twins back in. Exit
+non-zero on any build failure.
 
-Two deliberate readings of that sentence:
+Two things worth calling out:
 
-* **No rename step, and no move step.** §10.2 was settled with evidence: Maizzle 6
-  has a first-class ``output.extension``, so the pipeline emits ``.pt`` directly,
-  and ``output.path`` in the consumer's own config writes straight into
-  ``templates/``. §5's "rename ... move" describes the assumed default of a
-  question that has since been answered better. What this script *does* copy is
-  the hand-authored plaintext twins, because ``maizzle build`` empties its output
-  directory and would otherwise delete them.
-* **``--watch`` delegates to Maizzle's dev server**, exactly as §5 says, and §5
-  also says why that is the lesser loop: it shows build-time output, raw
-  ``${item/title}`` and unexpanded ``tal:repeat``. ``bin/preview-emails --watch``
-  is the loop you actually want.
+* **No rename step, and no move step.** Maizzle 6 has a first-class
+  ``output.extension``, so the pipeline emits ``.pt`` directly, and
+  ``output.path`` in the consumer's own config writes straight into
+  ``templates/``. What this script *does* copy is the hand-authored plaintext
+  twins, because ``maizzle build`` empties its output directory and would
+  otherwise delete them.
+* **``--watch`` delegates to Maizzle's dev server**, which is the lesser loop:
+  it shows build-time output, raw ``${item/title}`` and unexpanded
+  ``tal:repeat``. ``bin/preview-emails --watch`` is the loop you actually want.
 """
 
 from imio.recipe.emailkit import cli
@@ -126,9 +124,8 @@ def main(config=None, argv=None):
             failures.append(project.package)
 
     if failures:
-        # SPEC §5: "Exit non-zero on any build failure." Every package is
-        # attempted first, so one broken addon does not hide the state of the
-        # others.
+        # Exit non-zero on any build failure. Every package is attempted first,
+        # so one broken addon does not hide the state of the others.
         print(
             f"\ncompile-emails failed for: {', '.join(failures)}",
             file=sys.stderr,
@@ -154,8 +151,7 @@ def copy_twins(project):
     Not a nicety. ``maizzle build`` empties its output directory, silently, and
     Maizzle 6 exposes no option to stop it -- it deleted a committed twin once
     already, which is why the twins are *source* and live outside the build's
-    reach (``docs/DECISIONS.md``). SPEC §4 resolves a twin as
-    ``<directory>/<name>.txt.pt``, so it has to end up beside the compiled output,
+    reach. A twin resolves as ``<directory>/<name>.txt.pt``, so it has to end up beside the compiled output,
     and something has to put it there after every build. This is that something,
     for every consumer rather than for one Makefile.
     """

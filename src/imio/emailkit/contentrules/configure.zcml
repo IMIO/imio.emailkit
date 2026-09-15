@@ -32,7 +32,7 @@
       file="meta.zcml"
       />
 
-  <!-- SPEC §8.3: "executor delegates to Email(...)". -->
+  <!-- The executor delegates to Email(...). -->
   <adapter factory=".mail.StyledMailActionExecutor" />
 
   <browser:page
@@ -49,16 +49,16 @@
       permission="plone.app.contentrules.ManageContentRules"
       />
 
-  <!-- SPEC §8.3's action type, registered exactly the way every other
+  <!-- The action type, registered exactly the way every other
        `plone.contentrules` action in the Plone ecosystem is. There is no
        GenericSetup step and none is wanted.
 
        Why this is NOT conditional on the `:default` profile, since the question
        will come up: `plone:ruleAction` is unconditionally global, and that is
-       right here. §8.2's opt-out (installing `:base` instead of `:default`) is
+       right here. The opt-out (installing `:base` instead of `:default`) is
        about not restyling Plone's stock transactional mails; it is not a request
        to hide an action type. An action type is inert until a Manager creates a
-       rule that uses it, and its template list comes from §4 discovery, so a
+       rule that uses it, and its template list comes from discovery, so a
        `:base` site gains nothing it opted out of by having the entry available.
        Gating it would mean registering a local utility per site, whose stored
        copy then drifts from this file with no symptom; that is a worse failure

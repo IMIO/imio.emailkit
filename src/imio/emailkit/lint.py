@@ -1,21 +1,21 @@
-"""SPEC §5's authoring lint -- gate 2 of ``bin/check-emails``.
+"""The authoring lint -- gate 2 of ``bin/check-emails``.
 
 Reads ``.vue`` email sources and reports ``path:line: rule-id`` for each
-violation of SPEC §3's authoring rules, exiting non-zero if there is one.
+violation of the authoring rules below, exiting non-zero if there is one.
 
     python -m imio.emailkit.lint emails/src/templates src/imio/emailkit/kit
     python -m imio.emailkit.lint --list-rules
 
 **Every rule here is a failure this project actually hit, and every one of them
 produced a SUCCESSFUL Maizzle build.** That is the whole reason the module
-exists: the settled position of this project (``docs/DECISIONS.md``) is that the
+exists: the settled position of this project is that the
 Maizzle exit code carries almost no information about correctness. A browser
 preview does not show these either -- three of the eight rules only ever fail in
 a mail client or inside Chameleon at *send* time, long after CI was green.
 
 Design constraints, in the order they matter.
 
-**Plain regex, no parser** (§5: "plain-regex checks"). A lint that needs a parser
+**Plain regex, no parser.** A lint that needs a parser
 is a lint nobody runs, and this one has to run in a buildout-generated script on
 a machine with nothing but the egg installed. Nothing below imports anything
 outside the standard library, and nothing below imports from this package -- so
@@ -74,7 +74,6 @@ def _rule(rule_id, what, why, fix):
 RULES = {
     rule.rule_id: rule
     for rule in (
-        # SPEC §3 rule 1.
         _rule(
             "tal-on-component",
             "a tal:/i18n:/metal: attribute on a kit component",
@@ -83,7 +82,6 @@ RULES = {
             "author dynamic regions as plain <tr>/<td> markup and put the "
             "tal: attribute there, or wrap the component in a <div tal:...>",
         ),
-        # SPEC §3 rule 2.
         _rule(
             "runtime-class",
             "a class value that is not literal in the build output",
@@ -111,7 +109,7 @@ RULES = {
             'tal:attributes="class string:..." if it is truly needed -- but see '
             "runtime-class first: a runtime class has no CSS behind it",
         ),
-        # SPEC §3's enforced-alt a11y default. RGAA applies to iMio's clients.
+        # An enforced-alt a11y default. RGAA applies to iMio's clients.
         _rule(
             "missing-alt",
             "an image with no alt attribute",
@@ -584,7 +582,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="python -m imio.emailkit.lint",
         description=(
-            "SPEC §5 gate 2: check .vue email sources against §3's authoring "
+            "gate 2: check .vue email sources against the authoring "
             "rules. Every rule catches a mistake that compiles cleanly and "
             "fails silently at render time or in a mail client."
         ),

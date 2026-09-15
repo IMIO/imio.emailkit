@@ -1,8 +1,8 @@
-"""Installing the two dummy consumer add-ons, and running §7's CI contract on them.
+"""Installing the two dummy consumer add-ons, and running the CI contract on them.
 
 The add-ons themselves live in ``tests/dummies/`` and are documented there. This
 module is the machinery around them: how they get discovered without being
-pip-installed, and how the two CI gates §7 requires of every consumer add-on are
+pip-installed, and how the two CI gates required of every consumer add-on are
 reproduced against them.
 
 ----------------------------------------------------------------------------
@@ -64,7 +64,7 @@ CHECKOUT_NODE_MODULES = HERE.parent / "emails" / "node_modules"
 
 @dataclass(frozen=True)
 class DummyAddon:
-    """One dummy consumer add-on, described the way §5's recipe describes a real
+    """One dummy consumer add-on, described the way the recipe describes a real
     one: ``(package, emails_dir, templates_dir)`` plus what it registers."""
 
     #: Importable package == the ZCML file's package == lookup namespace.
@@ -127,8 +127,8 @@ COMPLETE = DummyAddon(
     languages=("fr", "en"),
 )
 
-#: Both of them, which is what SPEC §7 asks for: "discovery tests with two dummy
-#: addons (also serving as living documentation)".
+#: Both of them: "discovery tests with two dummy addons (also serving as
+#: living documentation)".
 ADDONS = (MINIMAL, COMPLETE)
 
 
@@ -285,10 +285,10 @@ def uninstalled():
 
 
 # ---------------------------------------------------------------------------
-# Gate 1 of §7's CI contract: build output is not stale
+# Gate 1 of the CI contract: build output is not stale
 # ---------------------------------------------------------------------------
 #
-# SPEC §5's `bin/check-emails` is the shipped implementation of this gate and lives
+# `bin/check-emails` is the shipped implementation of this gate and lives
 # in `imio.recipe.emailkit`. It cannot be pointed at these dummies: it resolves
 # packages from the buildout working set, and a package directory dropped on
 # `sys.path` by a test fixture is not in anybody's working set. So the gate's
@@ -409,7 +409,7 @@ def rebuild(addon):
             f"`maizzle build` failed for {addon.package} "
             f"(exit {result.returncode}):\n{result.stdout}\n{result.stderr}"
         )
-        # SPEC §4's plaintext twins are hand-authored source, so the build cannot
+        # The plaintext twins are hand-authored source, so the build cannot
         # produce them; `make build-emails` copies them in afterwards and so must
         # anything that compares against a committed tree, or every twin reports
         # as an ORPHAN.

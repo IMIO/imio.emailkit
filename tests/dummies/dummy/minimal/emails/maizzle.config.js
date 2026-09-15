@@ -10,7 +10,7 @@
  * Two things a real add-on writes differently:
  *
  *  1. `kitDir` -- a real consumer never hardcodes it. `bin/compile-emails`
- *     (SPEC §5, `kit-mode = path`) resolves the kit directory from the installed
+ *     (in `kit-mode = path`) resolves the kit directory from the installed
  *     `imio.emailkit` egg and wires it in. These dummies live *inside* the
  *     `imio.emailkit` checkout, so the honest thing here is a relative path to
  *     the sibling kit rather than a fake egg lookup.
@@ -43,7 +43,7 @@ export default defineConfig({
   output: {
     ...kit.output,
     /**
-     * SPEC §4's consumer layout: build output is committed to `<package>/templates/`
+     * The consumer layout: build output is committed to `<package>/templates/`
      * and is what the ZCML registration's `directory` attribute names.
      */
     path: resolve(here, '..', 'templates'),

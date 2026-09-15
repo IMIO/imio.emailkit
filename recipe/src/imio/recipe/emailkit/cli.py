@@ -145,7 +145,7 @@ def nothing_to_do(found, what):
             print(
                 f"  skip      {project.package}: ships no `emails/` directory, so "
                 f"there is nothing to {what}. That is normal for an installed egg "
-                f"(SPEC §4 prunes it from the sdist).",
+                f"(it is pruned from the sdist).",
             )
     return compilable
 

@@ -26,7 +26,7 @@
  *       …
  *     </KitMain>
  *
- * A `tal:` attribute may not go on the component (SPEC §3 rule 1), which is why
+ * A `tal:` attribute may not go on the component, which is why
  * the label above is wrapped in a `<span tal:omit-tag="">` rather than written
  * as `<KitPill i18n:translate="…">`.
  *
@@ -36,7 +36,7 @@
  * Four. Since the fill left the markup, a tone is nothing but a file name, so
  * this is now a lookup of one value; it still resolves at BUILD time, because a
  * runtime file name would have no `tal:condition` to hang the missing-asset case
- * on and SPEC §3 rule 2 rules out a runtime class either way.
+ * on, and a runtime class is ruled out either way.
  *
  *   info     blue disc,   white glyph  -- something to read or review
  *   success  green disc,  dark glyph   -- something that now exists and works

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>imio.emailkit preview</title>
     <!-- Deliberately standalone: no main_template, no Plone CSS, no theme.
-         This is a developer tool (SPEC §6.3, "~1 view"), and it has to work on a
+         This is a developer tool, and it has to work on a
          site whose front end is Volto as readily as on Classic UI. The mail
          itself is in an iframe, so nothing below can reach it. -->
     <style>
@@ -50,7 +50,7 @@
       <h1>imio.emailkit preview</h1>
       <p class="hint">
         The <em>committed</em> <code>.pt</code> files rendered through
-        <code>render()</code> with the <em>committed</em> fixtures of SPEC §7 --
+        <code>render()</code> with the <em>committed</em> fixtures --
         or, in <code>.pt</code> mode, shown as they are, with no fixture needed.
         Run <code>make build-emails</code> and reload after editing a source.
       </p>
@@ -68,8 +68,8 @@
         <h2>Templates</h2>
         <p tal:condition="not:view/template_rows" class="hint warn">
           No add-on has registered a template with
-          <code>&lt;emailkit:templates&gt;</code>. Note that SPEC §8's two Plone
-          default mails are deliberately not registered -- a stock view renders
+          <code>&lt;emailkit:templates&gt;</code>. Note that Plone's two default
+          mails are deliberately not registered -- a stock view renders
           them.
         </p>
         <ul>
@@ -115,8 +115,7 @@
           </tr>
         </table>
         <p class="hint">
-          <a href="${view/registry_url}">Edit these in the registry control panel</a>
-          -- SPEC §8.2 level 2.
+          <a href="${view/registry_url}">Edit these in the registry control panel</a>.
         </p>
 
         <h2>Fixture</h2>
@@ -155,7 +154,7 @@
             ${view/send_language_note}
           </p>
           <p class="hint">
-            Goes through the SPEC §6.2 <code>Email</code> builder, to your own
+            Goes through the <code>Email</code> builder, to your own
             address only. Browser previews lie; Outlook does not.
           </p>
         </form>

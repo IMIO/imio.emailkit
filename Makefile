@@ -48,12 +48,12 @@ export PYTHONWARNINGS := ignore
 export DOCKER_BUILDKIT := 1
 
 # ---------------------------------------------------------------------------
-# Email build (SPEC §5 in its Phase 1 Makefile form -- see §9's sequencing note:
+# Email build (in its Phase 1 Makefile form -- see the sequencing note:
 # `imio.emailkit` authors its own templates long before `imio.recipe.emailkit`
 # exists, and `bin/preview-emails` in Phase 4 is this generalised, not new
 # invention).
 #
-# NODE IS A DEVELOPER/CI TOOL ONLY (SPEC §1). No target below is a dependency of
+# NODE IS A DEVELOPER/CI TOOL ONLY. No target below is a dependency of
 # `install`, `sync`, `test`, `start` or `create-site`, and none of them may ever
 # become one: making Node reachable from a deployment path would put it in front
 # of ~350 production applications.
@@ -69,12 +69,12 @@ TWINS_FOLDER=$(BACKEND_FOLDER)/emails/twins
 
 # Where the committed build output lives. Two destinations because the two kinds
 # of artifact are addressed differently at runtime: templates are looked up by
-# name through the <emailkit:templates> registry (§4), overrides by the dotted
-# path of the file they shadow (§8.1).
+# name through the <emailkit:templates> registry, overrides by the dotted
+# path of the file they shadow.
 #
 # `emails/maizzle.config.js` writes here directly -- `output.path` for templates,
 # `useOutputPath()` + `emailkit.overridesPath` for the two jbot overrides -- and
-# emits `.pt` straight away via `output.extension` (docs/DECISIONS.md, §10.2), so
+# emits `.pt` straight away via `output.extension`, so
 # there is no intermediate `dist/` and no rename step. These paths are therefore
 # *duplicated* between the two files; keep them in step.
 PACKAGE_FOLDER=$(BACKEND_FOLDER)/src/imio/emailkit
@@ -146,8 +146,8 @@ console: $(VENV_FOLDER) instance/etc/zope.ini ## Start a console into a Plone in
 create-site: $(VENV_FOLDER) instance/etc/zope.ini ## Create a new site from scratch
 	@$(BIN_FOLDER)/zconsole run instance/etc/zope.conf ./scripts/create_site.py
 
-# Explicit paths: ruff invoked with no path walks the whole repo, which is how a
-# formatter got into SPEC.md and reflowed the approved API example.
+# Explicit paths: ruff invoked with no path walks the whole repo, which previously
+# reflowed a committed API example inside prose documentation.
 RUFF_TARGETS=src tests scripts
 
 # Hand-written markup and configuration only: the compiled .pt files under
@@ -201,9 +201,9 @@ format: ## Fix code base according to Plone standards
 .PHONY: check
 check: format lint ## Check and fix code base according to Plone standards
 
-# SPEC §5's `bin/check-emails`, gate (2): the authoring lint.
+# `bin/check-emails`, gate (2): the authoring lint.
 #
-# The `.vue` sources, not the compiled output -- these are the §3 authoring rules,
+# The `.vue` sources, not the compiled output -- these are the authoring rules,
 # and every one of them catches a mistake that produced a *successful* Maizzle
 # build. Two of them (`style-placeholder`, `comment-double-dash`) are invisible
 # until a mail client or Chameleon sees the result, which is why this is a gate
@@ -218,8 +218,8 @@ check: format lint ## Check and fix code base according to Plone standards
 LINT_EMAILS_TARGETS?=$(EMAILS_FOLDER)/src/templates $(PACKAGE_FOLDER)/kit
 
 .PHONY: lint-emails
-lint-emails: $(VENV_FOLDER) ## Authoring lint (SPEC §5 gate 2) of the .vue sources
-	@echo "$(GREEN)==> Linting email sources against SPEC §3's authoring rules$(RESET)"
+lint-emails: $(VENV_FOLDER) ## Authoring lint (gate 2) of the .vue sources
+	@echo "$(GREEN)==> Linting email sources against the authoring rules$(RESET)"
 	@$(BIN_FOLDER)/python -m imio.emailkit.lint $(LINT_EMAILS_TARGETS)
 
 # i18n
@@ -259,7 +259,7 @@ node-check:
 
 .PHONY: emails-deps
 emails-deps: node-check ## Install the Maizzle toolchain (npm ci when a lockfile exists)
-	# SPEC §5: `npm ci` "only if node_modules is stale vs. lockfile". `npm ci`
+	# `npm ci` "only if node_modules is stale vs. lockfile". `npm ci`
 	# needs a lockfile, so fall back to `npm install` while there is none -- which
 	# also creates it, after which every later run is the reproducible path.
 	@cd $(EMAILS_FOLDER)
@@ -292,8 +292,8 @@ build-emails: emails-deps ## Compile emails/ into the package (templates/ + brow
 	@cd $(EMAILS_FOLDER) && $(NPX) maizzle build
 	# `maizzle build` EMPTIES its output directory, silently, and 6.0.7 has no
 	# option to stop it -- it deleted a committed hand-authored twin. So the
-	# twins live in emails/twins/ as source and are copied in afterwards. SPEC §4
-	# resolves them as <directory>/<name>.txt.pt, which is what this produces.
+	# twins live in emails/twins/ as source and are copied in afterwards. Templates
+	# resolve them as <directory>/<name>.txt.pt, which is what this produces.
 	@if compgen -G "$(TWINS_FOLDER)/*.txt.pt" > /dev/null; then \
 		cp -a $(TWINS_FOLDER)/*.txt.pt $(TEMPLATES_FOLDER)/; \
 		echo "$(GREEN)==> Copied hand-authored plaintext twins$(RESET)"; \
@@ -301,8 +301,8 @@ build-emails: emails-deps ## Compile emails/ into the package (templates/ + brow
 	@echo "$(GREEN)==> Done. Commit the .pt files -- they are what production renders.$(RESET)"
 
 .PHONY: check-emails
-check-emails: emails-deps lint-emails ## SPEC §5's two gates: authoring lint, then staleness
-	# SPEC §5's `bin/check-emails`, both gates in one target.
+check-emails: emails-deps lint-emails ## The two gates: authoring lint, then staleness
+	# `bin/check-emails`, both gates in one target.
 	#
 	# Gate (2), the authoring lint, runs FIRST -- as a prerequisite -- because it
 	# reads the sources and a source-level mistake explains a stale or broken
@@ -364,12 +364,12 @@ check-emails: emails-deps lint-emails ## SPEC §5's two gates: authoring lint, t
 
 .PHONY: preview-emails
 preview-emails: $(VENV_FOLDER) instance/etc/zope.ini ## Render the committed templates with the committed fixtures and serve them
-	# The two-stage dev loop of SPEC §5, minus the file watcher.
+	# The two-stage dev loop, minus the file watcher.
 	#
-	# Maizzle's own --watch is explicitly rejected by §5: it shows *build-time*
+	# Maizzle's own --watch is explicitly rejected: it shows *build-time*
 	# output -- raw ${item/title}, unexpanded tal:repeat -- "a miserable
 	# authoring loop". So this renders through render() with the committed
-	# fixtures (§7), which is what the mail will actually look like.
+	# fixtures, which is what the mail will actually look like.
 	#
 	# DEFERRED, on purpose: watching sources + live reload. Re-run the target
 	# after `make build-emails`. Wiring a watcher to a process that has to hold a
@@ -381,13 +381,13 @@ preview-emails: $(VENV_FOLDER) instance/etc/zope.ini ## Render the committed tem
 
 # ---------------------------------------------------------------------------
 # imio.recipe.emailkit -- the second distribution in this repository, and the
-# SPEC §9 phase 4 acceptance test that runs it through a real buildout.
+# Phase 4 acceptance test that runs it through a real buildout.
 #
 # Nothing below is a prerequisite of install / sync / test / start / create-site,
 # and nothing below may become one. `buildout-test` deliberately runs buildout
-# with node, npm and npx removed from PATH, because SPEC §5's "Explicitly
-# rejected" section is a hard boundary: compiling at buildout time would make
-# Node a production dependency across ~350 applications.
+# with node, npm and npx removed from PATH, because compiling at buildout time
+# is explicitly rejected as a hard boundary: it would make Node a production
+# dependency across ~350 applications.
 # ---------------------------------------------------------------------------
 
 RECIPE_FOLDER=$(BACKEND_FOLDER)/recipe
@@ -433,8 +433,8 @@ $(BUILDOUT_VENV): $(VENV_FOLDER) ## Bootstrap zc.buildout for the acceptance tes
 		"zc.buildout" "zc.recipe.egg" "setuptools"
 
 .PHONY: buildout-test
-buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## SPEC §9 phase 4 acceptance: buildout, then bin/compile-emails
-	# `git clone && buildout && bin/compile-emails`, which is what §9 asks for.
+buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## Phase 4 acceptance: buildout, then bin/compile-emails
+	# `git clone && buildout && bin/compile-emails`, which is what this phase asks for.
 	#
 	# Eggs are resolved offline from the development virtualenv's site-packages
 	# rather than downloaded: same recipe, same working set, same generated
@@ -443,7 +443,7 @@ buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## SPEC §9 phase 4 ac
 	@set -euo pipefail
 	@site_packages="$$($(BIN_FOLDER)/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 	@echo "$(GREEN)==> buildout, with node/npm/npx REMOVED from PATH$(RESET)"
-	# The hard boundary of SPEC §5, tested rather than asserted: with
+	# The hard boundary tested rather than asserted: with
 	# `compile-on-install` at its default the whole run must succeed on a machine
 	# that has no Node at all.
 	@nonode="$$($(BIN_FOLDER)/python -c 'import os; print(os.pathsep.join(p for p in os.environ["PATH"].split(os.pathsep) if p and not any(os.path.exists(os.path.join(p, n)) for n in ("node", "npm", "npx"))))')"
@@ -456,10 +456,10 @@ buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## SPEC §9 phase 4 ac
 	done
 	@echo "$(GREEN)==> bin/compile-emails (kit-mode = path, the default)$(RESET)"
 	@$(BACKEND_FOLDER)/bin/compile-emails
-	@echo "$(GREEN)==> bin/compile-emails --kit-mode copy (SPEC §5's other mode)$(RESET)"
+	@echo "$(GREEN)==> bin/compile-emails --kit-mode copy (the other mode)$(RESET)"
 	@$(BACKEND_FOLDER)/bin/compile-emails --kit-mode copy
 	# Both packages, both gates. The external consumer addon is what proves the
-	# wiring end to end; imio.emailkit is its own first consumer (SPEC §4), so it
+	# wiring end to end; imio.emailkit is its own first consumer, so it
 	# goes through the identical generated script rather than being trusted
 	# because `make lint-emails` covers it separately.
 	@echo "$(GREEN)==> bin/check-emails --package emailkitdemo (both gates)$(RESET)"

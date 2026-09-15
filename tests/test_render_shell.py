@@ -1,9 +1,9 @@
-"""SPEC §9 phase 3 -- ``render_shell(subject, body_html, language=None)``.
+"""``render_shell(subject, body_html, language=None)``.
 
-``docs/plans/phase-3.md`` §4's nine gates, minus the two that have their own
-modules: gate 4 (the PloneMeeting-shaped golden) lives in ``tests/test_golden.py``
-because it *is* the golden harness, and gate 8 (sending shell output through the
-frozen builder) lives in ``tests/test_shell_send.py`` because it needs the sending
+Nine gates, minus the two that have their own modules: gate 4 (the
+PloneMeeting-shaped golden) lives in ``tests/test_golden.py`` because it *is*
+the golden harness, and gate 8 (sending shell output through the frozen
+builder) lives in ``tests/test_shell_send.py`` because it needs the sending
 layer.
 
 **The rule this module exists to enforce**, same as ``tests/test_render.py``:
@@ -19,15 +19,14 @@ behaviour, and the two must not be confused. Hence the shape of the tests below:
 * the shell's **own** markup is held to the usual standard -- no placeholder, no
   TAL residue, CSS inlined, a11y defaults present;
 * the **injected body** is held to the opposite standard -- byte-for-byte verbatim,
-  never evaluated, never sanitised (``docs/plans/phase-3.md`` §5: "the shell wraps;
-  it does not clean");
+  never evaluated, never sanitised ("the shell wraps; it does not clean");
 * so the cleanliness assertions run on ``html`` with the injected body *removed*,
   which is the only way to make both statements at once.
 
-``docs/DECISIONS.md`` ("``structure`` does NOT evaluate placeholders in an injected
-body") records the empirical verification this module is the regression test for.
-That entry is why ``structure`` is considered safe here at all; if these tests go
-red, that conclusion is what changed.
+The empirical verification this module is the regression test for: ``structure``
+does NOT evaluate placeholders in an injected body. That finding is why
+``structure`` is considered safe here at all; if these tests go red, that
+conclusion is what changed.
 """
 
 import pytest
@@ -44,7 +43,7 @@ from imio.emailkit import render  # noqa: E402
 # Identities. Chosen so that finding one in the output can only mean one thing.
 # ---------------------------------------------------------------------------
 
-#: A subject with characters that *must* be escaped. §3 rule 4 reserves
+#: A subject with characters that *must* be escaped. Rule 4 reserves
 #: ``structure`` for the body slot, so everything else -- the heading included --
 #: is escaped by Chameleon's default. A subject computed from user-entered content
 #: (an item title, say) is exactly where that matters.
@@ -53,7 +52,7 @@ SUBJECT_WITH_MARKUP = 'Séance <script>alert("x")</script> & suite'
 #: A subject that cannot collide with anything in the kit, for counting.
 SUBJECT_SENTINEL = "SUJET-SENTINELLE-3f9a"
 
-#: The simplest possible legacy body -- plan §4 gate 1, verbatim.
+#: The simplest possible legacy body -- gate 1, verbatim.
 SIMPLE_BODY = "<p>Body</p>"
 
 #: A marker that appears in no template, no stylesheet and no translation.
@@ -68,7 +67,7 @@ OTHER_LOGO = "https://probe.example.be/logo-other.png"
 PROBE_FOOTER = "<span>Pied de page sonde &mdash; probe-footer-marker</span>"
 
 #: A hidden element whose content is not a comment -- i.e. a preheader. The kit
-#: renders one for an authored template (§3, §4) and, per
+#: renders one for an authored template and, per
 #: ``emails/src/templates/shell.vue``, deliberately none for the shell.
 HIDDEN_ELEMENT = re.compile(
     r"<(?P<tag>div|span|p)[^>]*display:\s*none[^>]*>(?P<inner>.*?)</(?P=tag)\s*>",
@@ -85,7 +84,7 @@ def shell(integration):
     """``shell(subject, body, language="fr")`` -> ``(html, text)``.
 
     Bound to the ``integration`` layer because the theme tokens come from
-    ``plone.app.registry`` (§3) and the subject is translated through
+    ``plone.app.registry`` and the subject is translated through
     ``zope.i18n`` -- both need a site.
     """
 
@@ -116,7 +115,7 @@ def authored(integration):
 
 @pytest.fixture
 def set_record(integration):
-    """Set one SPEC §3 theme record, asserting the profile installed it first."""
+    """Set one theme record, asserting the profile installed it first."""
     from plone.registry.interfaces import IRegistry
     from zope.component import getUtility
 
@@ -125,7 +124,7 @@ def set_record(integration):
         record = support.THEME_RECORDS[name]
         assert record in registry.records, (
             f"{record} is not in the registry -- the {support.PACKAGE_NAME} "
-            "profile did not install the theme tokens (SPEC §3)"
+            "profile did not install the theme tokens"
         )
         registry[record] = value
 
@@ -165,7 +164,7 @@ def visible_hidden_text(html):
 
 class TestReturnValue:
     def test_returns_html_and_text(self, shell):
-        """Plan §2: "Returns ``(html, text)`` exactly as ``render()`` does"."""
+        """"Returns ``(html, text)`` exactly as ``render()`` does"."""
         result = shell()
 
         assert isinstance(result, tuple)
@@ -186,7 +185,7 @@ class TestReturnValue:
         assert "<html" not in text.lower()
 
     def test_the_body_is_injected_unescaped(self, shell):
-        """Gate 1. §3 rule 4's one sanctioned use of ``structure``.
+        """Gate 1. Rule 4's one sanctioned use of ``structure``.
 
         An escaped body is the visible symptom of the wrong idiom and it would
         turn every migrated notification into a mail full of ``&lt;p&gt;`` -- the
@@ -233,7 +232,7 @@ class TestReturnValue:
         )
 
     def test_the_subject_is_escaped(self, shell):
-        """The other half of §3 rule 4: everything that is *not* the body slot is
+        """The other half of rule 4: everything that is *not* the body slot is
         escaped. A subject is often computed from an item title, so it is
         user-influenced content in a heading -- and the shell is the one place in
         this package where escaped and unescaped injection sit side by side.
@@ -313,7 +312,7 @@ class TestTheCompiledShellRequiresASubject:
 
 class TestKitDefaultsAroundALegacyBody:
     """Gate 2. The shell is the kit layout with the content handed in, so every
-    §3 default has to survive the swap. Each of these is a feature §3 says
+    kit default has to survive the swap. Each of these is a feature that
     "the kit does, not authors" -- and a legacy body is precisely the case where
     nobody is watching the markup."""
 
@@ -336,14 +335,14 @@ class TestKitDefaultsAroundALegacyBody:
         assert support.head_of(shell_html) == support.head_of(authored_html)
 
     def test_layout_tables_are_marked_presentational(self, shell):
-        """§3: ``role="presentation"`` on all layout tables. Without it a screen
+        """``role="presentation"`` on all layout tables. Without it a screen
         reader announces the mail cell by cell."""
         html, _text = shell()
 
         assert support.A11Y_TABLE_MARKER in html
 
     def test_every_table_in_the_shell_is_presentational(self, shell):
-        """The stronger form, and the one §3 actually says ("*all* layout
+        """The stronger form, and the one that actually applies ("*all* layout
         tables"). Only the shell's own tables are counted: a legacy body brings
         its own data tables, and a data table with ``role="presentation"`` would
         be an a11y bug in the other direction.
@@ -369,7 +368,7 @@ class TestKitDefaultsAroundALegacyBody:
         assert unmarked == [], f"layout tables with no presentational role: {unmarked}"
 
     def test_the_logo_has_an_alt_attribute(self, shell, set_record):
-        """§3: "enforced ``alt`` on the logo/``Img`` component".
+        """"enforced ``alt`` on the logo/``Img`` component".
 
         The logo only renders when the token is set, so the token is set first --
         otherwise this test would pass by finding no image at all.
@@ -384,12 +383,12 @@ class TestKitDefaultsAroundALegacyBody:
         assert "alt=" in tag, f"logo <img> has no alt attribute: {tag}"
 
     def test_lang_is_emitted_on_html(self, shell):
-        """§3: "the layout emits ``lang="${lang}"`` on ``<html>``"."""
+        """"the layout emits ``lang="${lang}"`` on ``<html>``"."""
         html, _text = shell(language="fr")
 
         match = support.LANG_ATTRIBUTE.search(html)
 
-        assert match, "no lang attribute on <html> (SPEC §3 a11y default)"
+        assert match, "no lang attribute on <html> (a11y default)"
         assert match.group(1).lower().startswith("fr")
 
     def test_css_was_inlined(self, shell):
@@ -407,7 +406,7 @@ class TestKitDefaultsAroundALegacyBody:
         )
 
     def test_dark_mode_survives(self, shell, authored):
-        """``docs/DECISIONS.md``: dark mode is attribute selectors plus
+        """Dark mode is attribute selectors plus
         ``data-dark`` hooks. Head parity covers the stylesheet; this covers the
         hooks, which live in the body and are therefore the half the shell could
         lose on its own."""
@@ -437,7 +436,7 @@ class TestKitDefaultsAroundALegacyBody:
         authored_html, _ = authored(language="en")
 
         assert visible_hidden_text(authored_html), (
-            "the authored template renders no preheader at all: SPEC §4's "
+            "the authored template renders no preheader at all: the "
             "registration msgid never reached the layout's hidden div"
         )
         assert visible_hidden_text(shell_html) == [], (
@@ -453,7 +452,7 @@ class TestKitDefaultsAroundALegacyBody:
 
 
 class TestThemeTokens:
-    """Gate 3. §8.2 level 2 makes these three records "the majority of
+    """Gate 3. These three records make up "the majority of
     per-commune needs without touching markup" -- which has to include the
     migrated PloneMeeting mails, or the shell is the one mail flow where a commune
     cannot be branded."""
@@ -513,7 +512,7 @@ class TestThemeTokens:
         assert PROBE_LOGO in html
 
     def test_the_footer_token_is_injected_as_structure(self, shell, set_record):
-        """§3 rule 4 reserves ``structure`` for two things: the body slot and
+        """Rule 4 reserves ``structure`` for two things: the body slot and
         ``footer_html``. The shell uses both at once, which is the only render in
         this package where a mistake in one could look like the other."""
         set_record("footer_html", PROBE_FOOTER)
@@ -553,7 +552,7 @@ class TestThemeTokens:
 
 
 class TestNoTemplateInjection:
-    """Gate 5, the load-bearing gate of Phase 3 (plan §6: "the load-bearing risk
+    """Gate 5, the load-bearing gate of Phase 3 ("the load-bearing risk
     of this phase; the answer determines whether ``structure`` is safe here at
     all").
 
@@ -563,7 +562,7 @@ class TestNoTemplateInjection:
     full render namespace in scope -- a template-injection vulnerability, not a
     cosmetic defect.
 
-    ``docs/DECISIONS.md`` records the verification that it does not: ``structure``
+    The verification behind this: ``structure``
     inserts the string as markup *data*, and the compiled template is never
     re-parsed. These are the regression tests for that conclusion, and they are
     written so that an evaluation would be *visible* rather than merely
@@ -625,7 +624,7 @@ class TestNoTemplateInjection:
         assert body in html
 
     def test_no_name_in_the_render_namespace_can_be_reached(self, shell, set_record):
-        """Every documented namespace name at once (§6.1, §3, §4).
+        """Every documented namespace name at once.
 
         A test that probed one name would pass while another leaked. The theme
         records are set to probe values first, so a ``${theme/primary_color}`` that
@@ -706,7 +705,7 @@ class TestPathologicalBodies:
     """Gate 6, and the honest answer is the same for all three: **every one of
     them renders, verbatim, and nothing raises.**
 
-    That is the direct consequence of plan §5's "no sanitising or rewriting of
+    That is the direct consequence of "no sanitising or rewriting of
     ``body_html``. The shell wraps; it does not clean." The tests below therefore
     assert what actually happens rather than what would be nice, and each docstring
     records the consequence -- including the two where the consequence is a
@@ -731,7 +730,7 @@ class TestPathologicalBodies:
 
         This is the designed behaviour, not a gap: a shell that "fixed" a
         consumer's markup would be silently changing mails nobody asked it to
-        change (plan §5). What the shell does guarantee is that *its own* wrapper
+        change. What the shell does guarantee is that *its own* wrapper
         is intact, which is what the last two assertions check -- the header, the
         footer and the closing tags all survive an unbalanced body.
         """
@@ -836,7 +835,7 @@ class TestPathologicalBodies:
 
 class TestPlaintextPart:
     """Gate 7. There is deliberately no ``shell.txt.pt`` twin -- its only content
-    would be ``body_html``, which is HTML -- so the plaintext part is §4's naive
+    would be ``body_html``, which is HTML -- so the plaintext part is a naive
     extraction of the rendered document. That makes it the one part of
     ``render_shell``'s output that is *derived* rather than composed, and the part
     nobody looks at until a client renders only that.
@@ -882,7 +881,7 @@ class TestPlaintextPart:
             assert phrase in text, f"{phrase!r} was lost in the plaintext extraction"
 
     def test_table_cells_are_separated_not_concatenated(self, rendered):
-        """``docs/DECISIONS.md``, "Plaintext: table cells get a `` | `` separator".
+        """"Plaintext: table cells get a `` | `` separator".
 
         Legacy notification bodies are table-heavy and ``render_shell`` has no
         plaintext twin to fall back on, so what this extraction does to a ``<tr>``
@@ -979,9 +978,9 @@ class TestPlaintextPart:
     def test_there_is_no_plaintext_twin_and_none_is_warned_about(
         self, integration, caplog, fixture_body
     ):
-        """The naive extraction is the shell's *designed* path, not §4's fallback.
+        """The naive extraction is the shell's *designed* path, not a fallback.
 
-        §4 says a template with no ``.txt.pt`` twin gets "a warning at startup" and
+        A template with no ``.txt.pt`` twin gets "a warning at startup" and
         "a logged deprecation" on every render. For the shell that would be a
         deprecation warning nobody can ever act on: a twin's only content would be
         ``body_html``, which is HTML, so the twin would put tags in the plaintext
@@ -1011,7 +1010,7 @@ class TestPlaintextPart:
             if "DEPRECATION" in record.getMessage()
         ]
         assert deprecations == [], (
-            f"render_shell logged §4's missing-twin deprecation: {deprecations}"
+            f"render_shell logged the missing-twin deprecation: {deprecations}"
         )
 
 
@@ -1021,7 +1020,7 @@ class TestPlaintextPart:
 
 
 class TestLanguage:
-    """Gate 9. Plan §2: ``subject`` "accepts a msgid or a literal, like
+    """Gate 9. ``subject`` "accepts a msgid or a literal, like
     ``.subject()``" and the shell shares ``render()``'s "same namespace, theme
     tokens and locale helpers -- one code path, not a parallel one".
 
@@ -1055,7 +1054,7 @@ class TestLanguage:
         assert self.MSGID not in html, "the bare msgid reached the output"
 
     def test_a_literal_subject_is_passed_through_unchanged(self, shell):
-        """§6.2: "accepts a msgid or literal string". A literal is not a msgid, so
+        """"accepts a msgid or literal string". A literal is not a msgid, so
         no catalog may touch it."""
         html, _text = shell(subject=SUBJECT_SENTINEL, language="nl")
 
@@ -1071,7 +1070,7 @@ class TestLanguage:
         assert match.group(1).lower().startswith(language)
 
     def test_fr_and_nl_differ(self, shell, msgid):
-        """The whole point of §6.2's per-language send, at the shell's level."""
+        """The whole point of the per-language send, at the shell's level."""
         fr_html, fr_text = shell(subject=msgid, language="fr")
         nl_html, nl_text = shell(subject=msgid, language="nl")
 
@@ -1103,7 +1102,7 @@ class TestLanguage:
         assert first == again
 
     def test_omitting_the_language_uses_the_negotiated_one(self, shell, integration):
-        """§6.1, applied to the sibling: "the negotiated language when omitted".
+        """Applied to the sibling: "the negotiated language when omitted".
 
         Compared against the request's own ``LANGUAGE`` rather than a hardcoded
         code, so the test states the *rule* and not this layer's happenstance.
@@ -1121,9 +1120,9 @@ class TestLanguage:
 
 
 class TestPureFunction:
-    """§6.1's purity, which the golden files and ``@@emailkit-preview`` both rely
-    on. ``render_shell`` shares ``render()``'s code path, so this is a regression
-    test for that sharing rather than a second implementation of it."""
+    """``render()``'s purity, which the golden files and ``@@emailkit-preview`` both
+    rely on. ``render_shell`` shares ``render()``'s code path, so this is a
+    regression test for that sharing rather than a second implementation of it."""
 
     def test_render_shell_is_repeatable(self, shell):
         assert shell() == shell()

@@ -1,7 +1,7 @@
-"""SPEC §6.3 -- ``@@emailkit-preview`` and the send-test button.
+"""``@@emailkit-preview`` and the send-test button.
 
 > ``@@emailkit-preview`` (Manager-only): lists all registered templates, renders
-> each in an iframe using **committed fixture data** (see §7), with a language
+> each in an iframe using **committed fixture data**, with a language
 > switcher and a theme-token panel. A **Send test** button mails the currently
 > previewed template + fixture + language to the logged-in user's own address --
 > browser previews lie, Outlook doesn't; this closes the loop with real clients
@@ -9,27 +9,27 @@
 
 Two things make this module different from the rest of Phase 2.
 
-**The markup is not the contract.** §6.3 pins *behaviour* -- who may look, what
-is listed, what is rendered, that the language switcher switches, where the test
-mail goes -- and leaves the layout to whoever writes it. So the assertions here
-never look for a chosen class name or heading. Where the rendered previews live
-is discovered from the page itself: the ``src`` of each iframe is followed and
-what comes back is what gets asserted on. A preview page whose iframes 404, or
-which renders raw ``${}`` inside them, is broken however good the outer page
-looks.
+**The markup is not the contract.** What's pinned here is *behaviour* -- who may
+look, what is listed, what is rendered, that the language switcher switches, where
+the test mail goes -- and the layout is left to whoever writes it. So the
+assertions here never look for a chosen class name or heading. Where the rendered
+previews live is discovered from the page itself: the ``src`` of each iframe is
+followed and what comes back is what gets asserted on. A preview page whose
+iframes 404, or which renders raw ``${}`` inside them, is broken however good the
+outer page looks.
 
-**Two request keys had to be guessed.** §6.3 mentions "a language switcher" and
-"a Send test button" without naming either control. Both live in
+**Two request keys had to be guessed.** The passage above mentions "a language
+switcher" and "a Send test button" without naming either control. Both live in
 ``tests/support.py`` (``PREVIEW_LANGUAGE_PARAM``, ``SEND_TEST_FORM``,
 ``SEND_TEST_METHOD``) and nowhere else, so reconciling them was one edit there.
 ``language`` was right; the button is ``form.button.send_test`` and ``POST``-only.
 
 **One assertion is a recorded contradiction, not a bug.**
-``test_it_uses_the_previewed_language`` encodes §6.3's "+ language" and is marked
-``xfail(strict=True)``, because §6.2 -- the frozen section -- gives the builder no
-language argument and groups by the *recipient's* language. Its marker carries the
-full argument; the assertion still runs, and it flips the suite red if anybody
-makes it pass without settling the spec question.
+``test_it_uses_the_previewed_language`` encodes the "+ language" requirement
+above and is marked ``xfail(strict=True)``, because the builder's frozen API
+takes no language argument and groups by the *recipient's* language. Its marker
+carries the full argument; the assertion still runs, and it flips the suite red
+if anybody makes it pass without settling the question.
 """
 
 from AccessControl import Unauthorized
@@ -48,7 +48,7 @@ PREVIEW = f"@@{support.PREVIEW_VIEW}"
 
 @pytest.fixture
 def as_manager(mail_portal, grant_roles):
-    """§6.3 is "Manager-only", which is also the role a developer previewing
+    """The preview is "Manager-only", which is also the role a developer previewing
     templates actually has."""
     grant_roles(mail_portal, ["Manager"])
     return mail_portal
@@ -102,7 +102,7 @@ def previewed_bodies(mail_portal, mail_request, preview):
 
     Follows every iframe ``src`` and returns what each one renders. Falls back to
     the page itself when there is no iframe, so a preview that renders inline is
-    still checked rather than skipped -- §6.3 asks for an iframe, but what the
+    still checked rather than skipped -- the preview asks for an iframe, but what the
     assertions are about is the *rendered mail*, and a module that silently
     stopped looking at it would be the worst outcome here.
     """
@@ -128,9 +128,9 @@ def previewed_bodies(mail_portal, mail_request, preview):
 
 
 class TestItIsManagerOnly:
-    """§6.3, first three words. A preview page lists every template and renders
+    """A preview page lists every template and renders
     it with fixture data; it is not a secret, but it is a developer tool that
-    also mails on demand, and §6.3 chose Manager."""
+    also mails on demand, and Manager is the role that was chosen."""
 
     def test_anonymous_gets_unauthorized(self, mail_portal, mail_request):
         support.require_preview(mail_portal, mail_request)
@@ -144,7 +144,7 @@ class TestItIsManagerOnly:
 
     def test_a_plain_member_gets_unauthorized(self, mail_portal, mail_request):
         """ "Manager-only" is a stronger claim than "not anonymous", and it is the
-        one §6.3 makes. The test user is a Member by default in this fixture, so
+        one the preview makes. The test user is a Member by default in this fixture, so
         this is the case a permission of ``zope2.View`` would let through."""
         support.require_preview(mail_portal, mail_request)
 
@@ -159,7 +159,7 @@ class TestItIsManagerOnly:
 
 class TestItListsTheRegisteredTemplates:
     def test_every_registered_template_is_listed(self, preview):
-        """Driven off discovery, so a template added to the §4 registration and
+        """Driven off discovery, so a template added to the registration and
         forgotten by the preview shows up here -- the same reasoning
         ``test_golden.py`` uses for fixtures."""
         from imio.emailkit.discovery import available_templates
@@ -170,7 +170,7 @@ class TestItListsTheRegisteredTemplates:
         assert missing == [], f"registered templates absent from the preview: {missing}"
 
     def test_the_default_mails_are_listed_too(self, preview):
-        """§6.3 shows every mail the package sends, the two Plone defaults included.
+        """The preview shows every mail the package sends, the two Plone defaults included.
 
         They were absent for as long as they were jbot overrides: unregistered, so
         the preview could not offer them, so the one mail a commune is most likely
@@ -193,10 +193,10 @@ class TestItListsTheRegisteredTemplates:
 
 
 class TestItRendersWithTheCommittedFixtures:
-    """§6.3: "using **committed fixture data** (see §7)"."""
+    """The preview renders "using **committed fixture data**"."""
 
     def test_the_fixture_values_reach_the_rendered_preview(self, previewed_bodies):
-        """The point of reusing §7's fixtures is that the preview shows what the
+        """The point of reusing the golden files' fixtures is that the preview shows what the
         golden files pin. A preview built on lorem ipsum -- or on an empty
         context, which renders without error -- would look fine and prove
         nothing."""
@@ -212,8 +212,8 @@ class TestItRendersWithTheCommittedFixtures:
 
         assert any(expected in body for body in bodies), (
             f"no previewed body contains the committed fixture's title "
-            f"{expected!r}; §6.3 renders "
-            "with the fixture data from §7"
+            f"{expected!r}; the preview renders "
+            "with the committed fixture data"
         )
 
     def test_the_preview_has_no_unresolved_placeholder(self, previewed_bodies):
@@ -227,7 +227,7 @@ class TestItRendersWithTheCommittedFixtures:
 
 
 class TestTheLanguageSwitcher:
-    """§6.3: "with a language switcher"."""
+    """The preview comes "with a language switcher"."""
 
     def test_switching_changes_the_rendered_language(self, previewed_bodies):
         fr_bodies = previewed_bodies(language="fr")
@@ -265,7 +265,7 @@ class TestTheLanguageSwitcher:
 
 
 class TestSendTest:
-    """§6.3: "A **Send test** button mails the currently previewed template +
+    """"A **Send test** button mails the currently previewed template +
     fixture + language to the logged-in user's own address"."""
 
     @pytest.fixture
@@ -343,21 +343,22 @@ class TestSendTest:
     @pytest.mark.xfail(
         strict=True,
         reason=(
-            "SPEC §6.3 and §6.2 contradict each other and §6.2 is the frozen "
-            "one. §6.3: the button mails 'the currently previewed template + "
-            "fixture + LANGUAGE'. §6.2: the builder takes no language argument, "
+            "The preview's own send-test behaviour and the builder's frozen API "
+            "contradict each other and the frozen builder API wins. The button is "
+            "meant to mail 'the currently previewed template + fixture + "
+            "LANGUAGE'. But the builder takes no language argument, "
             "and .send() groups recipients by THEIR OWN resolved language "
             "(falling back to the site default). With a single recipient -- the "
             "logged-in user -- the sent language is therefore that user's "
             "preferred language, never the switcher's. The view computes and "
             "displays the discrepancy rather than faking it, and declines to "
             "rewrite the user's language preference behind their back. "
-            "The assertion is kept, running and strict: it encodes §6.3 as "
-            "written, so if anyone makes it pass, that is a deliberate resolution "
-            "of the conflict and this marker has to come off with a DECISIONS.md "
-            "entry. NEEDS A MAINTAINER DECISION: either amend §6.3, or give the "
-            "preview a way to pin the render language that does not add a method "
-            "to §6.2's frozen builder."
+            "The assertion is kept, running and strict: it encodes the intended "
+            "send-test behaviour as written, so if anyone makes it pass, that is "
+            "a deliberate resolution of the conflict and this marker has to come "
+            "off with a recorded decision. NEEDS A MAINTAINER DECISION: either "
+            "amend the intended behaviour, or give the preview a way to pin the "
+            "render language that does not add a method to the frozen builder."
         ),
     )
     def test_it_uses_the_previewed_language(
@@ -370,7 +371,7 @@ class TestSendTest:
         The site default is pinned to ``fr`` and the logged-in user is given no
         preferred language, so ``nl`` can only come from the switcher. Without
         that, a user who happened to prefer Dutch would make this pass for a
-        reason that has nothing to do with §6.3.
+        reason that has nothing to do with the switcher.
         """
         set_default_language("fr")
         me.setMemberProperties({"language": ""})
@@ -388,7 +389,7 @@ class TestSendTest:
     def test_it_sends_the_real_thing(
         self, send_test, me, mailhost, site_sender, deliver
     ):
-        """The whole justification in §6.3 is "browser previews lie, Outlook
+        """The whole justification for the send-test button is "browser previews lie, Outlook
         doesn't", so the test mail has to be the *same* message the builder
         would send -- both MIME parts, substituted, not a screenshot of the
         iframe."""
@@ -425,7 +426,7 @@ class TestSendTest:
         send-test with nowhere to send must not fall back to the site's contact
         address, to the ``From`` address, or to a developer address someone left
         in. Whether the refusal surfaces as an exception or as an on-page error is
-        W2's call and both honour §6.2's "fail loud" -- which is why the call
+        W2's call and both honour the builder's "fail loud" contract -- which is why the call
         below is allowed to raise or to return.
         """
         from plone.app.testing import TEST_USER_ID

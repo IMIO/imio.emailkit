@@ -17,7 +17,7 @@
  *       <p class="m-0 text-sm leading-[22px] text-imio-black">…</p>
  *     </KitPanel>
  *
- * `tal:` may not go on the component (SPEC §3 rule 1), so a translated overline
+ * `tal:` may not go on the component, so a translated overline
  * is a `<span tal:omit-tag="">` inside the slot.
  *
  * ---------------------------------------------------------------------------
@@ -32,7 +32,7 @@
  *
  * `tone` is resolved at BUILD time, so the class strings are literal in the
  * compiled output and Tailwind's scanner and `css.purge` both see them. A
- * runtime-computed class is SPEC §3 rule 2 and would style nothing.
+ * runtime-computed class would style nothing.
  *
  * ---------------------------------------------------------------------------
  * No fill, and what that costs in dark mode

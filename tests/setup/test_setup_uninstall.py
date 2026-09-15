@@ -25,7 +25,7 @@ class TestSetupUninstall:
         assert IEmailkitLayer not in browser_layers
 
     def test_theme_records_removed(self, portal):
-        """The three theme tokens (§3) must go with the add-on.
+        """The three theme tokens must go with the add-on.
 
         A record whose defining interface is no longer importable makes the
         registry control panel raise. Requires a ``profiles/uninstall`` shipping

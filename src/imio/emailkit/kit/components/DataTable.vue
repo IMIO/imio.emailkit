@@ -7,7 +7,7 @@
  * screen readers. `role="table"` is stated explicitly because Maizzle's
  * `addAttributes` transformer otherwise adds `role="none"` to every `<table>`.
  *
- * Rows are the author's, not the kit's: SPEC §3 rule 1 forbids `tal:` on kit
+ * Rows are the author's, not the kit's: `tal:` is forbidden on kit
  * components, because attribute fallthrough lands them on an unpredictable root
  * element. So a `tal:repeat` lives on the author's own `<tr>` inside the default
  * slot:

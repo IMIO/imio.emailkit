@@ -20,7 +20,7 @@ produced a successful build with exit code 0**. Maizzle catches its own errors a
 ships. A browser preview looks fine. The mail is broken in the inbox, or the
 template will not even parse at runtime.
 
-The only trustworthy gates are the two in §7's CI contract:
+The only trustworthy gates are the two in the CI contract:
 
 1. **staleness** — `bin/check-emails --package <self>`: the committed `.pt` matches
    a fresh build.
@@ -62,7 +62,7 @@ genuinely need CSS.
 ```
 
 `css.safe` rewrites selector-unsafe characters: `$` becomes `-` and the braces are
-stripped. Separately, SPEC §3 rule 2 forbids **runtime-computed class values**
+stripped. Separately, the authoring rules forbid **runtime-computed class values**
 outright — Tailwind's scanner and `removeUnusedCSS` only see build-time markup, so
 a class assembled at runtime has had its CSS purged before the mail is sent.
 Conditional styling goes through `tal:attributes="style string:…"` with literal
@@ -130,8 +130,8 @@ Same for `tal:content`: `tal:content="python: format_date(when)"`.
 
 ### 8. Theme tokens go via `tal:attributes` or `bgcolor`, never a literal `style`
 
-SPEC §3 as originally written showed `style="background-color: ${theme/primary_color}"`.
-That is failure 1. The amended rule is in `docs/DECISIONS.md`; the three tokens,
+An early version of this rule showed `style="background-color: ${theme/primary_color}"`
+as an example. That is failure 1. The rule has since been amended; the three tokens,
 their registry records and the locked-kit model are unchanged.
 
 ### 9. A legacy body's own `<style>` block is dropped by Gmail and Outlook.com
@@ -477,7 +477,7 @@ The shell defines them; read them as `${primary_color}` inside `bgcolor` or
 
 ---
 
-## Registration (SPEC §4)
+## Registration
 
 One `<emailkit:templates>` block per add-on, in its own `configure.zcml`:
 
@@ -538,7 +538,7 @@ precedence is effectively arbitrary.
 `i18n:translate` freezes at the English default. A generated twin ships a
 plausible-looking body with the wrong content in the wrong language.
 
-Without a twin, §4's naive extraction runs, warns once at startup, logs a
+Without a twin, the naive extraction runs, warns once at startup, logs a
 deprecation — and **drops every link**, because the URL lives in an `<a href>` the
 extraction throws away. Any template with a call to action wants a twin.
 
@@ -667,7 +667,7 @@ Two used to be `z3c.jbot` overrides rendered by a stock CMFPlone view, and that
 forced a second dialect — `${options/member}`, `${python: member.getProperty('email')}`,
 no locale helpers, no `theme`, and a hand-written `Subject:` header emitted from
 `useDoctype()`. If you find markup like that in a `.vue`, it is pre-2026-09-11 and
-wants converting; `docs/DECISIONS.md` has the entry.
+wants converting.
 
 What stays in Python, in the view, is the only part that cannot be a template:
 `RegistrationTool` parses `Subject`/`To`/`From` back out of the returned string, so

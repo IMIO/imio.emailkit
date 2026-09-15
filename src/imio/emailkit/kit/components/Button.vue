@@ -28,8 +28,7 @@
  * identical in both positions apart from that one margin.
  *
  * `variant` is resolved at BUILD time, so the class strings are literal in the
- * compiled output; a runtime-computed class is SPEC §3 rule 2 and would style
- * nothing.
+ * compiled output; a runtime-computed class would style nothing.
  *
  * The `primary_color` theme token rides on `bgcolor`, not on `style`. A
  * Chameleon placeholder in a literal `style` attribute silently kills CSS

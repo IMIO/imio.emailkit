@@ -1,7 +1,6 @@
 <script setup>
 /**
- * `shell` -- the template SPEC §9 phase 3's `render_shell(subject, body_html)`
- * renders (docs/plans/phase-3.md §2).
+ * `shell` -- the template `render_shell(subject, body_html)` renders.
  *
  * The one template in the kit with no content of its own, and since the v2
  * layout it has no markup either. Its entire job is to put an *existing*
@@ -14,7 +13,7 @@
  *   subject    -- the banner heading. Interpolated, never `i18n:translate`d: a
  *                 template cannot translate a *runtime* msgid, and the same
  *                 value is what the caller hands `.subject()` for the mail
- *                 header, which SPEC §6.2 already translates Python-side. So
+ *                 header, which is already translated Python-side. So
  *                 `render_shell` passes a translated string, exactly as it would
  *                 for the header.
  *   body_html  -- arbitrary legacy HTML, injected unescaped by the layout.
@@ -36,7 +35,7 @@
  *
  * WHERE THE BODY GOES, AND WHY IT IS NOT WRITTEN HERE.
  * `KitMain` already owns that seam. It defines `body_html` on `<html>` (so both
- * §6.1's flat context and a stock view's `options` reach it) and renders it with
+ * the flat render context and a stock view's `options` reach it) and renders it with
  * `structure` inside the content well, immediately after the default slot. A
  * `tal:content="structure body_html"` in this file would not create the slot; it
  * would render the legacy body TWICE. The heading above is all this file adds,

@@ -1,4 +1,4 @@
-"""SPEC §5's ``bin/check-emails``: the staleness gate and the lint delegation."""
+"""``bin/check-emails``: the staleness gate and the lint delegation."""
 
 from conftest import invocations
 from conftest import NPX_LOG
@@ -47,7 +47,7 @@ class TestTheStalenessGate:
         assert run_gate(project, kit, binary) == 1
         out = capsys.readouterr().out
         assert check_emails.STALE in out
-        # §5 asks for "a per-file diff summary", not just a verdict.
+        # A per-file diff summary is expected here, not just a verdict.
         assert "hand edited" in out
         assert "+++ fresh build" in out
 
@@ -72,7 +72,7 @@ class TestTheStalenessGate:
     def test_hand_written_templates_outside_the_build_are_left_alone(
         self, wired, capsys
     ):
-        """§5's own advice about the lint applies here: prefer a miss to a false alarm.
+        """The same advice about the lint applies here: prefer a miss to a false alarm.
 
         A browser view's ``.pt`` is nobody's build output. Reporting it as
         "committed, no longer built" would be a false alarm on a correct file, and a
@@ -95,7 +95,7 @@ class TestTheStalenessGate:
         """Otherwise every hand-authored twin would be reported as an ORPHAN.
 
         ``maizzle build`` empties its output directory, so a twin cannot live there
-        as source; it is copied in after each build (``docs/DECISIONS.md``). The
+        as source; it is copied in after each build. The
         gate has to reproduce that or it would report a file the build legitimately
         does not produce.
         """
@@ -169,7 +169,7 @@ def stub_lint(tmp_path, monkeypatch):
 
 
 class TestTheLintGate:
-    """§5 gate 2. Called, never reimplemented."""
+    """The lint gate. Called, never reimplemented."""
 
     def test_it_invokes_the_module_by_the_agreed_interface(
         self, project, tmp_path, stub_lint
@@ -193,7 +193,7 @@ class TestTheLintGate:
         assert check_emails.lint_gate([project], module=STUB_MODULE) == 0
 
     def test_a_missing_lint_module_fails_rather_than_skipping(self, project, capsys):
-        """§5 calls this "the CI gate".
+        """This is "the CI gate".
 
         A gate that turns itself off when its implementation is missing is worse
         than no gate, because it reports success. ``--no-lint`` exists so that

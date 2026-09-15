@@ -30,7 +30,7 @@
  * ---------------------------------------------------------------------------
  * Why this one may be a component when the rows of `KitDataTable` may not
  * ---------------------------------------------------------------------------
- * SPEC §3 rule 1 keeps `tal:` off kit components, because Vue's attribute
+ * `tal:` is kept off kit components, because Vue's attribute
  * fallthrough puts it on whichever element happens to be the root -- so a
  * repeated row has to be the author's own `<tr>`. A `KitDataList` is a fixed
  * handful of facts, never a repeat: that is the line between it and

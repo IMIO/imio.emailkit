@@ -1,4 +1,4 @@
-"""SPEC §6.1 -- ``render()``.
+"""``render()``.
 
 **The rule this module exists to enforce:** assert on *substituted values*, never
 on marker strings. Phase 0 measured that without the ``IPageTemplateEngine``
@@ -42,7 +42,7 @@ def rendered(integration, template, fixture_data):
 
 class TestReturnValue:
     def test_returns_html_and_text(self, rendered):
-        """§6.1: ``html, text = render(...)``."""
+        """Returns ``html, text = render(...)``."""
         assert isinstance(rendered, tuple)
         assert len(rendered) == 2
 
@@ -74,7 +74,7 @@ class TestPlaceholdersAreSubstituted:
     def test_every_fixture_value_reached_the_html(self, rendered, fixture_data):
         """The positive half: values that exist only in the fixture.
 
-        *Every* string value, not a chosen few. §7 pairs one fixture with one
+        *Every* string value, not a chosen few. One fixture is paired with one
         template, so a key nothing renders is either dead data or -- far more
         likely -- a placeholder that stopped resolving. Enumerating the whole
         fixture means adding a placeholder without adding its data, or removing a
@@ -99,7 +99,7 @@ class TestPlaceholdersAreSubstituted:
         reads the ``text/plain`` alternative until a client renders only that.
 
         Only the longest string value is required here: what a plaintext body
-        repeats is the author's call (and with no ``.txt.pt`` twin it is §4's naive
+        repeats is the author's call (and with no ``.txt.pt`` twin it is a naive
         extraction), but a text part carrying *none* of the context means it was
         never bound at all.
         """
@@ -132,8 +132,8 @@ class TestPlaceholdersAreSubstituted:
 
 class TestRenderLanguage:
     def test_lang_is_exposed_and_emitted_on_html(self, integration, template):
-        """§6.1 + §3: the render language "is also exposed as ``lang``, which the
-        layout emits on ``<html>``". Screen-reader pronunciation depends on it."""
+        """The render language is also exposed as ``lang``, which the
+        layout emits on ``<html>``. Screen-reader pronunciation depends on it."""
         html, _text = render(
             support.qualified(template),
             context=support.load_fixture(template),
@@ -142,7 +142,7 @@ class TestRenderLanguage:
 
         match = support.LANG_ATTRIBUTE.search(html)
 
-        assert match, "no lang attribute on <html> (SPEC §3 a11y default)"
+        assert match, "no lang attribute on <html> (kit accessibility default)"
         assert match.group(1).lower().startswith("fr")
 
     def test_the_language_argument_is_honoured(self, integration, template):
@@ -186,7 +186,7 @@ class TestRenderLanguage:
 
 class TestPureFunction:
     def test_render_is_repeatable(self, integration, template, fixture_data):
-        """§6.1: "pure function of (template, context, registry state)".
+        """A pure function of (template, context, registry state).
 
         Previews and golden files both depend on this; a timestamp or a random
         id in the output would make every golden file fail on the second run.
@@ -215,17 +215,17 @@ class TestPureFunction:
 
 
 class TestKitDefaults:
-    """§3 -- what the kit does so that no author has to remember it."""
+    """What the kit does so that no author has to remember it."""
 
     def test_layout_tables_are_marked_presentational(self, rendered):
-        """§3 accessibility defaults. RGAA applies to iMio's clients, and a
+        """Accessibility defaults. RGAA applies to iMio's clients, and a
         layout table without ``role="presentation"`` is read out cell by cell."""
         html, _text = rendered
 
         assert support.A11Y_TABLE_MARKER in html
 
     def test_css_was_inlined(self, rendered):
-        """§9's Phase 1 exit criterion, and Phase 0's caveat A1.
+        """Phase 1's exit criterion, and Phase 0's caveat A1.
 
         A single Chameleon placeholder in a literal ``style`` attribute stops
         Juice inlining **document-wide** while the build still reports success.

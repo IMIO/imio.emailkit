@@ -1,4 +1,4 @@
-"""SPEC §8.1 -- installing ``:default`` restyles Plone's stock transactional mails.
+"""Installing ``:default`` restyles Plone's stock transactional mails.
 
 This is the package's first visible value, so it is tested through the **real call
 site**: ``getMultiAdapter((portal_registration, request), name=...)`` called with
@@ -77,8 +77,8 @@ class TestWeOwnTheStockViews:
         )
 
     def test_it_renders_a_registered_template(self, view):
-        """The whole point of owning the view: these go through §4 discovery and
-        §6.1 ``render()`` like any consumer template, rather than through a
+        """The whole point of owning the view: these go through discovery and
+        ``render()`` like any consumer template, rather than through a
         dialect only these two speak."""
         from imio.emailkit.discovery import get_template
 
@@ -117,16 +117,16 @@ class TestWeOwnTheStockViews:
 
 class TestRenderedOutputIsOurs:
     def test_kit_accessibility_default_is_present(self, rendered):
-        """§3: ``role="presentation"`` on layout tables. Also the cheapest proof
+        """``role="presentation"`` on layout tables. Also the cheapest proof
         that a *kit* template rendered rather than any other file."""
         assert support.A11Y_TABLE_MARKER in rendered
 
     def test_html_carries_the_language(self, rendered):
-        """§3: the layout emits ``lang`` on ``<html>``."""
+        """The layout emits ``lang`` on ``<html>``."""
         assert support.LANG_ATTRIBUTE.search(rendered), "no lang attribute on <html>"
 
     def test_css_was_inlined(self, rendered):
-        """§9's Phase 1 exit criterion, through the jbot path this time.
+        """Phase 1's exit criterion, through the jbot path this time.
 
         Phase 0 caveat A1: a placeholder in a literal ``style`` attribute takes a
         template from 31 inline styles to 6 with the build still green.
@@ -169,7 +169,7 @@ class TestRenderedOutputIsOurs:
 
 
 class TestThemeTokensReachTheDefaultMails:
-    """§8.2 level 2 has to work on *these* two mails above all others.
+    """Level 2 has to work on *these* two mails above all others.
 
     "Adjust branding only: theme tokens via ``plone.app.registry`` -- covers the
     majority of per-commune needs without touching markup." The password-reset
@@ -204,8 +204,8 @@ class TestThemeTokensReachTheDefaultMails:
         rendered = support.call_stock_mail(portal, marked_request, template, member)
 
         assert with_probe_color in rendered, (
-            "the theme token did not reach the render: §8.2 level 2 does not "
-            "apply to the two mails §8.1 ships"
+            "the theme token did not reach the render: level 2 does not "
+            "apply to the two mails :default ships"
         )
 
 
@@ -225,10 +225,10 @@ class TestTheResultIsStillAParsableMail:
     def test_the_subject_is_our_registered_msgid_translated(
         self, rendered, template, marked_request
     ):
-        """§8.1: "subjects are re-registered as i18n msgids in the
-        ``imio.emailkit`` domain".
+        """Subjects are re-registered as i18n msgids in the
+        ``imio.emailkit`` domain.
 
-        They now live in the template's §4 ``<emailkit:templates>`` registration,
+        They now live in the template's ``<emailkit:templates>`` registration,
         exactly like every other subject in the package, and
         ``DefaultMailView.header_block`` translates that msgid into the
         recipient's language. Before the views were ours the msgid had to be
@@ -246,7 +246,7 @@ class TestTheResultIsStillAParsableMail:
 
         msgid = support.registered_subject(template)
 
-        assert msgid, f"{template} declares no subject in its §4 registration"
+        assert msgid, f"{template} declares no subject in its registration"
         expected = translate(msgid, context=marked_request)
         message = message_from_string(rendered.strip())
 

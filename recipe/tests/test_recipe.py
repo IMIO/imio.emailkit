@@ -2,7 +2,7 @@
 
 The most important test in this file is
 ``TestTheHardBoundary::test_a_default_install_never_imports_the_node_module``.
-SPEC §5's "Explicitly rejected" section is the reason this distribution exists in
+The explicitly rejected alternative is the reason this distribution exists in
 the shape it does: compiling at buildout time "would make Node a production
 dependency across ~350 applications". A regression there is not a bug in a script,
 it is a change to the deployment requirements of the whole iMio estate.

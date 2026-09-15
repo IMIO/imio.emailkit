@@ -3,7 +3,7 @@
           i18n:domain="imio.emailkit"
 >
 
-  <!-- Remove SPEC §3's three theme tokens along with the add-on.
+  <!-- Remove the three theme tokens along with the add-on.
 
        This deliberately overrides the usual Plone instinct of never destroying
        settings on uninstall. These records are defined by an interface that

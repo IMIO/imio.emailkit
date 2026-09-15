@@ -1,4 +1,4 @@
-"""SPEC §6.2 -- ``.attach(source, filename=None, mimetype=None)``.
+"""``.attach(source, filename=None, mimetype=None)``.
 
 > ``source`` accepts, in the same polymorphic spirit as recipients: raw
 > ``bytes``, a filesystem path (``str``/``Path``), an open binary file object, a
@@ -75,7 +75,7 @@ def assert_is_the_pdf(part, filename=PDF_NAME):
     )
     assert part.get_content_type() == "application/pdf", (
         f"attachment content type is {part.get_content_type()!r}; "
-        "mimetypes.guess_type('.pdf') is application/pdf (SPEC §6.2)"
+        "mimetypes.guess_type('.pdf') is application/pdf"
     )
     assert part.get_payload(decode=True) == PDF_BYTES, (
         "the attachment payload is not the bytes that went in"
@@ -83,7 +83,7 @@ def assert_is_the_pdf(part, filename=PDF_NAME):
 
 
 class TestBytes:
-    """§6.2: ``filename`` is "required for ``bytes``" -- bytes carry no name."""
+    """``filename`` is "required for ``bytes``" -- bytes carry no name."""
 
     def test_bytes_with_a_filename(self, mail, one_attachment):
         part = one_attachment(
@@ -99,7 +99,7 @@ class TestBytes:
             email.send()
 
     def test_the_error_is_raised_at_send_not_at_attach(self, mail):
-        """§6.2 puts it "at ``.send()`` time, consistent with
+        """It happens "at ``.send()`` time, consistent with
         ``RecipientError``" -- so the builder stays a data holder and every
         metadata problem in one mail surfaces in one exception."""
         mail().to(support.PLAIN_ADDRESS).attach(PDF_BYTES)  # must not raise
@@ -117,14 +117,14 @@ class TestBytes:
         assert part.get_payload(decode=True) == PDF_BYTES
 
     def test_an_unguessable_mimetype_raises(self, mail):
-        """§6.2, literally: "missing/**unguessable** metadata raises
+        """Literally: "missing/**unguessable** metadata raises
         ``AttachmentError``".
 
         ``mimetypes.guess_type("notes.emailkitx")`` returns ``(None, None)``, so
-        by the spec's own sentence this must fail rather than fall back to
-        ``application/octet-stream``. Recorded as a deliberate reading of §6.2:
-        an octet-stream default would be defensible, but it is not what the spec
-        says, and "fail loud" is the philosophy it says it everywhere else.
+        by that sentence this must fail rather than fall back to
+        ``application/octet-stream``. Recorded as a deliberate reading:
+        an octet-stream default would be defensible, but it is not what is
+        specified, and "fail loud" is the philosophy applied everywhere else.
         """
         email = (
             mail()
@@ -137,7 +137,7 @@ class TestBytes:
 
 
 class TestFilesystemPath:
-    """§6.2: "a filesystem path (``str``/``Path``)" -- both spellings."""
+    """The source: a "filesystem path (``str``/``Path``)" -- both spellings."""
 
     def test_a_path_object(self, mail, pdf_on_disk, one_attachment):
         part = one_attachment(mail().to(support.PLAIN_ADDRESS).attach(pdf_on_disk))
@@ -145,7 +145,7 @@ class TestFilesystemPath:
         assert_is_the_pdf(part)
 
     def test_a_string_path(self, mail, pdf_on_disk, one_attachment):
-        """A ``str`` is also how §6.2 spells a recipient, so the two readings
+        """A ``str`` is also how a recipient is spelled, so the two readings
         have to be told apart. Getting it wrong attaches the *path text* as the
         payload, which is a plausible-looking 60-byte file."""
         part = one_attachment(mail().to(support.PLAIN_ADDRESS).attach(str(pdf_on_disk)))
@@ -188,7 +188,7 @@ class TestFilesystemPath:
 
 
 class TestFileObject:
-    """§6.2: "an open binary file object"."""
+    """The source: "an open binary file object"."""
 
     def test_an_open_binary_file(self, mail, pdf_on_disk, one_attachment):
         with pdf_on_disk.open("rb") as handle:
@@ -218,7 +218,7 @@ class TestFileObject:
         assert_is_the_pdf(part)
 
     def test_a_text_mode_file_raises(self, mail, tmp_path):
-        """§6.2 says *binary*. A text-mode handle yields ``str``, and an
+        """The source must be *binary*. A text-mode handle yields ``str``, and an
         attachment silently re-encoded through the platform's default codec is
         a corrupt file that still opens in some readers."""
         path = tmp_path / "notes.txt"
@@ -232,7 +232,7 @@ class TestFileObject:
 
 
 class TestNamedFileValues:
-    """§6.2: "a ``NamedBlobFile``/``NamedFile`` value".
+    """A "``NamedBlobFile``/``NamedFile`` value".
 
     These are the field values a Dexterity object holds, and they carry both
     pieces of metadata themselves -- ``filename`` and ``contentType`` -- so
@@ -263,7 +263,7 @@ class TestNamedFileValues:
 
     def test_the_value_carries_its_own_content_type(self, mail, one_attachment):
         """Not guessed from the extension: the value's ``contentType`` is
-        authoritative, which is the whole reason §6.2 lists blob values
+        authoritative, which is the whole reason blob values are listed
         separately from paths."""
         from plone.namedfile.file import NamedBlobFile
 
@@ -290,7 +290,7 @@ class TestNamedFileValues:
 
 
 class TestContentObject:
-    """§6.2: "a Plone File/Image content object".
+    """A "Plone File/Image content object".
 
     The realistic call: the caller has the object the mail is *about* and hands
     it over whole. Requires the Dexterity content types, which is why the whole
@@ -347,9 +347,9 @@ class TestContentObject:
         assert part.get_payload(decode=True) == PNG_BYTES
 
     def test_a_content_object_with_no_file_raises(self, mail, mail_portal, as_manager):
-        """A ``Document`` has no primary file field. §6.2 lists File and Image,
-        so anything else is an unsupported source -- and must say so rather than
-        attach an empty part or the object's ``__repr__``."""
+        """A ``Document`` has no primary file field. Only File and Image are
+        supported, so anything else is an unsupported source -- and must say
+        so rather than attach an empty part or the object's ``__repr__``."""
         from plone import api
 
         document = api.content.create(
@@ -417,7 +417,7 @@ class TestUnsupportedSources:
 
 class TestMultipleAttachments:
     def test_attach_is_callable_multiple_times(self, mail, deliver, sent):
-        """§6.2: "callable multiple times"."""
+        """``.attach()`` is "callable multiple times"."""
         email = (
             mail()
             .to(support.PLAIN_ADDRESS)
@@ -454,8 +454,7 @@ class TestMultipleAttachments:
 
 
 class TestAcrossLanguageGroups:
-    """§6.2: "attachments ride the same message, identical across language
-    groups"."""
+    """Attachments ride the same message, identical across language groups."""
 
     def test_every_language_group_carries_the_attachment(
         self, mail, fr_member, nl_member, deliver, sent
@@ -479,7 +478,7 @@ class TestAcrossLanguageGroups:
     def test_the_attachment_is_byte_identical_in_both(
         self, mail, fr_member, nl_member, deliver, sent
     ):
-        """ "Identical" is the word §6.2 uses. A source consumed while rendering
+        """ "Identical" is the operative word. A source consumed while rendering
         the first group -- an open file handle, a generator -- leaves the second
         group with an empty part, and only the Dutch commune notices."""
         email = mail().to(fr_member).to(nl_member).attach(PDF_BYTES, filename=PDF_NAME)
@@ -498,8 +497,8 @@ class TestAcrossLanguageGroups:
 
 
 class TestFileHandlesAreReadAtSendTime:
-    """§6.2 makes the builder "a plain data holder"; ``docs/plans/phase-2.md`` §6
-    gate 8 spells out "no method does I/O before ``.send()``"."""
+    """The builder is "a plain data holder"; "no method does I/O before
+    ``.send()``"."""
 
     def test_a_path_that_appears_between_attach_and_send_still_works(
         self, mail, tmp_path, one_attachment

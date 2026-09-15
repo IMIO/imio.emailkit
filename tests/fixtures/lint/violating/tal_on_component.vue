@@ -1,6 +1,6 @@
 <script setup>
 /**
- * VIOLATING FIXTURE for `tal-on-component` (SPEC §3 rule 1).
+ * VIOLATING FIXTURE for `tal-on-component`.
  *
  * Both components below compile, render, and put the attribute on whichever
  * element the kit happens to use as that component's root. The author cannot

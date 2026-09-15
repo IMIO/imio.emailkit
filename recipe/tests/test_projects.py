@@ -1,4 +1,4 @@
-"""SPEC §5 step 1: which packages ship templates, and where their directories are."""
+"""Which packages ship templates, and where their directories are."""
 
 from imio.recipe.emailkit import projects
 
@@ -24,7 +24,7 @@ class TestTheMarker:
 
 class TestFindingTheMaizzleProject:
     def test_in_package_layout(self, consumer):
-        """SPEC §4 draws ``emails/`` inside the package."""
+        """The in-package layout draws ``emails/`` inside the package."""
         assert projects.find_emails_dir(consumer) == consumer / "emails"
 
     def test_root_layout(self, root_layout_consumer):
@@ -41,7 +41,7 @@ class TestFindingTheMaizzleProject:
         assert projects.find_emails_dir(package_dir) is None
 
     def test_none_when_the_sources_are_not_shipped(self, tmp_path):
-        """The normal answer for an installed egg: §4 prunes ``emails/``."""
+        """The normal answer for an installed egg: ``emails/`` is pruned."""
         package_dir = tmp_path / "installed" / "acme"
         package_dir.mkdir(parents=True)
         assert projects.find_emails_dir(package_dir) is None

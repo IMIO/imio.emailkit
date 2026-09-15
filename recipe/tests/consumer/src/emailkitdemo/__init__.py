@@ -1,4 +1,4 @@
-"""SPEC §4's registration lives in ``configure.zcml``, not here.
+"""Registration lives in ``configure.zcml``, not here.
 
 Kept deliberately empty: the recipe's buildout-time collector greps ZCML on
 disk and never imports this module, and the generated scripts' real scan

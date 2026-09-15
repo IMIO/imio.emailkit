@@ -1,27 +1,27 @@
-"""SPEC §6.1 ``render()`` -- the one way a registered template becomes text.
+"""``render()`` -- the one way a registered template becomes text.
 
 ``html, text = render(name, context={...}, language=None)``
 
-Plus its §9 phase 3 sibling for mails whose body already exists:
+Plus its sibling for mails whose body already exists:
 
 ``html, text = render_shell(subject, body_html, language=None)``
 
 Both build the same namespace and go through the same compiled-template loader;
 they differ only in where the markup comes from -- a registered template for one,
 the caller's legacy body dropped into the kit shell's ``body_html`` slot for the
-other. Neither is a builder method: §6.2 is frozen.
+other. Neither is a builder method: the ``Email`` API is frozen.
 
 Pure function of (template, context, registry state): no request faking, no
-site, no database. Previews (§6.3), golden-file tests (§7) and the ``Email``
-builder (§6.2) all go through this one door.
+site, no database. Previews, golden-file tests and the ``Email``
+builder all go through this one door.
 
-Two Phase 0 findings are load-bearing here and are not negotiable:
+Two findings are load-bearing here and are not negotiable:
 
 * Templates load through ``Products.PageTemplates.PageTemplateFile``, never
   through bare ``chameleon.PageTemplateFile``. Bare Chameleon has no TAL path
   expressions -- ``${member/fullname}`` raises ``NameError`` -- and z3c.jbot
   patches only the Zope classes, so jbot overridability of our own templates
-  (§4) depends on this class specifically.
+  depends on this class specifically.
 * Without the ``IPageTemplateEngine`` utility, zope.pagetemplate falls back to
   zope.tal, where ``${...}`` passes through **verbatim with no error** while
   ``tal:repeat`` still works. Any test over this module must assert on
@@ -30,7 +30,7 @@ Two Phase 0 findings are load-bearing here and are not negotiable:
 Two things worth knowing before you import from here:
 
 * ``imio.emailkit.__init__`` rebinds the name ``render`` on the package to the
-  *function*, because that is the API §6.1 documents. So
+  *function*, because that is the API this module documents. So
   ``from imio.emailkit import render`` gives the function and
   ``import imio.emailkit.render as m`` gives the function **too**. To reach this
   module, use ``from imio.emailkit.render import <name>``.
@@ -63,16 +63,15 @@ import re
 
 logger = logging.getLogger("imio.emailkit.render")
 
-#: SPEC §9 phase 3's shell -- the kit layout (§3) with no authored content, whose
+#: The shell -- the kit layout with no authored content, whose
 #: whole body is the ``body_html`` :func:`render_shell` injects.
 #:
-#: Resolved by **path**, not through §4's registry, because
+#: Resolved by **path**, not through the template registry, because
 #: ``render_shell(subject, body_html)`` takes no template name: there is nothing
 #: to look up, and registering it would put a template nobody can call by name in
-#: ``TemplateNotFound.available`` and in the §6.3 preview list. This does not bend
-#: §4 -- §4 governs how *consumers* publish named templates, and z3c.jbot
-#: overridability (§4's last bullet) is unaffected, since the file still loads
-#: through :func:`_page_template` and jbot keys on the filesystem path.
+#: ``TemplateNotFound.available`` and in the preview list. Named-template
+#: publishing and z3c.jbot overridability are unaffected, since the file still
+#: loads through :func:`_page_template` and jbot keys on the filesystem path.
 SHELL_TEMPLATE = Path(__file__).parent / "templates" / "shell.pt"
 
 
@@ -92,7 +91,7 @@ def render(name, context=None, language=None):
     html = render_file(template.html_path, namespace)
     # `text_path` comes from the cached startup scan, so it can name a file that
     # has since gone -- a rebuild that dropped the twin, or a checkout switch.
-    # SPEC §4 asks for a warning and a fallback when the twin is missing, and it
+    # The convention is a warning and a fallback when the twin is missing, and it
     # is the same situation whether it was never there or vanished afterwards.
     # Without the existence re-check this raised FileNotFoundError instead.
     if template.text_path is None or not template.text_path.exists():
@@ -105,36 +104,36 @@ def render(name, context=None, language=None):
 def render_shell(subject, body_html, language=None):
     """Wrap an *existing* HTML mail body in the kit shell; return ``(html, text)``.
 
-    SPEC §9 phase 3. The migration path for mails whose body already exists -- a
+    The migration path for mails whose body already exists -- a
     PloneMeeting notification assembled by string concatenation, say -- and which
     nobody wants to re-author as a kit template. The shell contributes the whole
     document: the inlined CSS, the a11y defaults, ``lang``, the header/footer and
     the theme tokens. The body contributes its own markup and nothing else about
     it changes.
 
-    A ``render()`` **sibling**, not a builder method (§6.2 is frozen). It returns
-    the same ``(html, text)`` pair and shares ``render()``'s code path --
-    :func:`negotiated_language`, :func:`build_namespace`, :func:`render_file` --
-    so ``Email`` sends its output with no change at all.
+    A ``render()`` **sibling**, not a builder method (the ``Email`` API is
+    frozen). It returns the same ``(html, text)`` pair and shares ``render()``'s
+    code path -- :func:`negotiated_language`, :func:`build_namespace`,
+    :func:`render_file` -- so ``Email`` sends its output with no change at all.
 
     :param subject: an i18n msgid **or** a literal string, exactly like
-        ``.subject()`` (§6.2). Translated into the render language and handed to
+        ``.subject()``. Translated into the render language and handed to
         the shell as its heading, under the name ``subject``. The shell feeds it
         to the kit layout's banner through a build-time slot, so a missing
         ``subject`` raises rather than producing an untitled mail.
     :param body_html: the existing body, inserted **verbatim** into the shell's
-        ``body_html`` slot with ``structure`` -- §3 rule 4's one sanctioned use of
+        ``body_html`` slot with ``structure`` -- the one sanctioned use of
         unescaped markup. Not sanitised, not reformatted and **not re-parsed as a
         template**: ``${...}`` inside it is emitted literally. That is verified,
-        not assumed; see ``docs/DECISIONS.md``.
+        not assumed.
     :param language: as ``render()`` -- the negotiated language when omitted.
     :raises EmailkitError: when the compiled shell is absent from the egg.
 
     The plaintext part is always :func:`naive_text` of the rendered HTML. A
-    hand-authored ``shell.txt.pt`` twin (§4) could not exist even in principle:
+    hand-authored ``shell.txt.pt`` twin could not exist even in principle:
     its only content would be ``body_html``, which is HTML, so the twin would put
-    tags in the plaintext part. This is therefore the designed path, not §4's
-    logged-deprecation fallback, and it is not warned about.
+    tags in the plaintext part. This is therefore the designed path, not the
+    logged-deprecation fallback used elsewhere, and it is not warned about.
 
     **No preheader is injected**, and that is the shell's decision, not an
     omission: ``emails/src/templates/shell.vue`` documents why (spending the whole
@@ -145,7 +144,7 @@ def render_shell(subject, body_html, language=None):
     """
     language = language or negotiated_language()
     # ``zope.i18n.translate`` returns a plain string unchanged, which is what
-    # makes §6.2's "a msgid or a literal" true here for free -- the same call
+    # makes "a msgid or a literal" true here for free -- the same call
     # ``.subject()`` resolves with, so the heading and the mail header agree.
     subject = zope_translate(subject, target_language=language)
     namespace = build_namespace(
@@ -168,7 +167,7 @@ def _shell_path():
         raise EmailkitError(
             f"The compiled kit shell is missing: {SHELL_TEMPLATE}. "
             f"render_shell() needs the committed Maizzle build output; run "
-            f"`make build-emails` (SPEC §5)."
+            f"`make build-emails`."
         )
     return SHELL_TEMPLATE
 
@@ -207,7 +206,7 @@ def build_namespace(context, language, preheader=None):
 
 
 def locale_helpers(language):
-    """SPEC §6.1's formatting helpers, bound to ``language``.
+    """The formatting helpers, bound to ``language``.
 
     A thin re-export of :func:`imio.emailkit.helpers.bind`, kept here because the
     namespace assembly above is the only caller and because "what does render()
@@ -217,7 +216,7 @@ def locale_helpers(language):
 
 
 def get_theme():
-    """Return SPEC §3's theme tokens, read from ``plone.app.registry``.
+    """Return the theme tokens, read from ``plone.app.registry``.
 
     Missing registry, missing record and ``None`` all collapse to the empty
     string: a token is interpolated straight into markup, and the string
@@ -288,7 +287,7 @@ def _page_template(path):
     z3c.jbot's patches turn ``PageTemplateFile`` into a *descriptor*, which is
     how an override is substituted -- but a descriptor only fires through
     attribute access on a class, and we hold ours in a dict. Invoking ``__get__``
-    by hand is therefore what makes SPEC §4's "z3c.jbot works on the resolved
+    by hand is therefore what makes "z3c.jbot works on the resolved
     ``.pt`` files" true for our own templates. ``__get__`` is absent until
     ``z3c.jbot.patches`` is imported, hence the guard rather than a bare call.
     """
@@ -303,9 +302,9 @@ def _page_template(path):
 def resolved_path(path):
     """The file :func:`render_file` would actually compile for ``path``.
 
-    ``path`` itself, unless z3c.jbot has an override registered for it (SPEC
-    §4) -- in which case it is the override, which is the whole point. Exposed
-    because the §6.3 preview can show the ``.pt`` itself, and a preview that
+    ``path`` itself, unless z3c.jbot has an override registered for it -- in
+    which case it is the override, which is the whole point. Exposed
+    because the preview can show the ``.pt`` itself, and a preview that
     kept showing the original file while ``render()`` compiled somebody's
     override would be a trap rather than a tool.
     """
@@ -345,7 +344,7 @@ _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # Table cells get a visible separator rather than a line break, so a row stays on
 # one line and remains readable. Without this the cells simply concatenated:
 # a header row came out as "PointDécision" and a data row as "Budget 2026approuvé".
-# It matters because legacy notification bodies (§9 phase 3) are table-heavy, and
+# It matters because legacy notification bodies rendered through the shell are table-heavy, and
 # `render_shell` has no plaintext twin to fall back on -- naive extraction IS its
 # plaintext part, by design.
 _CELL_BREAK = re.compile(r"</(?:td|th)\s*>", re.IGNORECASE)
@@ -403,7 +402,7 @@ _warned_missing_twin = set()
 
 
 def _fallback_text(template, html):
-    """SPEC §4's documented fallback when a template ships no ``.txt.pt`` twin.
+    """The documented fallback when a template ships no ``.txt.pt`` twin.
 
     Logged once per template per process rather than per render: a mail loop
     would otherwise bury the rest of the log, and the point of the message is
@@ -413,7 +412,7 @@ def _fallback_text(template, html):
         _warned_missing_twin.add(template.name)
         logger.warning(
             "DEPRECATION: %s ships no %s twin, so its plaintext part comes from "
-            "naive extraction of the HTML. Ship a plaintext twin (SPEC §4).",
+            "naive extraction of the HTML. Ship a plaintext twin.",
             template.name,
             TEXT_SUFFIX,
         )
@@ -421,7 +420,7 @@ def _fallback_text(template, html):
 
 
 def naive_text(html):
-    """Strip ``html`` down to something readable. Naive by design, per SPEC §4."""
+    """Strip ``html`` down to something readable. Naive by design."""
     text = _HEAD.sub("", html)
     text = _SCRIPT_OR_STYLE.sub("", text)
     text = _COMMENT.sub("", text)

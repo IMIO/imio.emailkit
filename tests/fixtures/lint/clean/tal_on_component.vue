@@ -2,7 +2,7 @@
 /**
  * CLEAN counterpart to `violating/tal_on_component.vue`.
  *
- * Same two effects, expressed the way SPEC §3 rule 1 asks for: the conditional
+ * Same two effects, expressed the sanctioned way: the conditional
  * lives on the author's own `<div>`, and the translatable label lives on a plain
  * `<span>` inside the component's slot. `tal:` and `i18n:` on lowercase tags are
  * exactly what the rule wants and must never be reported.

@@ -39,7 +39,7 @@ class TestFixtureLookup:
         assert preview_emails.find_fixture(project, "hello") is None
 
     def test_a_fixture_is_loaded_by_path_not_imported(self, project):
-        """§7 describes a *directory of data files*, not an importable package.
+        """Fixtures are a *directory of data files*, not an importable package.
 
         Loading by path is also what keeps the preview and the golden test from ever
         disagreeing about what a fixture says.

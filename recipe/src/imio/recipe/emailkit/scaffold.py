@@ -1,4 +1,4 @@
-"""``bin/compile-emails --new NAME`` (SPEC §5).
+"""``bin/compile-emails --new NAME``.
 
 "``--new NAME`` scaffolds the four files a template needs -- a minimal ``.vue``
 skeleton, a fixture, a golden placeholder, and a registration stub to paste.
@@ -6,7 +6,7 @@ Templates have a rigid shape; making the right structure the path of least
 resistance beats documenting it."
 
 Every skeleton below encodes an authoring rule that this project learned the hard
-way and that ``docs/DECISIONS.md`` records: no Chameleon placeholder in a literal
+way: no Chameleon placeholder in a literal
 ``style`` or ``class`` attribute, no ``tal:``/``i18n:`` on a kit component, locale
 helpers called as ``${python: ...}``, no ``--`` in a comment. The point of
 scaffolding is that a new template starts on the right side of all four.
@@ -19,8 +19,8 @@ class ScaffoldError(Exception):
     """A file the scaffolding would create already exists, or cannot be placed."""
 
 
-#: The language the golden placeholder is written for. First of §7's pair; the
-#: second is produced by the same regeneration run.
+#: The language the golden placeholder is written for. First of the golden pair;
+#: the second is produced by the same regeneration run.
 GOLDEN_LANGUAGE = "fr"
 
 VUE_TEMPLATE = """\
@@ -33,7 +33,7 @@ VUE_TEMPLATE = """\
  *   title  ; heading text
  *   intro  ; lead paragraph
  *
- * Authoring rules that apply here (SPEC §3, enforced by `bin/check-emails`):
+ * Authoring rules that apply here (enforced by `bin/check-emails`):
  *   1. no tal: or i18n: attribute on a Kit* component; author dynamic regions as
  *      plain <tr>/<td> markup instead
  *   2. no Chameleon placeholder in a literal `class` or `style` attribute; use
@@ -55,7 +55,7 @@ VUE_TEMPLATE = """\
 """
 
 FIXTURE_TEMPLATE = '''\
-"""Fixture for the `{name}` template (SPEC §7).
+"""Fixture for the `{name}` template.
 
 One dict of context data, named CONTEXT. It feeds three things and must keep all
 three honest: `bin/preview-emails`, the golden-file test, and anybody reading the
@@ -82,16 +82,16 @@ against. Regenerate deliberately once the template renders the way you want:
 
     make update-golden          # or: EMAILKIT_UPDATE_GOLDEN=1 pytest
 
-and review the diff before committing it. SPEC §7: "`bin/test --update-golden`
-regenerates snapshots deliberately."
+and review the diff before committing it. `bin/test --update-golden`
+regenerates snapshots deliberately.
 
 Leaving this text in place is intentional: a golden file that silently agreed
 with whatever the template happens to emit would catch nothing, which is the one
-failure mode §7 exists to prevent.
+failure mode this discipline exists to prevent.
 """
 
 REGISTRATION_TEMPLATE = """\
-# Paste into {package}'s ZCML (SPEC §4), inside its existing
+# Paste into {package}'s ZCML, inside its existing
 # `<emailkit:templates>` block:
 #
 #     <emailkit:template
@@ -141,7 +141,7 @@ def new_template(project, name, force=False):
     if not project.compilable:
         raise ScaffoldError(
             f"{project.package} ships no `emails/` directory, so there is nowhere "
-            f"to put a new template. `emails/` is pruned from the sdist (SPEC §4), "
+            f"to put a new template. `emails/` is pruned from the sdist, "
             f"so scaffolding only works in a checkout."
         )
     if not name or not name.replace("_", "").replace("-", "").isalnum():

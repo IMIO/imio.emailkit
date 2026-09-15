@@ -21,7 +21,7 @@
  *    expression cannot call a function; the path form raises `Invalid variable
  *    name` at render time.
  * 2. `tal:repeat` on the author's own `<tr>`, never on `<KitDataTable>`
- *    (SPEC §3 rule 1: attribute fallthrough).
+ *    (attribute fallthrough would land it on the wrong element).
  * 3. No `${...}` in a literal `class` or `style` attribute, ever. In `style` the
  *    `{` opens a CSS block, the `}` is eaten and CSS inlining dies for the whole
  *    document; in `class` the `css.safe` rewriter turns `$` into `-` and strips

@@ -21,7 +21,7 @@
  *
  * As in `dummy.minimal`, `kitDir` is a relative path only because these dummies
  * live inside the `imio.emailkit` checkout; `bin/compile-emails` resolves it from
- * the installed egg (SPEC §5, `kit-mode = path`).
+ * the installed egg in `kit-mode = path`.
  */
 import { defineConfig } from '@maizzle/framework'
 import { fileURLToPath } from 'node:url'

@@ -23,7 +23,7 @@ support.require_runtime()
 from imio.emailkit import render  # noqa: E402
 
 
-#: §1: "First-class i18n (FR/NL/DE)". §8.1: "(FR/NL/DE shipped)".
+#: "First-class i18n (FR/NL/DE)"; "(FR/NL/DE shipped)".
 SHIPPED_LANGUAGES = ("fr", "nl", "de")
 
 #: The two the Phase 1 exit criteria and the iMio client base actually require.
@@ -95,12 +95,12 @@ class TestCatalogsAreShipped:
         )
 
     def test_german_is_shipped(self, locales):
-        """§8.1 says DE ships. Its own test so a missing German catalog is one
+        """German ships too. Its own test so a missing German catalog is one
         clear failure rather than a parametrised surprise in the middle of the
         FR/NL run."""
         path = locales / "de" / "LC_MESSAGES" / f"{support.PACKAGE_NAME}.po"
 
-        assert path.exists(), f"§1 and §8.1 promise German: {path}"
+        assert path.exists(), f"German is expected to be shipped: {path}"
 
 
 @pytest.mark.parametrize(
@@ -113,7 +113,7 @@ class TestTemplatesAreReallyTranslated:
         """The differential assertion caveat A3 demands.
 
         The ``lang`` attribute is stripped from both sides first, because it
-        differs by construction (§3) and would make this pass on a template whose
+        differs by construction and would make this pass on a template whose
         i18n is entirely broken.
         """
         context = support.load_fixture(template)
@@ -136,11 +136,11 @@ class TestTemplatesAreReallyTranslated:
         )
 
     def test_the_registered_subject_is_translated(self, integration, template):
-        """§4: "the **subject lives in the registration** as an i18n msgid,
+        """The "**subject lives in the registration** as an i18n msgid,
         translated per recipient language at send time".
 
         Taken from the registration rather than from a rendered header, because
-        that is where §4 puts it -- for a discovered template the subject never
+        that is where it is put -- for a discovered template the subject never
         appears in the body at all. The assertion is differential for caveat A3's
         reason: a msgid with no catalog entry returns its English default, which
         reads exactly like a successful translation.
@@ -161,7 +161,7 @@ class TestTemplatesAreReallyTranslated:
         assert fr != str(msgid), f"{msgid!r} is untranslated in French"
 
     def test_the_registered_preheader_is_translated(self, integration, template):
-        """§4: ``preheader`` is an optional msgid per template. §3 renders it into
+        """``preheader`` is an optional msgid per template, rendered into
         the layout's hidden div -- "the highest-visibility email feature that
         everyone forgets; every inbox shows it". An untranslated one is shown to
         every recipient, in the wrong language, next to the subject."""
@@ -170,7 +170,7 @@ class TestTemplatesAreReallyTranslated:
 
         msgid = discovery.get_template(support.qualified(template)).preheader
         if msgid is None:
-            pytest.skip(f"{template} registers no preheader, which §4 allows")
+            pytest.skip(f"{template} registers no preheader, which is allowed")
 
         fr = translate(msgid, target_language="fr")
         nl = translate(msgid, target_language="nl")

@@ -1,4 +1,4 @@
-"""Context data for ``dummy.complete:convocation`` (SPEC §7).
+"""Context data for ``dummy.complete:convocation``.
 
 Note what the shape of this file teaches:
 

@@ -3,7 +3,7 @@
     i18n_domain="imio.emailkit"
     >
 
-  <!-- SPEC §8.3: "the registered template names (vocabulary from discovery)".
+  <!-- The registered template names, as a vocabulary from discovery.
        Registered as a NAMED utility so a schema can name it as a string, which
        is what keeps `imio.emailkit.contentrules` from importing discovery
        itself; the vocabulary is the seam.

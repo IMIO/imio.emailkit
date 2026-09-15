@@ -1,4 +1,4 @@
-"""``--new NAME``: SPEC §5's "the four files a template needs"."""
+"""``--new NAME``: "the four files a template needs"."""
 
 from imio.recipe.emailkit import projects
 from imio.recipe.emailkit import scaffold
@@ -24,7 +24,7 @@ class TestTheFourFiles:
         assert (project.tests_dir / "golden" / "convocation.fr.html").is_file()
 
     def test_the_fixture_defines_a_context_dict(self, project):
-        """§7's contract, and what ``bin/preview-emails`` loads by path."""
+        """The fixture's contract, and what ``bin/preview-emails`` loads by path."""
         scaffold.new_template(project, "convocation")
         body = (project.tests_dir / "fixtures" / "convocation.py").read_text(
             encoding="utf-8"
@@ -52,8 +52,8 @@ class TestTheFourFiles:
         assert project.package in stub
 
     def test_the_registration_stub_is_zcml_not_the_old_dict_form(self, project):
-        """SPEC's registration moved from a Python dict to a ZCML directive;
-        the scaffold must teach the current form, not the old one."""
+        """Registration moved from a Python dict to a ZCML directive; the
+        scaffold must teach the current form, not the old one."""
         stub = scaffold.registration_stub(project, "convocation")
         assert "<emailkit:template" in stub
         assert 'name="convocation"' in stub
@@ -65,12 +65,12 @@ class TestTheFourFiles:
 
 
 class TestTheSkeletonEncodesTheAuthoringRules:
-    """The point of scaffolding: start on the right side of every §3 rule."""
+    """The point of scaffolding: start on the right side of every authoring rule."""
 
     def test_no_chameleon_placeholder_in_a_literal_style_or_class_attribute(
         self, project
     ):
-        """The amended §3 rule: it kills CSS inlining document-wide, silently."""
+        """The amended rule: it kills CSS inlining document-wide, silently."""
         scaffold.new_template(project, "convocation")
         body = (project.sources_dir / "convocation.vue").read_text(encoding="utf-8")
         import re
@@ -84,7 +84,7 @@ class TestTheSkeletonEncodesTheAuthoringRules:
 
         Asserted over the whole file rather than only inside its comments, which is
         both simpler and stricter, and which is exactly how the repo-wide rule is
-        written (``docs/DECISIONS.md``: "No ``--`` in any comment, anywhere").
+        written: "No ``--`` in any comment, anywhere".
         A ``.vue`` source's comments are the ones that become HTML comments in the
         compiled output, so this is the file where the rule bites.
         """

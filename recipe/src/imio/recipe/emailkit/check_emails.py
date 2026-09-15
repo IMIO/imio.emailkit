@@ -1,11 +1,11 @@
-"""``bin/check-emails`` (SPEC §5). Two gates in one script. **This is the CI gate.**
+"""``bin/check-emails``. Two gates in one script. **This is the CI gate.**
 
     bin/check-emails [--package NAME]
 
-Gate 1 -- *staleness*: "compile each package into a tmpdir and ``diff`` against the
-committed ``templates/``; exit 1 with a per-file diff summary if stale."
+Gate 1 -- *staleness*: compile each package into a tmpdir and ``diff`` against the
+committed ``templates/``; exit 1 with a per-file diff summary if stale.
 
-Gate 2 -- *the authoring lint*: the ``.vue`` sources are checked against SPEC §3's
+Gate 2 -- *the authoring lint*: the ``.vue`` sources are checked against the
 authoring rules. That lint lives in ``imio.emailkit`` as
 ``python -m imio.emailkit.lint <paths>`` and **is called, not reimplemented** --
 the rules are about the templates, so they belong with the runtime that ships
@@ -13,10 +13,9 @@ them, and a second copy here would be a second copy to keep correct.
 
 Why the staleness gate matters more than it looks: the compiled ``.pt`` is the
 production artifact, Node never runs in production, and *nothing else in the
-system notices* when someone edits a ``.vue`` source and forgets to rebuild. It is
-the settled position of this project that the Maizzle exit code carries almost no
-information about correctness (``docs/DECISIONS.md``), which leaves this diff and
-§7's golden files as the only trustworthy gates.
+system notices* when someone edits a ``.vue`` source and forgets to rebuild. The
+Maizzle exit code carries almost no information about correctness, which leaves
+this diff and the golden files as the only trustworthy gates.
 
 A note on "into a tmpdir": the build's destination is the consumer's own
 ``output.path``, and Maizzle has no configurable alternate destination -- it writes
@@ -43,7 +42,7 @@ import tempfile
 
 DESCRIPTION = (
     "CI gate for email templates: the committed `.pt` output must match a fresh "
-    "build, and the `.vue` sources must obey SPEC §3's authoring rules."
+    "build, and the `.vue` sources must obey the authoring rules."
 )
 
 #: The lint's interface, as agreed with the workstream that owns it. Invoked as a
@@ -114,7 +113,7 @@ def main(config=None, argv=None):
             failed.append("staleness")
 
     if not arguments.no_lint:
-        print("\n==> gate 2: the authoring lint (SPEC §3 rules)")
+        print("\n==> gate 2: the authoring lint")
         if lint_gate(compilable) != 0:
             failed.append("lint")
     else:
@@ -185,7 +184,7 @@ def take_snapshot(package_dir, destination):
     """Copy every committed ``.pt`` under ``package_dir`` into ``destination``.
 
     Every ``.pt``, not just ``templates/``: the build legitimately writes to more
-    than one place -- ``imio.emailkit``'s own project also emits §8's jbot
+    than one place -- ``imio.emailkit``'s own project also emits jbot
     overrides under ``browser/overrides/``, addressed by dotted filename rather
     than by name -- and a gate that only watched one directory would have let the
     other go stale silently. Hand-written templates are swept up too, which is
@@ -263,8 +262,8 @@ def _built_dirs(package_dir, snapshot, fresh):
     Only these are subject to the ORPHAN check, and only files inside them are
     reported at all. A directory of *hand-written* templates -- a browser view's
     ``.pt``, say -- is nobody's build output, and reporting it as "committed, no
-    longer built" would be a false alarm on a file that is perfectly correct. §5's
-    lint guidance applies to this gate too: prefer a missed case to a false alarm.
+    longer built" would be a false alarm on a file that is perfectly correct. The
+    same guidance applies to this gate too: prefer a missed case to a false alarm.
     """
     return {
         relative.parent
@@ -331,7 +330,7 @@ def lint_gate(projects, module=LINT_MODULE, executable=None):
     """Run ``python -m imio.emailkit.lint`` over every ``.vue`` source.
 
     Delegated, not reimplemented. If the module is not importable the gate
-    **fails**: SPEC §5 calls this "the CI gate", and a gate that quietly turns
+    **fails**: this is the CI gate, and a gate that quietly turns
     itself off when its implementation is missing is worse than no gate, because
     it reports success. ``--no-lint`` exists for the one case where that is a
     deliberate, visible choice.

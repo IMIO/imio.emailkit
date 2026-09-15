@@ -27,7 +27,7 @@
        this package owns the view that renders each one (`browser/login_help.py`
        for get_username, `browser/default_mails.py` for the other two), so every
        one of them goes through render() and is discovered, previewable and
-       golden tested like any consumer template. See docs/DECISIONS.md. -->
+       golden tested like any consumer template. -->
   <emailkit:templates directory="templates">
     <emailkit:template
         name="notification"

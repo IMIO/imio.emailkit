@@ -1,4 +1,4 @@
-"""Context data for ``imio.emailkit:registered_notify_template`` (SPEC §7).
+"""Context data for ``imio.emailkit:registered_notify_template``.
 
 The keys are exactly what
 ``imio.emailkit.browser.default_mails.RegisteredNotifyView.build_context``
@@ -8,7 +8,7 @@ returns.
 from the Zope ``DateTime`` ``portal_password_reset`` hands out). An ISO string
 would work at render time -- ``format_datetime`` coerces one -- but it would be
 the one fixture value that never appears in the output verbatim, because the
-template formats it; §7's "every fixture value reaches the html" check would then
+template formats it; the "every fixture value reaches the html" check would then
 have to special-case it. "Plain data, not objects" is about Zope path traversal,
 and this value is reached by a ``python:`` call, not traversed.
 

@@ -1,6 +1,6 @@
 /**
- * Shared Maizzle 6 build config for `imio.emailkit` and every consumer addon
- * (SPEC §3). It ships inside the Python egg, so a consumer resolves the kit
+ * Shared Maizzle 6 build config for `imio.emailkit` and every consumer addon.
+ * It ships inside the Python egg, so a consumer resolves the kit
  * directory from the installed distribution and spreads this object into its
  * own `maizzle.config.js`:
  *
@@ -41,13 +41,13 @@ export const kitDir = dirname(fileURLToPath(import.meta.url))
 /**
  * @param {string} [dir] Absolute path to the kit directory. Defaults to the
  *   directory this module was loaded from. Passing it explicitly is the path
- *   `bin/compile-emails` (SPEC §5) takes when it resolves the kit from the
+ *   `bin/compile-emails` takes when it resolves the kit from the
  *   installed `imio.emailkit` egg rather than importing this file directly.
  */
 export function kitBaseConfig(dir = kitDir) {
   return {
     /**
-     * SPEC §4's consumer layout: sources in `emails/src/templates/`. Resolved
+     * The consumer layout: sources in `emails/src/templates/`. Resolved
      * against `root`, which defaults to the directory the build runs from.
      */
     content: ['src/templates/**/*.vue'],
@@ -62,7 +62,7 @@ export function kitBaseConfig(dir = kitDir) {
 
     components: {
       /**
-       * `kit-mode = path` (SPEC §10.1): components are resolved from an
+       * `kit-mode = path`: components are resolved from an
        * absolute path outside the Maizzle project root.
        *
        * `prefix` is not cosmetic. Maizzle ships a built-in `Button`, and an
@@ -98,7 +98,7 @@ export function kitBaseConfig(dir = kitDir) {
     html: {
       /**
        * Formatting is on (not the Maizzle default) because it keeps the
-       * committed `.pt` diffs line-granular, which is what makes SPEC §5's
+       * committed `.pt` diffs line-granular, which is what makes the
        * staleness gate readable. Output is deterministic either way.
        *
        * Maizzle's default options are kept: measured, they are the only ones
@@ -117,8 +117,8 @@ export function kitBaseConfig(dir = kitDir) {
      */
     emailkit: {
       /**
-       * The one locked, email-safe Tailwind entry (SPEC §3, amended: a CSS
-       * entry rather than a JS preset, because Maizzle 6 ships Tailwind 4).
+       * The one locked, email-safe Tailwind entry (a CSS entry rather than a
+       * JS preset, because Maizzle 6 ships Tailwind 4).
        * `layouts/Main.vue` `@import`s this by absolute path, so the shell
        * works from inside an egg where no relative path would.
        */

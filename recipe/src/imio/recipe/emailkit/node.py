@@ -1,8 +1,8 @@
 """The only module in this distribution that knows Node exists.
 
-SPEC §1: "Zero Node.js in production. Node is a developer/CI tool only." SPEC §5
-rejects buildout-time compilation outright, because it "would make Node a
-production dependency across ~350 applications".
+Zero Node.js in production: Node is a developer/CI tool only, and buildout-time
+compilation is rejected outright, because it would make Node a production
+dependency across ~350 applications.
 
 Consequently: **nothing here is imported at buildout time.** The recipe's
 ``install()`` imports this module only when ``compile-on-install = true``, which
@@ -28,8 +28,8 @@ MANIFEST = "package.json"
 NODE_MODULES = "node_modules"
 
 #: Written inside ``node_modules`` after a successful install, holding the digest
-#: of the lockfile it was installed from. §5 wants ``npm ci`` "only if
-#: ``node_modules`` is stale vs. lockfile"; a digest answers that question
+#: of the lockfile it was installed from. The goal is running ``npm ci`` only if
+#: ``node_modules`` is stale vs. lockfile; a digest answers that question
 #: exactly, where the mtime comparison the Makefile precursor uses answers it
 #: approximately (npm touches ``node_modules`` for unrelated reasons, and a
 #: checkout or a rebase can order the two files either way).
@@ -43,8 +43,9 @@ class NodeError(Exception):
 def resolve(node_bin="node"):
     """Return ``(node, npm, npx)`` executables for a ``node-bin`` setting.
 
-    §5 names only ``node-bin`` and says "resolution: PATH by default". ``npm`` and
-    ``npx`` are therefore derived: from the same directory when ``node-bin`` is a
+    Only ``node-bin`` is a named setting; resolution otherwise falls back to
+    ``PATH``. ``npm`` and ``npx`` are therefore derived: from the same directory
+    when ``node-bin`` is a
     path, from ``PATH`` when it is a bare name. That keeps one option instead of
     three and still works for the case that motivates the option -- a Node
     installed outside ``PATH``, e.g. by nvm or a CI cache.
@@ -69,7 +70,7 @@ def resolve(node_bin="node"):
         raise NodeError(
             f"{', '.join(missing)} not found on PATH. Node is required for the "
             f"email build only: installing, testing and running an addon never "
-            f"needs it, and buildout never invokes it (SPEC §1, §5)."
+            f"needs it, and buildout never invokes it."
         )
     return found["node"], found["npm"], found["npx"]
 
@@ -84,7 +85,7 @@ def available(node_bin="node"):
 
 
 def ensure_dependencies(emails_dir, npm, force=False):
-    """``npm ci`` in ``emails_dir``, but only when it is needed (SPEC §5).
+    """``npm ci`` in ``emails_dir``, but only when it is needed.
 
     Falls back to ``npm install`` while there is no lockfile -- ``npm ci``
     requires one, and the fallback is also what creates it, after which every
@@ -95,7 +96,7 @@ def ensure_dependencies(emails_dir, npm, force=False):
     if not (emails_dir / MANIFEST).is_file():
         raise NodeError(
             f"{emails_dir} has no {MANIFEST}, so its Maizzle toolchain cannot be "
-            f"installed. A consumer's `emails/` directory is an npm project (SPEC §4)."
+            f"installed. A consumer's `emails/` directory is an npm project."
         )
     lockfile = emails_dir / LOCKFILE
     stamp = emails_dir / NODE_MODULES / STAMP

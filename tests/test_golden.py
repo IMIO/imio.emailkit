@@ -1,4 +1,4 @@
-"""The golden-file smoke test for ``imio.emailkit``'s own templates (SPEC §7).
+"""The golden-file smoke test for ``imio.emailkit``'s own templates.
 
 > Golden files + ``check-emails`` for its own templates -- dogfooding the full
 > contract.
@@ -22,7 +22,7 @@ What covers the rest, and covered it all along:
 * ``make check-emails`` compares the committed build against a fresh one byte for
   byte, which is the gate that catches a stale or purged build.
 * ``tests/dummies/`` runs the *shipped* harness end to end for two consumer
-  add-ons, which is what proves §7's promise to consumers still works.
+  add-ons, which is what proves the promise to consumers still works.
 
 ``TestFixtureCoverage`` below is unchanged in spirit and never churns: it is about
 which templates exist, not what they render.
@@ -31,7 +31,7 @@ which templates exist, not what they render.
 
 1. They are jbot-only: rendered by a stock Plone view whose namespace requires the
    ``options/...`` dialect, so ``render()`` -- and therefore this harness -- can
-   never render them (``docs/DECISIONS.md``; Phase 0 caveat D2).
+   never render them.
 2. Even if it could, that output is not snapshot-able: it embeds a freshly
    generated password-reset token and an expiry computed from the clock, so every
    run would differ.
@@ -74,7 +74,7 @@ class TestFixtureCoverage:
     """
 
     def test_every_registered_template_has_a_fixture(self, integration):
-        """§7: "Each template ships a fixture and a snapshot".
+        """Each template ships a fixture and a snapshot.
 
         Driven off *discovery* rather than off a hardcoded list, so a template
         added to the registration without a fixture is caught here instead of
@@ -107,7 +107,7 @@ class TestFixtureCoverage:
         )
 
     def test_every_shipped_template_is_registered_for_discovery(self, integration):
-        """The inverse of the guard this replaced, and the point of §8.
+        """The inverse of the guard this replaced, and the point of this test.
 
         There used to be a test here asserting that the two Plone default mails
         were **not** registered: a stock view rendered them, their bodies spoke

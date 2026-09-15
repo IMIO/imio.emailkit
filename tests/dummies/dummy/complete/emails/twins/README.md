@@ -1,6 +1,6 @@
 # Hand-authored plaintext twins — `dummy.complete`
 
-`<name>.txt.pt` is the plaintext half of a template (SPEC §4). It is **source**,
+`<name>.txt.pt` is the plaintext half of a template. It is **source**,
 lives here, and is copied into `../templates/` after Maizzle has run — exactly what
 `imio.emailkit` itself does, for the same two reasons:
 
@@ -14,7 +14,7 @@ lives here, and is copied into `../templates/` after Maizzle has run — exactly
 
 ## Why bother, when `render()` has a fallback
 
-Without a twin, §4's naive text extraction runs, logs a deprecation, and produces
+Without a twin, the naive fallback text extraction runs, logs a deprecation, and produces
 text derived from the HTML — which **drops every link**, because the URL lives in
 an `<a href>` the extraction throws away. Compare the two committed snapshots:
 

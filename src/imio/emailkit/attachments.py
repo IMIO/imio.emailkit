@@ -1,4 +1,4 @@
-"""SPEC §6.2 attachment sources -- polymorphic in, ``(bytes, filename, type)`` out.
+"""Attachment sources -- polymorphic in, ``(bytes, filename, type)`` out.
 
 ``.attach(source, filename=None, mimetype=None)`` takes "raw ``bytes``, a filesystem
 path (``str``/``Path``), an open binary file object, a ``NamedBlobFile``/``NamedFile``
@@ -9,7 +9,7 @@ verbatim; this module turns them into something
 Like recipients, and for the same reason, failures are **collected** and raised
 once as :class:`~imio.emailkit.interfaces.AttachmentError`.
 
-The plan (§8) asks that any Plone-version-specific branch be isolated here rather
+Any Plone-version-specific branch is isolated here rather
 than in the builder. :func:`read_source` is that seam: it is the only function that
 knows what a source can be.
 """
@@ -61,8 +61,8 @@ def resolve_one(source, filename=None, mimetype=None):
 
     Precedence for both metadata values: what the caller passed wins, then what
     the source carries, then -- for the mimetype only -- what
-    :func:`mimetypes.guess_type` makes of the filename. §6.2 requires both to be
-    inferred "where the source carries them" and both to be given for ``bytes``;
+    :func:`mimetypes.guess_type` makes of the filename. Both are
+    inferred "where the source carries them" and both are required for ``bytes``;
     an explicit argument overriding a blob's own ``contentType`` is the point of
     having the arguments at all.
     """
@@ -149,8 +149,8 @@ def read_source(source):
         return read_source(info.value)
 
     raise AttachmentError([
-        f"{describe(source)} is not a supported attachment source. SPEC §6.2 "
-        f"accepts bytes, a filesystem path, an open binary file, a NamedFile/"
+        f"{describe(source)} is not a supported attachment source. Supported "
+        f"sources are bytes, a filesystem path, an open binary file, a NamedFile/"
         f"NamedBlobFile value, or a Plone File/Image content object"
     ])
 

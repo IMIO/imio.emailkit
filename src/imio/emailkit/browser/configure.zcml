@@ -24,7 +24,7 @@
        a stable, anonymously readable, cacheable URL under the portal.
 
        Registered on IDefaultBrowserLayer rather than IEmailkitLayer. A `:base`
-       site (SPEC 8.2's opt-out) keeps stock Plone's default mails but still
+       site (the opt-out) keeps stock Plone's default mails but still
        renders its OWN templates through the kit shell, and those reference the
        same assets; binding the directory to the layer would give that site a
        footer logo that 404s.
@@ -43,7 +43,7 @@
       directory="static"
       />
 
-  <!-- z3c.jbot, for SPEC 4's promise that a site can override the `.pt` files
+  <!-- z3c.jbot, for the promise that a site can override the `.pt` files
        THIS package resolves. No `browser:jbot` directive any more, since this
        package overrides no stock Plone template now that `default_mails.py` has
        taken the two views over; but the include is still load-bearing, and in
@@ -64,7 +64,7 @@
   -->
   <include package="z3c.jbot" />
 
-  <!-- SPEC 8.1's two remaining Plone default mails, as owned views.
+  <!-- The two remaining Plone default mails, as owned views.
 
        They were `z3c.jbot` overrides of stock Plone's page templates until
        `browser/default_mails.py` took the views over. jbot could reach them, so
@@ -79,7 +79,7 @@
        `render()` and return the RFC822 document `RegistrationTool` expects.
 
        On IEmailkitLayer, which only the `:default` profile installs. That
-       binding IS SPEC 8.2's opt-out: a `:base` site keeps stock Plone's views
+       binding IS the opt-out: a `:base` site keeps stock Plone's views
        and stock Plone's mails. -->
   <browser:page
       name="mail_password_template"
@@ -140,7 +140,7 @@
       permission="zope2.View"
       />
 
-  <!-- SPEC §6.3's preview. Two registrations, one feature: the page, and the
+  <!-- The preview. Two registrations, one feature: the page, and the
        rendered mail on its own for the page's <iframe>. Splitting them is what
        keeps the mail's stylesheet (written for mail clients, full of `body {}`
        rules and !important utilities) out of the Plone UI and vice versa.
@@ -152,13 +152,12 @@
        On IEmailkitLayer, so the preview only exists where the restyled mails do:
        a preview that showed stock Plone's markup would be lying about the very
        thing it exists to show. Consequence, and it is deliberate: a site that
-       installed `:base` for SPEC §8.2's opt-out has no preview view. That is the
+       installed `:base` for the opt-out has no preview view. That is the
        opposite call from `emailkit_theme` above, which a `:base` site genuinely
        needs at render time; nothing renders because of this one.
 
        (No double hyphen anywhere in this comment: XML forbids it, and ZCML then
-       fails to parse at instance start-up. Same trap docs/DECISIONS.md records
-       for Chameleon and the compiled .pt files, one layer up.) -->
+       fails to parse at instance start-up.) -->
 
   <!-- `cmf.ManagePortal` has to be a REGISTERED permission utility by the time
        the two `browser:page` actions below execute, and ZCML executes actions in

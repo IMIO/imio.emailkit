@@ -1,11 +1,11 @@
-"""SPEC §8.1's two Plone default mails, rendered through ``render()`` like the rest.
+"""Plone's two default mails, rendered through ``render()`` like the rest.
 
 These two used to be ``z3c.jbot`` overrides of stock Plone's page templates, and
 that made them the package's only second-class citizens: a stock view rendered
 them, so they spoke that view's dialect (``options/member``,
 ``python:member.getProperty('email')``, no locale helpers, no ``theme``), they
 could not be registered for discovery, and therefore they never appeared in
-``bin/preview-emails`` or ``@@emailkit-preview``. §8's own claim that the default
+``bin/preview-emails`` or ``@@emailkit-preview``. The claim that the default
 mails are "authored, compiled, discovered, tested and shipped exactly like
 consumer templates" was true for everything except *discovered*.
 
@@ -20,7 +20,7 @@ these two were different is that jbot *could* reach them, not that it should.
 What the consumer sees now: three registered templates in the ordinary dialect,
 one preview list, one set of authoring rules. The Plone machinery -- which kwargs
 the tool passes, which header block it parses back out -- is hidden in this module,
-which is where §8's "hide the ugly stuff" belongs.
+which is where "hide the ugly stuff" belongs.
 
 ---------------------------------------------------------------------------
 The one piece of machinery that cannot move: the header block
@@ -34,7 +34,7 @@ document, headers included, or the mail goes out with no subject and no recipien
 That block used to live in the templates, emitted through Maizzle's ``useDoctype()``
 with ``tal:omit-tag=""`` on every span -- one forgotten attribute away from shipping
 ``Subject: <span>Password reset request</span>``. It is now built here, in one
-place, from data. The subject comes from the template's §4 registration like every
+place, from data. The subject comes from the template's registration like every
 other subject in the package, which is the single biggest thing this change buys:
 it is a msgid in ZCML, not markup in a template.
 
@@ -55,7 +55,7 @@ for it. The kwargs each tool passes are pinned by
 Plone upgrade trips it, re-read the call site and update :meth:`build_context`. Do
 not weaken the test -- it is the same drift guard ``login_help.py`` carries.
 
-Both views are bound to ``IEmailkitLayer`` in ``configure.zcml``, so SPEC §8.2's
+Both views are bound to ``IEmailkitLayer`` in ``configure.zcml``, so the
 ``:base`` opt-out still works exactly as before: a site that installs ``:base``
 gets stock Plone's views and stock Plone's mails.
 """
@@ -102,7 +102,7 @@ class DefaultMailView(PasswordResetToolView):
     that touches Plone's calling convention lives here.
     """
 
-    #: Namespaced §4 name of the template this view renders.
+    #: Namespaced name of the template this view renders.
     template_name = None
 
     def build_context(self, **kwargs):
@@ -120,7 +120,7 @@ class DefaultMailView(PasswordResetToolView):
     def header_block(self, member, language):
         """The headers ``RegistrationTool`` parses back out.
 
-        The subject is the template's §4 registration msgid, translated into the
+        The subject is the template's registration msgid, translated into the
         recipient's language -- the same value ``Email`` would use for a
         registered template, resolved the same way.
         """

@@ -1,4 +1,4 @@
-"""Installing ``imio.emailkit:default`` registers what SPEC §8 says it does."""
+"""Installing ``imio.emailkit:default`` registers what the ``:default`` profile promises."""
 
 import support
 
@@ -13,8 +13,8 @@ class TestSetupInstall:
         assert installer.is_product_installed(PACKAGE_NAME) is True
 
     def test_browserlayer(self, browser_layers):
-        """§8.1: the jbot directory is registered on a dedicated browser layer,
-        and that layer is installed by the ``:default`` profile."""
+        """The jbot directory is registered on a dedicated browser layer, and
+        that layer is installed by the ``:default`` profile."""
         from imio.emailkit.interfaces import IEmailkitLayer
 
         assert IEmailkitLayer in browser_layers
@@ -23,7 +23,7 @@ class TestSetupInstall:
         assert profile_last_version(f"{PACKAGE_NAME}:default") == "1000"
 
     def test_default_profile_extends_base(self, profile_last_version):
-        """§8.2: "``:default`` extends ``:base``".
+        """``:default`` extends ``:base``.
 
         Applying ``:default`` alone must therefore leave ``:base`` recorded as
         applied. If this fails, the two profiles are siblings and a site that
