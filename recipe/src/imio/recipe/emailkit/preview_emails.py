@@ -83,6 +83,26 @@ RESOURCE_PREFIX = "/++resource++"
 WATCH_INTERVAL = 0.6
 
 
+class NotShipped(str):
+    """A row note that is a plain fact rather than a failure.
+
+    An installed egg prunes both ``emails/`` and ``tests/`` (SPEC §4's
+    ``MANIFEST.in``), so the fixture §7 asks for cannot be there and no consumer
+    buildout could put it there: it lives in that package's own checkout.
+    ``@@emailkit-preview`` already reports that absence as a fact rather than an
+    error (§6.3); this is the same judgement in the command line's vocabulary.
+
+    A ``str`` subclass so every consumer of a row keeps working unchanged, and
+    distinguished by *type* rather than by matching the message, so
+    :func:`report` can never mistake one for the other.
+    """
+
+    #: The same fact in the few words a sidebar entry has room for. The full
+    #: string is the terminal line, where there is room to say where the fixture
+    #: does live and why it is not here.
+    short = "no fixture (installed egg) -- the .pt part still opens"
+
+
 def parser():
     parsed = cli.base_parser("preview-emails", DESCRIPTION)
     parsed.add_argument(
@@ -443,14 +463,7 @@ def render_all(projects, languages, output):
         _write_source(name, template, output)
         fixture = find_fixture(project, template.basename)
         if fixture is None:
-            rows.append(
-                (
-                    name,
-                    None,
-                    f"no fixture; SPEC §7 wants one at "
-                    f"{project.tests_dir / 'fixtures' / (template.basename + '.py')}",
-                )
-            )
+            rows.append((name, None, _no_fixture(project, template.basename)))
             continue
         try:
             context = load_fixture(fixture)
@@ -516,6 +529,28 @@ def _render_one(name, context, language, output):
     return (name, language, None)
 
 
+def _no_fixture(project, basename):
+    """Why there is no fixture for ``basename``, as a failure or as a fact.
+
+    A package that ships neither ``emails/`` nor ``tests/`` is an installed egg
+    whose sdist pruned both (§4). Its fixtures are in its own checkout and
+    nothing here can conjure them, so reporting FAILED would be telling the
+    person running the preview to fix something that is not theirs -- and would
+    exit non-zero on a buildout that is working exactly as intended.
+
+    Anywhere else -- any checkout, which is where this script is meant to run --
+    a missing fixture is the omission §7 wants caught, and still fails.
+    """
+    wanted = project.tests_dir / "fixtures" / f"{basename}.py"
+    if project.emails_dir is None and not project.tests_dir.is_dir():
+        return NotShipped(
+            f"no fixture, and none possible: {project.package} is installed as an "
+            f"egg, whose sdist prunes tests/ (SPEC §4). Its fixtures live in its "
+            f"own checkout. The .pt part below needs none."
+        )
+    return f"no fixture; SPEC §7 wants one at {wanted}"
+
+
 def find_fixture(project, basename):
     """``<tests>/fixtures/<basename>.py``, per SPEC §7, or ``None``."""
     candidates = [project.tests_dir / "fixtures" / f"{basename}.py"]
@@ -547,8 +582,14 @@ def load_fixture(path):
 
 
 def report(rows, output):
-    failures = [row for row in rows if row[2]]
-    print(f"\nrendered {len(rows) - len(failures)} preview(s) into {output}")
+    notes = [row for row in rows if isinstance(row[2], NotShipped)]
+    failures = [row for row in rows if row[2] and not isinstance(row[2], NotShipped)]
+    rendered = len(rows) - len(failures) - len(notes)
+    print(f"\nrendered {rendered} preview(s) into {output}")
+    # Reported on stdout and never silently: a template the preview could not
+    # render is worth a line even when nobody is at fault for it.
+    for name, _language, note in notes:
+        print(f"  skip   {name}: {note}")
     for name, language, error in failures:
         print(f"  FAILED {name} [{language or '-'}]: {error}", file=sys.stderr)
     # Non-zero on any failure: a preview that reports success while a template
@@ -581,6 +622,7 @@ nav { padding: 8px 12px; border-bottom: 1px solid #d1d5db; display: flex; gap: 1
 iframe { flex: 1; width: 100%; border: 0; background: #fff; }
 code { font-size: 12px; opacity: .75; }
 .err { color: #b91c1c; font-size: 12px; }
+.note { font-size: 12px; opacity: .7; }
 """
 
 INDEX_JS = """
@@ -633,8 +675,12 @@ def write_index(rows, output, languages, generation, watch=False):
     templates = {}
     for name, language, error in rows:
         stem = name.replace(":", ".")
-        entry = templates.setdefault(stem, {"name": name, "errors": []})
-        if error:
+        entry = templates.setdefault(stem, {"name": name, "errors": [], "notes": []})
+        # A note is not an error and must not be painted as one: the template is
+        # still listed, and its .pt part -- which needs no fixture -- still opens.
+        if isinstance(error, NotShipped):
+            entry["notes"].append(error.short)
+        elif error:
             entry["errors"].append(f"{language or '-'}: {error}")
 
     listing = "\n".join(
@@ -643,6 +689,11 @@ def write_index(rows, output, languages, generation, watch=False):
         + (
             f'<div class="err">{html_module.escape("; ".join(entry["errors"]))}</div>'
             if entry["errors"]
+            else ""
+        )
+        + (
+            f'<div class="note">{html_module.escape("; ".join(entry["notes"]))}</div>'
+            if entry["notes"]
             else ""
         )
         + "</li>"
