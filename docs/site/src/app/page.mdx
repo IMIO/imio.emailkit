@@ -27,13 +27,13 @@ Installing it restyles Plone's stock password-reset, registration and username-r
 
 ## What you get {{ anchor: false }}
 
-- **Better defaults out of the box.** The `imio.emailkit:default` profile restyles Plone's password-reset, user-registration and username-reminder mails, with no extra package and no opt-in step.
-- **A two-stage pipeline with a build-time seam.** Maizzle compiles `.vue` into email-safe HTML — inlined CSS, Outlook fallbacks — and the output is committed as `.pt` and rendered by Chameleon at runtime. Node is a developer and CI tool only.
-- **A design system shipped inside the egg**, so the buildout pin that governs the runtime governs the design system too. No npm registry, no version skew.
-- **`render(name, context, language)`** returning `(html, text)`: a pure function of template, context and registry state, so previews, tests and real sends all take the same path.
-- **Locale-aware helpers** bound to the render language, so no template reinvents French date formatting.
-- **Accessibility and i18n baked into the kit**, not left to authors: `role="presentation"` on layout tables, an enforced `alt` on images, `lang` on `<html>`, and the hidden preheader line every inbox shows next to the subject.
-- **Three levels of override**, from a registry record to a full markup replacement, plus a complete opt-out.
+- Better defaults out of the box: the `imio.emailkit:default` profile restyles Plone's password-reset, user-registration and username-reminder mails, with no extra package and no opt-in step.
+- A two-stage pipeline with a build-time seam: Maizzle compiles `.vue` into email-safe HTML — inlined CSS, Outlook fallbacks — and the output is committed as `.pt` and rendered by Chameleon at runtime. Node is a developer and CI tool only.
+- A design system shipped inside the egg, so the buildout pin that governs the runtime governs the design system too. No npm registry, no version skew.
+- `render(name, context, language)` returns `(html, text)`: a pure function of template, context and registry state, so previews, tests and real sends all take the same path.
+- Locale-aware helpers bound to the render language, so no template reinvents French date formatting.
+- Accessibility and i18n baked into the kit, not left to authors: `role="presentation"` on layout tables, an enforced `alt` on images, `lang` on `<html>`, and the hidden preheader line every inbox shows next to the subject.
+- Three levels of override, from a registry record to a full markup replacement, plus a complete opt-out.
 
 ## Compatibility {{ anchor: false }}
 

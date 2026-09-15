@@ -38,7 +38,7 @@ username-reminder mails immediately. That is the point: the mails a citizen
 actually receives from a commune are the ones nobody ever gets round to
 designing.
 
-## 📖 Documentation
+## Documentation
 
 **<https://imio.github.io/imio.emailkit/>**
 
@@ -102,7 +102,7 @@ Plone 6.0, 6.1 and 6.2 on Python 3.10 to 3.13.
 - [Source code](https://github.com/IMIO/imio.emailkit/)
 - [Contributing guide](https://imio.github.io/imio.emailkit/contributing/)
 
-### Prerequisites ✅
+### Prerequisites
 
 -   An [operating system](https://6.docs.plone.org/install/create-project-cookieplone.html#prerequisites-for-installation) that runs all the requirements mentioned.
 -   [uv](https://6.docs.plone.org/install/create-project-cookieplone.html#uv)
@@ -110,7 +110,7 @@ Plone 6.0, 6.1 and 6.2 on Python 3.10 to 3.13.
 -   [Git](https://6.docs.plone.org/install/create-project-cookieplone.html#git)
 -   [Node.js](https://nodejs.org) 22+ — **only** to build email templates
 
-### Installation 🔧
+### Installation
 
 1.  Clone this repository, then change your working directory.
 
