@@ -84,7 +84,7 @@ class TestTheMethodSet:
 
 
 class TestEveryMethodReturnsSelf:
-    """"Each method returns ``self``"."""
+    """ "Each method returns ``self``"."""
 
     @pytest.mark.parametrize("name", support.CHAINING_METHODS)
     def test_returns_the_same_object(self, builder, fr_member, name, tmp_path):
@@ -188,7 +188,7 @@ class TestHeldData:
 
 
 class TestNoIoBeforeSend:
-    """"No method does I/O before
+    """ "No method does I/O before
     ``.send()``"."""
 
     def test_an_unknown_template_never_sends_silently(

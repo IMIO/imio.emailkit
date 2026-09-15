@@ -18,10 +18,11 @@ with ``tests/fixtures/<template>.py`` and ``tests/golden/<template>.<lang>.<ext>
 next to it -- that layout. That is one test per
 (template x language x part), so a failure names exactly one file.
 
-**Why this lives in the egg and not in a test directory.** This class is meant to
-be *provided*, and a base class a consumer cannot import is not provided. Phases 1-3 kept it in
-``tests/golden_harness.py`` with a note that shipping it was Phase 4 work; this is
-that move. ``tests/golden_harness.py`` is now a thin subclass that binds this
+**Why this lives in the egg and not in a test directory.** This class is meant
+to be *provided*, and a base class a consumer cannot import is not provided.
+Phases 1-3 kept it in ``tests/golden_harness.py`` with a note that shipping it
+was Phase 4 work; this is that move. ``tests/golden_harness.py`` is now a thin
+subclass that binds this
 class to ``imio.emailkit``'s own suite, so the export is a move rather than a fork.
 
 **Why a separate module rather than ``imio.emailkit.testing``.** This module

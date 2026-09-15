@@ -151,9 +151,10 @@ def copy_twins(project):
     Not a nicety. ``maizzle build`` empties its output directory, silently, and
     Maizzle 6 exposes no option to stop it -- it deleted a committed twin once
     already, which is why the twins are *source* and live outside the build's
-    reach. A twin resolves as ``<directory>/<name>.txt.pt``, so it has to end up beside the compiled output,
-    and something has to put it there after every build. This is that something,
-    for every consumer rather than for one Makefile.
+    reach. A twin resolves as ``<directory>/<name>.txt.pt``, so it has to end
+    up beside the compiled output, and something has to put it there after
+    every build. This is that something, for every consumer rather than for
+    one Makefile.
     """
     twins = project.twins_dir
     if twins is None or not twins.is_dir():

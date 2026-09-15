@@ -586,9 +586,10 @@ class EmailkitPreview(PreviewBase):
         state = self.state()
         template = state["template"]
         try:
-            # The builder's contract verbatim, and nothing else. `.to(member)` rather than
-            # `.to(address)` on purpose: it is the recipient the builder resolves
-            # for itself, so no address this form received can reach the wire.
+            # The builder's contract verbatim, and nothing else. `.to(member)`
+            # rather than `.to(address)` on purpose: it is the recipient the
+            # builder resolves for itself, so no address this form received
+            # can reach the wire.
             email_builder()(template.name).to(self.member()).subject(
                 f"[emailkit test] {template.name}"
             ).with_context(**dict(state["context"])).send()

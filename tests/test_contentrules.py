@@ -716,7 +716,7 @@ class TestFiringTheRuleSends:
     def test_the_sender_is_the_site_sender(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """"``From`` defaults to the site's configured sender". The action
+        """ "``From`` defaults to the site's configured sender". The action
         offers no source field, so this is the only ``From`` it can have."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
@@ -1107,7 +1107,7 @@ class TestAStaleTemplateNameFailsLoudly:
 
 
 class TestTheStockMailActionIsUntouched:
-    """"The stock mail action is left untouched"."""
+    """ "The stock mail action is left untouched"."""
 
     def test_it_is_still_registered_globally(self, mail_portal):
         # ``mail_portal`` is not used, but it is what sets the layer up: without

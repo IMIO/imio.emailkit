@@ -88,7 +88,7 @@ class TestTheAdapterContract:
         )
 
     def test_a_string_adapts_to_a_recipient(self, mail_portal):
-        """"Default adapters ship for ``str`` and Plone members"."""
+        """ "Default adapters ship for ``str`` and Plone members"."""
         recipient = IEmailRecipient(support.PLAIN_ADDRESS, None)
 
         assert recipient is not None, (
@@ -165,7 +165,7 @@ class TestIterablesAndMixtures:
         assert addresses == sorted([support.PLAIN_ADDRESS, support.OTHER_ADDRESS])
 
     def test_a_mixed_iterable(self, mail, fr_member, envelope):
-        """"accept, in any mix" -- one call, three different forms."""
+        """ "accept, in any mix" -- one call, three different forms."""
         addresses = envelope(
             mail().to([fr_member, support.PLAIN_ADDRESS, support.FR_MEMBER["userid"]])
         )
@@ -186,7 +186,7 @@ class TestIterablesAndMixtures:
         ])
 
     def test_a_generator_is_accepted_and_consumed_once(self, mail, envelope):
-        """"An iterable" is what's accepted, and ``.send()`` may render several language
+        """ "An iterable" is what's accepted, and ``.send()`` may render several language
         groups from the same recipient set. A generator stored unflattened is
         empty by the second group -- one message with recipients, the rest
         silently addressed to nobody."""
@@ -316,13 +316,13 @@ class TestReplyToAndSender:
         assert support.addresses(message, "Reply-To") == [support.REPLY_TO]
 
     def test_from_defaults_to_the_site_sender(self, mail, site_sender, one_message):
-        """"``From`` defaults to the site's configured sender"."""
+        """ "``From`` defaults to the site's configured sender"."""
         message = one_message(mail().to(support.PLAIN_ADDRESS))
 
         assert support.addresses(message, "From") == [site_sender]
 
     def test_sender_overrides_the_default(self, mail, site_sender, one_message):
-        """".sender(...) overrides"."""
+        """ ".sender(...) overrides"."""
         message = one_message(
             mail().to(support.PLAIN_ADDRESS).sender(support.OVERRIDE_SENDER)
         )
@@ -331,7 +331,7 @@ class TestReplyToAndSender:
 
 
 class TestUnresolvable:
-    """"Fail loud, not silent drop"."""
+    """ "Fail loud, not silent drop"."""
 
     def test_collecting_an_unresolvable_recipient_does_not_raise(self, mail):
         """The builder puts the error at ``.send()`` time: "resolution at
@@ -444,7 +444,7 @@ class TestUnresolvable:
 
 
 class TestAMemberWithTwoAddresses:
-    """"Fail loud, not silent drop" -- on the member path too.
+    """ "Fail loud, not silent drop" -- on the member path too.
 
     Regression cover for a real defect. The ``str`` adapter refused a
     multi-address value from the start; the member adapter did not, so a member

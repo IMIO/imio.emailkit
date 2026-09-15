@@ -14,9 +14,10 @@ egg, and generates three scripts.
 
 **What it does not do, and must never do by default: compile.** Compiling at
 buildout time by default would make Node a production dependency across ~350
-applications and couple deployments to npm availability. So ``compile-on-install`` defaults to false, and with that
-default this module imports nothing that knows Node exists, touches no ``emails/``
-directory, and runs no subprocess. It does not even *import* the consumer's code:
+applications and couple deployments to npm availability. So
+``compile-on-install`` defaults to false, and with that default this module
+imports nothing that knows Node exists, touches no ``emails/`` directory, and
+runs no subprocess. It does not even *import* the consumer's code:
 discovery at install time greps each dist's ZCML for the emailkit marker on the
 filesystem only, so a buildout run stays a buildout run.
 """

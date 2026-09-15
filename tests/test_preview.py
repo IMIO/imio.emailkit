@@ -265,7 +265,7 @@ class TestTheLanguageSwitcher:
 
 
 class TestSendTest:
-    """"A **Send test** button mails the currently previewed template +
+    """ "A **Send test** button mails the currently previewed template +
     fixture + language to the logged-in user's own address"."""
 
     @pytest.fixture

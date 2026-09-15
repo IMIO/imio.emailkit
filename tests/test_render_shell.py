@@ -164,7 +164,7 @@ def visible_hidden_text(html):
 
 class TestReturnValue:
     def test_returns_html_and_text(self, shell):
-        """"Returns ``(html, text)`` exactly as ``render()`` does"."""
+        """ "Returns ``(html, text)`` exactly as ``render()`` does"."""
         result = shell()
 
         assert isinstance(result, tuple)
@@ -368,7 +368,7 @@ class TestKitDefaultsAroundALegacyBody:
         assert unmarked == [], f"layout tables with no presentational role: {unmarked}"
 
     def test_the_logo_has_an_alt_attribute(self, shell, set_record):
-        """"enforced ``alt`` on the logo/``Img`` component".
+        """ "enforced ``alt`` on the logo/``Img`` component".
 
         The logo only renders when the token is set, so the token is set first --
         otherwise this test would pass by finding no image at all.
@@ -383,7 +383,7 @@ class TestKitDefaultsAroundALegacyBody:
         assert "alt=" in tag, f"logo <img> has no alt attribute: {tag}"
 
     def test_lang_is_emitted_on_html(self, shell):
-        """"the layout emits ``lang="${lang}"`` on ``<html>``"."""
+        """ "the layout emits ``lang="${lang}"`` on ``<html>``"."""
         html, _text = shell(language="fr")
 
         match = support.LANG_ATTRIBUTE.search(html)
@@ -881,7 +881,7 @@ class TestPlaintextPart:
             assert phrase in text, f"{phrase!r} was lost in the plaintext extraction"
 
     def test_table_cells_are_separated_not_concatenated(self, rendered):
-        """"Plaintext: table cells get a `` | `` separator".
+        """ "Plaintext: table cells get a `` | `` separator".
 
         Legacy notification bodies are table-heavy and ``render_shell`` has no
         plaintext twin to fall back on, so what this extraction does to a ``<tr>``
@@ -1054,7 +1054,7 @@ class TestLanguage:
         assert self.MSGID not in html, "the bare msgid reached the output"
 
     def test_a_literal_subject_is_passed_through_unchanged(self, shell):
-        """"accepts a msgid or literal string". A literal is not a msgid, so
+        """ "accepts a msgid or literal string". A literal is not a msgid, so
         no catalog may touch it."""
         html, _text = shell(subject=SUBJECT_SENTINEL, language="nl")
 

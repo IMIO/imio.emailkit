@@ -344,9 +344,9 @@ _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # Table cells get a visible separator rather than a line break, so a row stays on
 # one line and remains readable. Without this the cells simply concatenated:
 # a header row came out as "PointDécision" and a data row as "Budget 2026approuvé".
-# It matters because legacy notification bodies rendered through the shell are table-heavy, and
-# `render_shell` has no plaintext twin to fall back on -- naive extraction IS its
-# plaintext part, by design.
+# It matters because legacy notification bodies rendered through the shell
+# are table-heavy, and `render_shell` has no plaintext twin to fall back on --
+# naive extraction IS its plaintext part, by design.
 _CELL_BREAK = re.compile(r"</(?:td|th)\s*>", re.IGNORECASE)
 # Asymmetric on purpose. The part AFTER the separator stays `\s*`: it swallows one
 # newline, which is what keeps consecutive table rows on consecutive lines instead
