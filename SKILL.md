@@ -678,6 +678,25 @@ never in the template.
 If you add a context key, add it to `build_context` *and* to the fixture; the golden
 test is what tells you when you forgot.
 
+## The Wallonie Connect migration mail
+
+`imio.emailkit:user_migrated_to_sso` tells a user that their local account now
+logs in through Wallonie Connect. The kit owns the template, its translations and
+the Wallonie Connect mark, so a consumer only sends it:
+
+```python
+Email("imio.emailkit:user_migrated_to_sso").to(member).with_context(
+    site_name="Délibérations.be",  # the product the reader knows
+    institution=institution.Title(),
+    email=new_userid,
+    username=old_userid,
+    login_url=login_url,  # starts the OIDC flow
+    account_url=account_url or "",  # empty drops the account-console link
+).send()
+```
+
+The subject names no product: it is one registered msgid for every consumer.
+
 ## Checklist before you commit
 
 - [ ] `.vue` changed → **rebuild** and commit the `.pt` (never edit the `.pt`)

@@ -72,17 +72,19 @@ DEFAULT_MAIL_TEMPLATES = (MAIL_PASSWORD, REGISTERED_NOTIFY)
 #: authoring rules, one preview list. Driven off discovery in the tests that can;
 #: this tuple is for parametrisation, which needs values at import time.
 #:
-#: All four are here, which is the point of owning the views. ``get_username`` was
-#: the first (stock Plone has no template for it, so jbot could not reach it and
+#: The Plone mails are here too, which is the point of owning the views.
+#: ``get_username`` was the first (stock Plone has no template for it, so jbot could not reach it and
 #: the view was the only seam); the two default mails followed, because reaching
 #: them with jbot was possible but made them second-class.
 NOTIFICATION = "notification"
 GET_USERNAME = "get_username"
+USER_MIGRATED_TO_SSO = "user_migrated_to_sso"
 RENDERABLE_TEMPLATES = (
     NOTIFICATION,
     GET_USERNAME,
     MAIL_PASSWORD,
     REGISTERED_NOTIFY,
+    USER_MIGRATED_TO_SSO,
 )
 
 

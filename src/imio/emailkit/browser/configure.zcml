@@ -6,8 +6,8 @@
 
   <!-- The raster assets the kit shell and `KitPill` reference by absolute URL:
        the v3 head artwork (`art-head.png` with its `art-head-tail.png`), the
-       four pill icons, the two iMio logos and the Quicksand weights `fonts.css`
-       serves.
+       four pill icons, the two iMio logos, the Wallonie Connect mark of the
+       `user_migrated_to_sso` mail and the Quicksand weights `fonts.css` serves.
 
        The artwork PNGs are crops of the design's own SVG sources, converted to PNG
        and kept transparent so the card shows through them and an image-blocking

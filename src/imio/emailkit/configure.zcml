@@ -49,6 +49,11 @@
         preheader="[email_preheader_registered_notify_template] Follow the link to choose your password."
         subject="[email_subject_registered_notify_template] An account has been created for you"
         />
+    <emailkit:template
+        name="user_migrated_to_sso"
+        preheader="[email_preheader_sso_migrated] Log in from now on with Wallonie Connect, using your email address."
+        subject="[email_subject_sso_migrated] Your account now uses Wallonie Connect"
+        />
   </emailkit:templates>
 
   <!-- -*- extra stuff goes here -*- -->

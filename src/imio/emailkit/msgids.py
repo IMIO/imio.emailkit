@@ -29,3 +29,8 @@ _(
     "email_preheader_registered_notify_template",
     default="Follow the link to choose your password.",
 )
+_("email_subject_sso_migrated", default="Your account now uses Wallonie Connect")
+_(
+    "email_preheader_sso_migrated",
+    default="Log in from now on with Wallonie Connect, using your email address.",
+)
