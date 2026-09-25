@@ -4,8 +4,8 @@
  *
  * It owns exactly the document: the `<html>` namespace declarations, the a11y
  * defaults, the preheader, and the four bands of the v3 design -- white logo
- * band under the head artwork, tinted title band, content well, negative footer
- * under the cap. Anything else is a component.
+ * band under the head artwork, tinted title band, content well, negative footer.
+ * Anything else is a component.
  *
  * Import-free on purpose: this file is read from inside a Python egg, and a
  * `site-packages` directory has no `node_modules` ancestor for Vite to walk up
@@ -30,7 +30,7 @@
  *      message this is. A template with no title degrades to the rule alone.
  *   3. CONTENT WELL -- the default slot, plus the `body_html` seam.
  *   4. NEGATIVE FOOTER -- #1c1c1c, `footer_html` or the translated default,
- *      then the iMio logo, introduced by the cap artwork above it.
+ *      then the iMio logo.
  *
  * Between 3 and 4 sits the optional `mentions` region: the centred small print
  * every model in the design ends with (a fallback link, why you received this).
@@ -40,23 +40,21 @@
  * ---------------------------------------------------------------------------
  * The brand artwork, and where the brand colour went
  * ---------------------------------------------------------------------------
- * v3's whole subject is two cuts of the iMio brand shapes entering the mail: a
- * head visual behind the logo band, and a cap closing the white body. They are
+ * v3's whole subject is a cut of the iMio brand shapes entering the mail: a head
+ * visual behind the logo band, with its tail in the title band. It ships as
  * PNGs from the resource directory, transparent so the card shows through and an
  * image-blocking client is left with a clean flat rather than a hole. SVG is not
  * an option; mail clients do not render it.
  *
  * The head visual is a CSS background because the logo and the pill sit on top
- * of it. The cap is an `<img>` because nothing does. That is the only reason
- * the two are built differently, and it is the whole of the difference in what
- * Outlook shows: see the band itself for why there is no VML behind it.
+ * of it. See the band itself for why there is no VML behind it.
  *
  * In exchange the title band gave up `primary_color`. The token still drives
  * `KitCard`'s rail and `KitButton`'s fill, so a site's colour is still in the
  * mail, but the largest coloured surface is now a raster asset that is iMio
  * magenta for everyone. A consumer who needs its own colour there replaces
- * `art-head.png`, `art-head-tail.png` and `art-hero.png` in the resource
- * directory; nothing in this file has to change.
+ * `art-head.png` and `art-head-tail.png` in the resource directory; nothing in
+ * this file has to change.
  *
  * ---------------------------------------------------------------------------
  * Slots, and the runtime/build-time pairs
@@ -98,7 +96,7 @@
  * ---------------------------------------------------------------------------
  * `asset_base`, and why an image can be missing
  * ---------------------------------------------------------------------------
- * The two brand cuts, the pill icons and the footer's iMio logo are raster
+ * The head artwork, the pill icons and the footer's iMio logo are raster
  * assets served from the `++resource++imio.emailkit` directory registered in
  * `browser/configure.zcml`.
  * A mail client fetches them over HTTP long after the render, from outside the
@@ -566,44 +564,6 @@ const hiddenPreheader =
               <tr v-if="$slots.mentions">
                 <td align="center" class="px-10 pb-[26px] text-center text-[13px] leading-[21px] text-imio-grey-dark sm:px-5" data-dark="muted">
                   <slot name="mentions" />
-                </td>
-              </tr>
-
-              <!-- The cap: the second of v3's two brand cuts, closing the
-                   white body the way the head artwork opens it.
-
-                   An `img` and not a background, unlike the head: nothing sits
-                   on top of it, and a real image is the one thing every client
-                   renders. Drawn at the full 600 px width and cut off dead by the
-                   black footer below, which the design asks for.
-
-                   `-mt-8` is the design's own -32 px: the cap slides up under the
-                   mentions region so the hills start inside the text block rather
-                   than after a gap. Outlook drops a negative margin and simply
-                   leaves the gap, which is the harmless direction to fail in.
-
-                   No `height`, in the attribute or the CSS. `width="600"` plus
-                   `w-full` is the responsive-image idiom, and the aspect ratio
-                   then takes care of itself at every width; stating a height as
-                   well only gives Maizzle's size-attribute sync something to
-                   rewrite to `height="auto"`, which is not a value the attribute
-                   has.
-
-                   No background colour, for the same reason as the head band: the
-                   PNG is transparent, the card behind it carries the surface, and
-                   painting white here would nail the strip to white in a dark
-                   client. `alt=""` because it is decoration and says nothing a
-                   reader needs; `tal:condition="asset_base"` because a render with
-                   no request cannot build an absolute url, and no cap is a better
-                   ending than a broken-image icon. -->
-              <tr tal:condition="asset_base">
-                <td class="p-0 text-[0px] leading-[0]">
-                  <img
-                    src="${asset_base}/art-hero.png"
-                    alt=""
-                    width="600"
-                    class="-mt-8 block w-full max-w-[600px]"
-                  >
                 </td>
               </tr>
 

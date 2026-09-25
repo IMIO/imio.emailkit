@@ -258,10 +258,10 @@ four bands of the v3 design —
    running down into it, holding the title and optional subtitle in ink;
 3. **content well** — your markup, plus the `body_html` injection point;
 4. **negative footer** — `footer_html` or a translated default, then the iMio
-   logo, introduced by the cap artwork above it.
+   logo.
 
-The two artwork cuts are v3's whole subject, and they are shell-owned: a template
-never references them. `primary_color` no longer paints the title band; it is
+The head artwork is v3's whole subject, and it is shell-owned: a template never
+references it. `primary_color` no longer paints the title band; it is
 `KitCard`'s rail and `KitButton`'s fill, and the brand colour at the top of the
 mail is now the artwork, which is iMio magenta for every consumer.
 

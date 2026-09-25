@@ -5,16 +5,16 @@
     >
 
   <!-- The raster assets the kit shell and `KitPill` reference by absolute URL:
-       the two v3 brand cuts (`art-head.png` with its `art-head-tail.png`, and
-       `art-hero.png`), the four pill icons, the two iMio logos and the Quicksand
-       weights `fonts.css` serves.
+       the v3 head artwork (`art-head.png` with its `art-head-tail.png`), the
+       four pill icons, the two iMio logos and the Quicksand weights `fonts.css`
+       serves.
 
-       The brand cuts are crops of the design's own SVG sources, converted to PNG
+       The artwork PNGs are crops of the design's own SVG sources, converted to PNG
        and kept transparent so the card shows through them and an image-blocking
        client is left with a clean flat rather than a hole. They are the one place
        a consumer can rebrand the top of the mail: `primary_color` drives
        `KitCard`'s rail and `KitButton`'s fill but cannot recolour a raster, so a
-       site that needs its own artwork replaces these three files and touches no
+       site that needs its own artwork replaces these two files and touches no
        markup.
 
        Mail clients fetch every image over HTTP, so a kit image cannot be a file
