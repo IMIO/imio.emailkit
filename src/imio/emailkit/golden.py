@@ -1,41 +1,8 @@
-"""The golden-file test base class provided to consumer add-ons.
+"""Golden-file test base class for a consumer add-on's email templates.
 
-> A provided test base class renders each registered template against its fixture
-> and diffs against the golden file. Catches the two real regressions: a Tailwind
-> class silently purged at build, and a ``${}`` placeholder that stopped resolving
-> after a refactor.
-
-A consumer add-on's whole email test suite is this::
-
-    from imio.emailkit.golden import GoldenTemplateTests
-
-
-    class TestEmailGoldens(GoldenTemplateTests):
-        package = "imio.pm.notifications"
-        templates = ("item_published", "meeting_convocation")
-
-with ``tests/fixtures/<template>.py`` and ``tests/golden/<template>.<lang>.<ext>``
-next to it -- that layout. That is one test per
-(template x language x part), so a failure names exactly one file.
-
-**Why this lives in the egg and not in a test directory.** This class is meant
-to be *provided*, and a base class a consumer cannot import is not provided.
-Phases 1-3 kept it in ``tests/golden_harness.py`` with a note that shipping it
-was Phase 4 work; this is that move. ``tests/golden_harness.py`` is now a thin
-subclass that binds this
-class to ``imio.emailkit``'s own suite, so the export is a move rather than a fork.
-
-**Why a separate module rather than ``imio.emailkit.testing``.** This module
-imports ``pytest`` at import time. ``imio.emailkit.testing`` holds the Plone test
-layers, and plenty of iMio add-ons still run their tests under
-``zope.testrunner``; folding a pytest import into that module would make the
-layers unimportable for them. Two modules, two dependencies, no coupling.
-
-**Regeneration is deliberate and never automatic.** Set
-``EMAILKIT_UPDATE_GOLDEN=1`` and the run *writes* the snapshots and reports every
-one as skipped -- so an update run can never be mistaken for a verification run.
-Nothing regenerates as a side effect of a failing comparison; a snapshot that
-repairs itself when it breaks is not a snapshot.
+Renders each registered template against its fixture and diffs it against
+the committed golden file. Set ``EMAILKIT_UPDATE_GOLDEN=1`` to write new
+snapshots instead of comparing.
 """
 
 from contextlib import contextmanager
@@ -50,32 +17,20 @@ import pytest
 import re
 
 
-# On the bare ``assert`` statements below: this module ships in the egg, so ruff's
-# S101 (assert in non-test code) fires on it, and the exemption is recorded in
-# ``pyproject.toml``'s ``per-file-ignores`` rather than sprinkled here. The reason
-# is that this *is* test code -- a pytest base class a consumer's test module
-# subclasses -- and ``assert cond, message`` is the only form pytest reports as a
-# test failure with a diff. Raising ``AssertionError`` by hand would work and read
-# worse, and ``python -O`` (which strips asserts) does not run test suites.
+# S101 (assert in non-test code) is ignored for this file in pyproject.toml.
+# This is test code, and pytest only reports `assert cond, message` with a diff.
 
 
-#: Environment variable that turns a verification run into a regeneration run.
+#: Turns a verification run into a regeneration run.
 UPDATE_GOLDEN_ENV = "EMAILKIT_UPDATE_GOLDEN"
 
-#: The default ships ``fr``; ``en`` is the source language, and having both means
-#: a translation that stops resolving shows up as a diff rather than as nothing at
-#: all. Override ``languages`` on the subclass to trim or extend.
+#: Snapshotted by default.
 DEFAULT_LANGUAGES = ("fr", "en")
 
-#: How many diff lines to show before truncating. Enough to see the change, few
-#: enough that a purged stylesheet does not bury the summary.
+#: How many diff lines to show before truncating.
 DIFF_LINES = 40
 
-#: A Chameleon placeholder that survived into the output. Phase 0: without the
-#: ``IPageTemplateEngine`` utility, ``zope.pagetemplate`` falls back to
-#: ``zope.tal``, where ``${...}`` passes through **verbatim and with no error** --
-#: so a test that only checks "my marker is present" ships raw placeholders to
-#: production and stays green.
+#: A Chameleon placeholder left unresolved in rendered output.
 UNRESOLVED_PLACEHOLDER = re.compile(r"\$\{[^}]*\}")
 
 #: TAL/i18n attributes that should never survive a render.
@@ -99,10 +54,7 @@ def unresolved_placeholders(rendered):
 def assert_render_is_clean(rendered, what="output"):
     """No unsubstituted placeholder and no leftover TAL attribute.
 
-    The single most important assertion in an email test suite: the failure this
-    catches is silent, and a mail that reaches a commune reading
-    ``Bonjour ${member/fullname}`` looks exactly like a successful send from the
-    sending side.
+    Catches a mail that would silently send as ``Bonjour ${member/fullname}``.
     """
     leftovers = unresolved_placeholders(rendered)
     assert not leftovers, (
@@ -114,11 +66,7 @@ def assert_render_is_clean(rendered, what="output"):
 
 
 def load_fixture(path):
-    """Return the ``CONTEXT`` dict of a ``tests/fixtures/<template>.py`` file.
-
-    Loaded *by path* rather than imported, so ``tests/fixtures/`` stays a
-    directory of data files instead of having to become an importable package.
-    """
+    """Return the ``CONTEXT`` dict of a ``tests/fixtures/<template>.py`` file."""
     path = Path(path)
     if not path.exists():
         raise FileNotFoundError(
@@ -141,7 +89,7 @@ def load_fixture(path):
 
 
 def diff(expected, actual, label):
-    """A truncated unified diff, labelled so the two sides cannot be confused."""
+    """A truncated unified diff between the two labelled sides."""
     lines = list(
         difflib.unified_diff(
             expected.splitlines(keepends=True),
@@ -158,36 +106,24 @@ def diff(expected, actual, label):
 
 
 class GoldenTemplateTests:
-    """One test per template x language x part.
+    """One test per template x language x part. Configure via class attributes."""
 
-    Everything below is a class attribute a subclass may set; the only method
-    worth overriding is :meth:`render_parts`.
-    """
-
-    #: Namespace of the add-on whose templates these are -- the package part of
-    #: the ``<package>:<template>`` lookup name its ``<emailkit:templates>`` ZCML
-    #: registration gives them. The harness namespaces :attr:`templates`
-    #: with it.
+    #: Package part of the ``<package>:<template>`` name.
     package = None
 
-    #: Template basenames, *unqualified*.
+    #: Template basenames, unqualified.
     templates = ()
 
-    #: Languages to snapshot. See :data:`DEFAULT_LANGUAGES`.
     languages = DEFAULT_LANGUAGES
 
     #: ``(file suffix, index into render()'s return tuple)``.
     parts = (("html", 0), ("txt", 1))
 
-    #: ``tests/fixtures`` and ``tests/golden``, absolute. ``None`` means "beside
-    #: the module this subclass is defined in", which is the expected layout.
+    #: ``None`` means beside the module the subclass is defined in.
     fixtures_dir = None
     golden_dir = None
 
-    #: Name of the pytest fixture that sets up the Plone site. The harness pulls
-    #: it in for every test rather than naming it in each signature, so a consumer
-    #: whose layer fixture is called something else changes this one string.
-    #: ``None`` disables it (for a suite that sets its layer up another way).
+    #: Pytest fixture that sets up the Plone site. ``None`` disables it.
     layer_fixture = "integration"
 
     # -- wiring ------------------------------------------------------------
@@ -238,8 +174,7 @@ class GoldenTemplateTests:
 
     # -- the one seam a consumer would override ----------------------------
 
-    #: Host every snapshot is rendered against, whatever host the test server is
-    #: actually listening on. See :meth:`stable_host`.
+    #: Host every snapshot is rendered against. See :meth:`stable_host`.
     snapshot_host = "http://nohost"
 
     def render_parts(self, template, language):
@@ -257,32 +192,15 @@ class GoldenTemplateTests:
     def stable_host(self):
         """Pin the host in ``portal_url`` for the duration of a snapshot render.
 
-        A snapshot has to be reproducible, and without this one it is not. The kit
-        builds ``asset_base`` from ``portal_url``, which is ``getSite()
-        .absolute_url()``, which is whatever host the test request happens to
-        carry -- so every image ``src``, every ``background`` attribute and the
-        web-font stylesheet land in the committed file with that host baked in.
-
-        For years that host was ``nohost`` and the problem was invisible. It stops
-        being invisible the moment a test layer serves on a real socket: Plone
-        6.2's newer ``plone.app.testing`` does, so the same templates rendered
-        ``http://localhost:37267/...`` and every snapshot in the suite failed at
-        once, on a port that is different again next run. Regenerating was not a
-        fix -- the regenerated files fail on the following run.
-
-        Only the scheme and the authority are replaced. The portal's own path
-        survives, so a consumer whose test site is not called ``plone`` still gets
-        its own path in the snapshot; only the part that was never theirs to begin
-        with is normalised.
+        Without this, the host of the test request bakes into every image
+        ``src`` in the committed snapshot. Only scheme and authority are
+        replaced; the portal's own path is kept.
         """
         from urllib.parse import urlsplit
         from urllib.parse import urlunsplit
 
-        # `import imio.emailkit.render` yields the render FUNCTION, because
-        # `imio/emailkit/__init__.py` rebinds the name to it -- that is the public
-        # API. The module itself is only reachable this way, and
-        # patching the function object instead is the mistake that made
-        # `bin/preview-emails` silently drop every image once already.
+        # Get the real module, not the render function `__init__.py` rebinds
+        # the name to, so the patched attribute is the one render() reads.
         module = importlib.import_module("imio.emailkit.render")
         original = module.portal_url
 
@@ -307,7 +225,7 @@ class GoldenTemplateTests:
             module.portal_url = original
 
     def assert_clean(self, rendered, label):
-        """Overridable so a suite can tighten the audit; see the module docs."""
+        """Overridable so a suite can tighten the audit."""
         assert_render_is_clean(rendered, label)
 
     # -- the tests ---------------------------------------------------------
@@ -316,10 +234,8 @@ class GoldenTemplateTests:
         suffix, index = part
         path = self.golden_path(template, language, suffix)
 
-        # The existence check comes *before* rendering on purpose. With no
-        # snapshot there is nothing to compare, and a render that blows up here
-        # would report as a golden-file failure while the actual defect belongs
-        # to the render tests. One defect, one red test.
+        # Check existence before rendering, so a render error reports as
+        # such, not as a golden-file failure.
         if not path.exists() and not updating_golden():
             pytest.skip(
                 f"no golden file at {path}. Snapshots can only be generated once "
@@ -346,12 +262,7 @@ class GoldenTemplateTests:
         )
 
     def test_golden_has_no_unresolved_placeholder(self, template, language, part):
-        """A snapshot is only trustworthy if it was clean when it was taken.
-
-        Without this, a regeneration run on a broken engine bakes raw
-        ``${member/fullname}`` into the committed file, and every later run
-        happily confirms it.
-        """
+        """A snapshot is only trustworthy if it was clean when it was taken."""
         suffix, _index = part
         path = self.golden_path(template, language, suffix)
         if not path.exists() or updating_golden():
@@ -360,8 +271,7 @@ class GoldenTemplateTests:
         self.assert_clean(path.read_text(encoding="utf-8"), f"golden {path.name}")
 
     def test_every_template_has_a_fixture(self, template):
-        """Each template ships a fixture and a snapshot. The fixture is the
-        harness's input, so a missing one is a hard failure, not a skip."""
+        """A missing fixture is a hard failure, not a skip."""
         assert self.fixture_path(template).exists(), (
             f"no fixture at {self.fixture_path(template)}"
         )

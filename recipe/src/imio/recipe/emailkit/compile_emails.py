@@ -2,22 +2,16 @@
 
     bin/compile-emails [--package NAME] [--watch] [--new NAME]
 
-For each discovered package (or the one selected): wire the kit (per
-``kit-mode``) -> ``npm ci`` in ``emails/`` (only if ``node_modules`` is stale vs.
-lockfile) -> ``npx maizzle build`` -> copy the hand-authored twins back in. Exit
-non-zero on any build failure.
+For each package: wire the kit, run ``npm ci`` if ``node_modules`` is
+stale, run ``npx maizzle build``, then copy the hand-authored twins back
+in. Exits non-zero on any build failure.
 
-Two things worth calling out:
+Maizzle writes ``.pt`` directly into ``templates/``, so no rename step
+is needed. Twins are copied back because the build empties its output
+directory.
 
-* **No rename step, and no move step.** Maizzle 6 has a first-class
-  ``output.extension``, so the pipeline emits ``.pt`` directly, and
-  ``output.path`` in the consumer's own config writes straight into
-  ``templates/``. What this script *does* copy is the hand-authored plaintext
-  twins, because ``maizzle build`` empties its output directory and would
-  otherwise delete them.
-* **``--watch`` delegates to Maizzle's dev server**, which is the lesser loop:
-  it shows build-time output, raw ``${item/title}`` and unexpanded
-  ``tal:repeat``. ``bin/preview-emails --watch`` is the loop you actually want.
+``--watch`` delegates to Maizzle's dev server, which shows raw,
+unrendered placeholders. Use ``bin/preview-emails --watch`` instead.
 """
 
 from imio.recipe.emailkit import cli
@@ -124,8 +118,7 @@ def main(config=None, argv=None):
             failures.append(project.package)
 
     if failures:
-        # Exit non-zero on any build failure. Every package is attempted first,
-        # so one broken addon does not hide the state of the others.
+        # Every package is attempted first, so one failure does not hide others.
         print(
             f"\ncompile-emails failed for: {', '.join(failures)}",
             file=sys.stderr,
@@ -148,13 +141,8 @@ def compile_project(project, kit_dir, kit_mode, npm, npx, watch=False, reinstall
 def copy_twins(project):
     """Copy ``emails/twins/*.txt.pt`` into the templates directory.
 
-    Not a nicety. ``maizzle build`` empties its output directory, silently, and
-    Maizzle 6 exposes no option to stop it -- it deleted a committed twin once
-    already, which is why the twins are *source* and live outside the build's
-    reach. A twin resolves as ``<directory>/<name>.txt.pt``, so it has to end
-    up beside the compiled output, and something has to put it there after
-    every build. This is that something, for every consumer rather than for
-    one Makefile.
+    ``maizzle build`` empties its output directory, so twins live outside
+    the build's reach and are copied back in after every build.
     """
     twins = project.twins_dir
     if twins is None or not twins.is_dir():

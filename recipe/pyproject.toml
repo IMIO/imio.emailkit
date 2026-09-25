@@ -20,13 +20,8 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
 ]
-# Deliberately NOT a dependency of this recipe: `imio.emailkit`. The recipe
-# consumes it through the part's own `eggs` option
-# (`eggs = ${instance:eggs}`), so a buildout that has no emailkit consumer never
-# drags the runtime -- and therefore Plone -- into the buildout interpreter.
-# And deliberately not Node, npm or anything that implies them: this is
-# explicitly rejected because Node must not become a dependency of ~350
-# production deployments.
+# `imio.emailkit`, Node and npm are not dependencies: a buildout with no
+# emailkit consumer must not drag Plone into the buildout interpreter.
 dependencies = [
     "setuptools",
     "zc.buildout",
@@ -42,7 +37,6 @@ PyPI = "https://pypi.org/project/imio.recipe.emailkit"
 Source = "https://github.com/IMIO/imio.emailkit"
 Tracker = "https://github.com/IMIO/imio.emailkit/issues"
 
-# The entry point that makes `recipe = imio.recipe.emailkit` resolve.
 [project.entry-points."zc.buildout"]
 default = "imio.recipe.emailkit:Recipe"
 
@@ -50,11 +44,8 @@ default = "imio.recipe.emailkit:Recipe"
 managed = false
 
 [build-system]
-# setuptools, not hatchling: zc.buildout's `develop` runs `setup.py` directly,
-# so this distribution needs the same shim `imio.emailkit` carries.
-#
-# >=77 for the same reason as the root distribution: `license` above is a PEP 639
-# SPDX expression and only 77.0+ understands that form.
+# setuptools: zc.buildout's `develop` needs a `setup.py`. >=77 for the
+# PEP 639 SPDX `license` expression above.
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
@@ -66,9 +57,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-# PEP 420: neither `imio` nor `imio.recipe` has an __init__.py, so this
-# distribution can share the `imio` namespace with `imio.emailkit` while both
-# are develop eggs in the same buildout.
+# PEP 420: shares the `imio` namespace with `imio.emailkit`.
 namespaces = true
 
 [tool.setuptools.package-data]
@@ -96,16 +85,12 @@ order-by-type = false
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501", "RUF001", "S101"]
-# The `.vue` skeleton this module generates carries a real Tailwind class list,
-# copied from the repository's own `notification.vue`. Wrapping it to fit 88
-# columns would produce a skeleton that is not what a template actually looks
-# like, which defeats the point of scaffolding.
+# The generated `.vue` skeleton carries a real Tailwind class list; wrapping
+# it to 88 columns would make it not match a real template.
 "src/imio/recipe/emailkit/scaffold.py" = ["E501"]
 
 [tool.zest-releaser]
 python-file-with-version = "src/imio/recipe/emailkit/__init__.py"
-# Prefixed: this distribution shares a git repository, and therefore a tag
-# namespace, with `imio.emailkit`. See the same block in the root pyproject.toml
-# for what a colliding bare tag does.
+# Prefixed: shares a git repository and tag namespace with `imio.emailkit`.
 tag-format = "imio.recipe.emailkit-{version}"
 tag-message = "Release imio.recipe.emailkit {version}"

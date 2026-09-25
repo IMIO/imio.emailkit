@@ -2,44 +2,27 @@
 /**
  * Plone's password-reset mail, restyled.
  *
- * An ordinary template in the ordinary dialect. It used to be a `z3c.jbot`
- * override rendered by a stock Plone view, which forced `options/member`,
- * `python:member.getProperty(…)`, a hand-written header block and no locale
- * helpers. `imio.emailkit.browser.default_mails.MailPasswordView` now owns that
- * view, builds a flat context and renders through `render()`, so nothing here is
- * special any more: no `useDoctype`, no `useOutputPath`, no `#preheader` slot.
- * The subject and the preheader are msgids in this package's
- * `<emailkit:templates>` registration, like every other template.
+ * An ordinary template in the ordinary dialect.
+ * `imio.emailkit.browser.default_mails.MailPasswordView` owns the view,
+ * builds a flat context and renders through `render()`: no `useDoctype`,
+ * no `useOutputPath`, no `#preheader` slot. The subject and the preheader
+ * are msgids in this package's `<emailkit:templates>` registration, like
+ * every other template.
  *
- * Context keys, all of them from `MailPasswordView.build_context`:
- * `userid`, `site_name`, `is_anonymous`, `reset_url`, `expiration_hours`,
+ * Context keys, all from `MailPasswordView.build_context`: `userid`,
+ * `site_name`, `is_anonymous`, `reset_url`, `expiration_hours`,
  * `client_addr`.
  *
- * ---------------------------------------------------------------------------
- * What the v2 layout changed here
- * ---------------------------------------------------------------------------
- * Nothing about the *wording*. The title moved out of the body into the banner
- * (a `#title` slot, because it is wording and only a slot can be translated),
- * the validity sentence moved from a trailing grey paragraph into a callout with
- * an overline, and the copy-this-link fallback moved into the shell's `mentions`
- * region. All three are the same sentences in the place the design puts them:
- * a deadline is a condition, and a condition is a callout.
+ * The title lives in the banner (a `#title` slot, since only a slot can
+ * be translated). The validity sentence is a callout with an overline.
+ * The copy-this-link fallback lives in the shell's `mentions` region.
  *
- * The pill is `info`, on the maintainer's call, and it used to be `warning`.
- * The argument for `warning` was that this is the one mail whose link stops
- * working, and the pill is the only part of the design a reader sees before
- * deciding whether to open the message now or later. The argument against it
- * won: this mail and `get_username` carry the SAME label, "Your account", and
- * two mails that say the same words while showing different colours and
- * different glyphs are telling the reader about a distinction that does not
- * exist. The deadline is stated where it belongs, in the callout below, which
- * is the one place that can give the actual date.
- *
- * v3's white pill sharpened the point. With the tone reduced to a coloured disc
- * under the glyph, the difference between the two "Your account" pills was a
- * yellow circle with an exclamation mark against a blue one with an `i` -- and
- * an exclamation mark on a password mail reads as "something is wrong with your
- * account", which is the one thing this mail must not imply.
+ * The pill is `info`. This mail and `get_username` share the same label,
+ * "Your account", and a different colour here would tell the reader about
+ * a distinction that does not exist. An exclamation mark on a password
+ * mail also reads as "something is wrong with your account", which this
+ * mail must not imply. The deadline is stated in the callout below, which
+ * is the one place that gives the actual date.
  */
 </script>
 
@@ -105,12 +88,11 @@
 
     <template #mentions>
       <!--
-        One paragraph with a break, and the address as a real link, which is
-        what the mockups draw. It used to be two paragraphs with the url as
-        plain grey text: a client that autolinked it styled it its own way
-        (blue, usually) and one that did not left the reader retyping a
-        sixty-character url by hand. `data-dark="accent"` moves it to
-        #ffadd9 in a dark client, where #b3004b is around 2:1.
+        One paragraph with a break, and the address as a real link. A
+        client that autolinks a plain-text url styles it on its own; one
+        that does not leaves the reader retyping a long url by hand.
+        `data-dark="accent"` moves it to #ffadd9 in a dark client, where
+        #b3004b is about 2:1 contrast.
       -->
       <p class="m-0 text-[13px] leading-[21px] text-imio-grey-dark">
         <span i18n:translate="email_mail_password_fallback" tal:omit-tag="">If the button does not work, copy this address into your browser:</span>

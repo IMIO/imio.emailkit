@@ -2,9 +2,6 @@
 /**
  * The one template this throwaway addon ships.
  *
- * Written to pass the authoring lint clean, so that `bin/check-emails` has a
- * package whose gate 2 is green ; a lint with no passing fixture proves nothing.
- *
  * Context it expects:
  *   title  ; heading text
  *   intro  ; lead paragraph

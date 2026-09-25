@@ -1,15 +1,8 @@
 """``bin/compile-emails --new NAME``.
 
-"``--new NAME`` scaffolds the four files a template needs -- a minimal ``.vue``
-skeleton, a fixture, a golden placeholder, and a registration stub to paste.
-Templates have a rigid shape; making the right structure the path of least
-resistance beats documenting it."
-
-Every skeleton below encodes an authoring rule that this project learned the hard
-way: no Chameleon placeholder in a literal
-``style`` or ``class`` attribute, no ``tal:``/``i18n:`` on a kit component, locale
-helpers called as ``${python: ...}``, no ``--`` in a comment. The point of
-scaffolding is that a new template starts on the right side of all four.
+Scaffolds the four files a template needs: a ``.vue`` skeleton, a
+fixture, a golden placeholder, and a registration stub, already
+following the authoring rules.
 """
 
 from pathlib import Path
@@ -19,8 +12,7 @@ class ScaffoldError(Exception):
     """A file the scaffolding would create already exists, or cannot be placed."""
 
 
-#: The language the golden placeholder is written for. First of the golden pair;
-#: the second is produced by the same regeneration run.
+#: The language the golden placeholder is written for.
 GOLDEN_LANGUAGE = "fr"
 
 VUE_TEMPLATE = """\

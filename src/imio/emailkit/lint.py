@@ -1,47 +1,9 @@
-"""The authoring lint -- gate 2 of ``bin/check-emails``.
+"""Authoring lint for ``.vue`` email sources.
 
-Reads ``.vue`` email sources and reports ``path:line: rule-id`` for each
-violation of the authoring rules below, exiting non-zero if there is one.
-
-    python -m imio.emailkit.lint emails/src/templates src/imio/emailkit/kit
-    python -m imio.emailkit.lint --list-rules
-
-**Every rule here is a failure this project actually hit, and every one of them
-produced a SUCCESSFUL Maizzle build.** That is the whole reason the module
-exists: the settled position of this project is that the
-Maizzle exit code carries almost no information about correctness. A browser
-preview does not show these either -- three of the eight rules only ever fail in
-a mail client or inside Chameleon at *send* time, long after CI was green.
-
-Design constraints, in the order they matter.
-
-**Plain regex, no parser.** A lint that needs a parser
-is a lint nobody runs, and this one has to run in a buildout-generated script on
-a machine with nothing but the egg installed. Nothing below imports anything
-outside the standard library, and nothing below imports from this package -- so
-``python src/imio/emailkit/lint.py <paths>`` works with a bare interpreter, while
-``python -m imio.emailkit.lint`` is the entry point the Makefile and
-``bin/check-emails`` use.
-
-**Prefer a missed case to a false positive.** A lint that cries wolf gets
-disabled, and then ``style-placeholder`` and ``comment-double-dash`` ship to
-production. So every pattern below stops at the first ambiguity rather than
-guessing: attribute lists are read only as far as the first ``>``, ``${...}`` is
-read only as far as the first ``}``, and the contents of ``<script>`` blocks and
-of Vue-bound attribute values are not scanned for Chameleon syntax at all. Each
-rule has a *clean* fixture in ``tests/fixtures/lint/clean/`` that must stay
-silent, as well as a violating one.
-
-**An escape hatch, because without one someone deletes the gate.** Any line may
-carry ``emailkit-lint: ignore=<rule-id>`` (comma-separated ids, or ``all``) in a
-comment; the marker counts on the offending line, on the line just above it, and
-anywhere inside the enclosing tag -- an HTML comment cannot be written *inside* a
-tag, so a violation on the fourth line of a multi-line tag would otherwise have
-nowhere to put one.
-
-**Say what the consequence is.** These failures are invisible at build time, so
-a bare rule name teaches nobody anything. Every report prints why it matters and
-what to write instead.
+Reports ``path:line: rule-id`` for each rule violation below and exits
+non-zero. Plain regex, no parser: this runs from a buildout-generated script
+with only the standard library. ``emailkit-lint: ignore=<rule-id>`` in a
+comment opts a line out of one rule, or ``all`` of them.
 """
 
 from dataclasses import dataclass
@@ -90,7 +52,6 @@ RULES = {
             'use tal:attributes="style string:..." with literal values for '
             "runtime styling, and keep whole class names literal in the source",
         ),
-        # Phase 0 caveat A1. The single most damaging rule in this file.
         _rule(
             "style-placeholder",
             "a Chameleon ${...} placeholder in a literal style attribute",
@@ -100,7 +61,6 @@ RULES = {
             'tal:attributes="style string:background-color: ${theme/primary_color}"'
             ' -- or bgcolor="${...}", which is never parsed as CSS',
         ),
-        # Phase 0 control 2.
         _rule(
             "class-placeholder",
             "a Chameleon ${...} placeholder in a literal class attribute",
@@ -109,7 +69,7 @@ RULES = {
             'tal:attributes="class string:..." if it is truly needed -- but see '
             "runtime-class first: a runtime class has no CSS behind it",
         ),
-        # An enforced-alt a11y default. RGAA applies to iMio's clients.
+        # RGAA accessibility applies to iMio's clients.
         _rule(
             "missing-alt",
             "an image with no alt attribute",
@@ -118,7 +78,6 @@ RULES = {
             'add alt="..." (i18n:attributes="alt <msgid>" to translate it); '
             'alt="" is the correct spelling for a purely decorative image',
         ),
-        # Phase 0 caveat A2.
         _rule(
             "comment-double-dash",
             'a "--" sequence inside an HTML comment',
@@ -129,7 +88,6 @@ RULES = {
             "ZCML and GenericSetup XML comment in the repo, which have no "
             "comment stripper protecting them",
         ),
-        # Phase 1 -- Maizzle's rawExtract plugin.
         _rule(
             "raw-in-comment",
             "the <Raw> component named in angle brackets inside a comment",
@@ -138,7 +96,6 @@ RULES = {
             "the match, swallows the real block and deletes it from the output",
             "write Raw without the angle brackets in prose, or spell it &lt;Raw&gt;",
         ),
-        # Phase 1 -- the locale helpers.
         _rule(
             "path-call",
             "a function call in a TAL path expression",
@@ -185,47 +142,36 @@ IGNORE_HINT = "emailkit-lint: ignore="
 # Reading a .vue file with regexes only
 # ---------------------------------------------------------------------------
 
-# <script>/<style> *contents* are blanked before anything is scanned. They are
-# JavaScript and CSS, and they are full of things that look like violations to a
-# regex: `/** ---- */` banner comments, `${config.emailkit.cssEntry}` JS template
-# literals, and `'<!--[if mso]>...'` raw strings. None of it is authored markup.
+# <script>/<style> contents are JS/CSS, not markup, so they are blanked
+# before any scan.
 _SCRIPT_OR_STYLE = re.compile(r"(<(script|style)\b[^>]*>)(.*?)(</\2\s*>)", re.S | re.I)
 
-# An opening tag. `[^>]*` deliberately stops at the first `>`, even one inside a
-# quoted value: truncating the attribute list can only make us miss a violation,
-# never invent one.
+# Stops at the first `>`, even inside a quoted value: this can miss a
+# violation, never invent one.
 _TAG = re.compile(r"<([A-Za-z][-\w.:]*)([^>]*)>", re.S)
 
-# A PascalCase tag is a Vue component -- kit (`KitButton`) or Maizzle built-in
-# (`Container`, `Outlook`). Attribute fallthrough is the same hazard for both.
+# A PascalCase tag is a Vue component: kit or Maizzle built-in.
 _COMPONENT = re.compile(r"^[A-Z][A-Za-z0-9]*$")
 
 _ATTR = re.compile(r"""([@:\w][-\w.:]*)\s*=\s*(?:"([^"]*)"|'([^']*)')""", re.S)
 _ATTR_NAME = re.compile(r"([@:\w][-\w.:]*)")
 _QUOTED_VALUE = re.compile(r"""=\s*("[^"]*"|'[^']*')""", re.S)
 
-# Vue-bound attributes (`:class`, `v-html`, `@click`). Their values are
-# JavaScript evaluated at *build* time, so a `${...}` in one is a JS template
-# literal and not Chameleon -- scanning them for TAL would be a false positive
-# factory. Values are blanked before the placeholder scan; the attribute pass
-# still sees them, because `:style` and `:class` have rules of their own.
+# Vue-bound attribute values are JavaScript evaluated at build time, so a
+# `${...}` there is a JS template literal, not Chameleon.
 _VUE_BOUND = re.compile(r"""(?:^|\s)(?::|@|v-)[-\w.:]*\s*=\s*("[^"]*"|'[^']*')""", re.S)
 
 _HTML_COMMENT = re.compile(r"<!--(.*?)-->", re.S)
-# Outlook conditional comments are load-bearing markup, not commentary, and they
-# legitimately carry `-` runs. Recognised exactly as the kit's comment stripper
-# recognises them, which also covers the downlevel-revealed `<!--[if !mso]><!-->`.
+# Outlook conditional comments legitimately carry `-` runs; they are markup,
+# not commentary.
 _CONDITIONAL_COMMENT = re.compile(r"\[if|\[endif\]")
 _JS_COMMENT = re.compile(r"/\*.*?\*/|//[^\n]*", re.S)
 _RAW_MENTION = re.compile(r"</?Raw\b")
 
-# `[^}]*` stops at the first `}`, so a nested expression such as
-# `${python:(theme or {}).get('x')}` simply is not matched. Missing it is fine;
-# it starts with `python:` and would have been skipped anyway.
+# Stops at the first `}`, so a nested `${python:...}` is skipped safely.
 _PLACEHOLDER = re.compile(r"\$\{([^}]*)\}")
 
-# Prefixes that make a `${...}` something other than a TAL *path*, so a call
-# inside it is legal.
+# Prefixes where a `${...}` is not a TAL path, so a call inside it is legal.
 _NOT_A_PATH = (
     "python:",
     "string:",
@@ -249,12 +195,7 @@ _IMAGE_TAGS = frozenset({"img", "Img", "KitImg"})
 
 
 def _blank(text):
-    """``text`` with every character except newlines replaced by a space.
-
-    Length and newline positions are preserved, so every offset taken from a
-    blanked copy is still a valid offset into the original source and line
-    numbers stay honest.
-    """
+    """``text`` with every character except newlines replaced by a space."""
     return re.sub(r"[^\n]", " ", text)
 
 
@@ -271,12 +212,7 @@ def _script_bodies(source):
 
 
 def _blank_quoted_values(text):
-    """``text`` with every quoted attribute value blanked.
-
-    Attribute *names* are then safe to scan: without this, the words inside a
-    long ``tal:define="..."`` value read as attribute names, and a component
-    whose ``title`` happened to mention ``tal:content`` would be reported.
-    """
+    """``text`` with every quoted attribute value blanked, so names are safe to scan."""
     return _QUOTED_VALUE.sub(
         lambda m: m.group(0).replace(m.group(1), _blank(m.group(1)), 1), text
     )
@@ -322,24 +258,16 @@ def _assigns_class(value):
 
 
 def _assembles_a_name(value):
-    """Does a Vue expression *build* a class string rather than pick a whole one?
+    """Does a Vue expression build a class string instead of picking a whole one?
 
-    ``:class="toneClass"`` and ``:class="cond ? 'bg-a' : 'bg-b'"`` are fine: the
-    complete utility names are present in the source, so Tailwind's content
-    scanner finds them and Vue resolves the binding at build time -- the kit's
-    own ``Panel.vue`` does exactly this and is correct. ``:class="'bg-' + tone"``
-    and ``:class="`bg-${tone}`"`` are not: no complete name exists anywhere for
-    the scanner to find, so the CSS is never generated.
+    ``:class="'bg-' + tone"`` has no complete class name for Tailwind's
+    scanner to find.
     """
     return "+" in value or "`" in value or "${" in value
 
 
 def _is_runtime_class(name, bare, value):
-    """Rule 2: would this attribute produce a class no scanner ever saw?
-
-    Two shapes: Chameleon computing the attribute at render time, and a Vue
-    binding assembling the name out of fragments.
-    """
+    """Rule 2: would this attribute produce a class no scanner ever saw?"""
     if name in ("tal:attributes", "tal:attribute"):
         return _assigns_class(value)
     return bare == "class" and name != "class" and _assembles_a_name(value)
@@ -381,11 +309,7 @@ def _tag_body_findings(source, tag):
 
 
 def _tag_findings(source, tag):
-    """``_tag_body_findings`` with the tag's own first line as the opt-out anchor.
-
-    The anchor is what lets a marker written above a multi-line tag suppress a
-    violation found on one of its inner lines. See ``ignored_on``.
-    """
+    """``_tag_body_findings`` with the tag's first line as the opt-out anchor."""
     anchor = line_at(source, tag.start())
     for line, rule_id, detail in _tag_body_findings(source, tag):
         yield line, rule_id, detail, anchor
@@ -404,17 +328,15 @@ def _comment_findings(source, markup):
                 "comment-double-dash",
                 _excerpt(inner),
             )
-    # Rule 7 looks at *every* comment, including the ones inside <script> and
-    # inside conditional comments, because Maizzle's rawExtract regex runs over
-    # the raw file and has no idea what a comment is.
+    # Every comment, including in <script>: Maizzle's rawExtract regex scans
+    # the raw file and does not know what a comment is.
     for offset, text in _all_comments(source):
         hit = _RAW_MENTION.search(text)
         if hit:
             yield (
                 line_at(source, offset + hit.start()),
                 "raw-in-comment",
-                # A window around the mention, not the whole comment: these are
-                # often long prose blocks and the point is the six characters.
+                # A window around the mention, not the whole comment.
                 _excerpt(text[max(0, hit.start() - 30) : hit.start() + 40]),
             )
 
@@ -441,7 +363,7 @@ def _placeholder_findings(source, markup):
 
 
 def _excerpt(text, limit=70):
-    """One line of ``text``, shortened -- reports quote sources, not dump them."""
+    """One line of ``text``, shortened."""
     flat = " ".join(text.split())
     return flat if len(flat) <= limit else flat[: limit - 3] + "..."
 
@@ -452,15 +374,7 @@ def _excerpt(text, limit=70):
 
 
 def ignored_on(lines, line_number, anchor=None):
-    """Rule ids opted out for a violation reported on ``line_number``.
-
-    The marker counts on the reported line and on the line just above it, and --
-    when ``anchor`` names the first line of the enclosing tag -- anywhere from
-    just above that tag down to the reported line. An HTML comment cannot be
-    written *inside* a tag, so without that span a violation on the fourth line
-    of a multi-line tag would have nowhere to put a marker, and an author who
-    cannot opt out deletes the whole gate instead.
-    """
+    """Rule ids opted out for a violation on ``line_number``, up to ``anchor``."""
     first = min(line_number, anchor if anchor is not None else line_number) - 1
     ignored = set()
     for candidate in range(first, line_number + 1):
@@ -507,10 +421,9 @@ def check_file(path):
 
 
 def collect(paths):
-    """``(files, missing)`` -- the ``.vue`` files under ``paths``.
+    """``(files, missing)`` -- ``.vue`` files under ``paths``.
 
-    A directory is walked recursively, skipping ``node_modules``: pointing the
-    lint at ``emails/`` should not spend a minute on Maizzle's own components.
+    Skips ``node_modules``.
     """
     files = []
     missing = []
@@ -532,12 +445,7 @@ def collect(paths):
 
 
 def report(violations, checked, stream=None):
-    """Print ``violations`` and the summary. Returns the process exit code.
-
-    ``stream`` is resolved here rather than in the signature: bound as a default
-    it would capture whatever ``sys.stdout`` was at import time, which is not the
-    stream a test (or a buildout script that redirects output) is watching.
-    """
+    """Print ``violations`` and the summary. Returns the process exit code."""
     stream = sys.stdout if stream is None else stream
     for violation in violations:
         print(violation, file=stream)
@@ -582,9 +490,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="python -m imio.emailkit.lint",
         description=(
-            "gate 2: check .vue email sources against the authoring "
-            "rules. Every rule catches a mistake that compiles cleanly and "
-            "fails silently at render time or in a mail client."
+            "Check .vue email sources against the authoring rules. Every "
+            "rule catches a mistake that compiles cleanly and fails "
+            "silently at render time or in a mail client."
         ),
     )
     parser.add_argument("paths", nargs="*", help="`.vue` files, or directories to walk")
@@ -606,8 +514,7 @@ def main(argv=None):
             print(f"emailkit-lint: no such file or directory: {raw}", file=sys.stderr)
         return 2
     if not files:
-        # A gate that silently passes because it looked at nothing is worse than
-        # no gate: it is a green tick nobody can distinguish from a real one.
+        # Checking nothing must not report success.
         print(
             "emailkit-lint: no .vue files found under "
             f"{' '.join(args.paths)} -- nothing was checked",

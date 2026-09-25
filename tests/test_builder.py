@@ -1,25 +1,15 @@
 """The builder holds data and does not grow behaviour.
 
-> The builder is a plain data holder; each method returns ``self``. **It holds
-> data, it does not grow behavior** -- no conditionals, no scheduling, no
-> retries.
+Each method returns ``self``. The builder has no conditionals, no
+scheduling, and no retries.
 
-This is restated elsewhere as a boundary rather than a style note:
-"Methods, and nothing beyond them [...] A signature change is a decision-log
-entry plus approval, never a quiet edit." "No new builder methods beyond the
-frozen set" is listed among the non-goals.
+This module pins three properties:
 
-A property nobody asserts is a property that erodes. So this module pins three
-things a reviewer would otherwise have to notice by eye:
-
-* the **closed set** of nine methods -- the tenth arrives as a red test, with
-  a deliberate, recorded decision plus approval as the remedy rather than a
-  quiet merge;
-* **identity** on chaining, not merely truthiness -- returning a *new* builder
-  would keep the chaining example working while silently discarding whatever the
-  caller accumulated on a reference they kept;
-* **no I/O before ``.send()``**, which is what makes an unsent builder harmless
-  and ``render()`` callable exactly once per language group.
+* the method set is closed: a fixed list of methods, no more;
+* chaining returns the same object, not a new one -- a new object would
+  silently discard whatever the caller already set;
+* no I/O happens before ``.send()``, so an unsent builder is harmless and
+  render happens exactly once per language group.
 """
 
 import pytest
@@ -38,14 +28,14 @@ def builder(mail):
 
 
 class TestTheMethodSet:
-    def test_every_spec_method_exists(self, builder):
+    def test_every_api_method_exists(self, builder):
         missing = [
             name for name in support.BUILDER_METHODS if not hasattr(builder, name)
         ]
 
         assert missing == [], f"builder methods missing from Email: {missing}"
 
-    def test_every_spec_method_is_callable(self, builder):
+    def test_every_api_method_is_callable(self, builder):
         not_callable = [
             name
             for name in support.BUILDER_METHODS
@@ -54,20 +44,10 @@ class TestTheMethodSet:
 
         assert not_callable == [], f"not callable: {not_callable}"
 
-    def test_there_are_no_methods_beyond_the_spec(self, builder):
-        """The anti-drift assertion.
-
-        "No new builder methods beyond the frozen set" is a
-        non-goal, and the pressure is anticipated: "``.send()`` grows conditionals
-        to handle a real case -- that is the boundary; report instead of
-        absorbing it". A ``.schedule()``, a ``.retry()`` or a ``.when()`` is the
-        visible form of that pressure, and it is much easier to decline before it
-        has callers.
-
-        Read off the *class* rather than the instance, so held data does not look
-        like API. A genuinely needed tenth method requires a deliberate, recorded
-        decision plus approval -- then this list, and only then.
-        """
+    def test_there_are_no_methods_beyond_the_api(self, builder):
+        """Guards against an added method, such as ``.schedule()`` or
+        ``.retry()``. Read off the class, not the instance, so held data is
+        not mistaken for an API method."""
         public = {
             name
             for name in dir(type(builder))
@@ -84,7 +64,7 @@ class TestTheMethodSet:
 
 
 class TestEveryMethodReturnsSelf:
-    """ "Each method returns ``self``"."""
+    """Every chaining method must return the same builder instance."""
 
     @pytest.mark.parametrize("name", support.CHAINING_METHODS)
     def test_returns_the_same_object(self, builder, fr_member, name, tmp_path):
@@ -107,13 +87,9 @@ class TestEveryMethodReturnsSelf:
             "silently discards everything the caller accumulated on the old one."
         )
 
-    def test_the_spec_example_chains(self, mail, fr_member, tmp_path):
-        """The builder's own illustration, method for method, as one expression.
-
-        A formatter once collapsed this exact chain; having it as executable
-        code means the shape is pinned somewhere a formatter cannot quietly
-        rewrite it.
-        """
+    def test_the_documented_example_chains(self, mail, fr_member, tmp_path):
+        """One chain exercising every builder method, as executable code, so
+        a formatter cannot quietly change its shape."""
         pdf = tmp_path / "convocation.pdf"
         pdf.write_bytes(b"%PDF-1.7\n")
 
@@ -133,11 +109,9 @@ class TestEveryMethodReturnsSelf:
 
 class TestHeldData:
     def test_with_context_accumulates(self, mail, deliver, sent, set_default_language):
-        """The builder spells it ``with_context(**kw)`` and the example calls it once,
-        but a builder assembled across a couple of helper functions calls it
-        several times. A second call that replaced the first would drop context
-        the template needs -- and the template's ``${}`` would then either raise
-        or, on the fallback engine, ship verbatim."""
+        """A second ``with_context()`` call must add to the first, not
+        replace it. A template that reads a key set by the first call would
+        break silently otherwise."""
         set_default_language("fr")
         email = mail().to(support.PLAIN_ADDRESS)
 
@@ -145,19 +119,15 @@ class TestHeldData:
         email.send()
         deliver()
 
-        # Neither key is in the template, so the proof that both survived is
-        # simply that assembly succeeded with both present -- the assertion that
-        # matters is that the *fixture* context, set before these two calls, is
-        # still there.
+        # The fixture's own context, set before these two calls, must still render.
         html = support.html_of(support.sole(sent).message)
         assert support.load_fixture(support.NOTIFICATION)["title"] in html, (
             "a later with_context() dropped the context set earlier"
         )
 
     def test_two_builders_do_not_share_state(self, mail, deliver, sent):
-        """Mutable default arguments and class-level containers are the classic
-        way a "plain data holder" acquires memory. The symptom is a mail sent to
-        the previous mail's recipients."""
+        """Two builders must not share mutable state, such as a class-level
+        container or a mutable default argument."""
         first = mail().to(support.PLAIN_ADDRESS)
         second = mail().to(support.OTHER_ADDRESS)
 
@@ -172,10 +142,8 @@ class TestHeldData:
         assert first is not second
 
     def test_sending_twice_sends_twice(self, mail, mailhost, deliver):
-        """Not a documented feature, but the builder is a data holder, so
-        ``.send()`` must be a *read* of that data. A ``.send()`` that consumed or
-        cleared its recipients would raise the second time -- and the retry loop
-        someone writes around it would silently do nothing."""
+        """``.send()`` must read the builder's data, not consume it, so
+        calling it twice sends twice."""
         email = mail().to(support.PLAIN_ADDRESS)
 
         email.send()
@@ -188,20 +156,14 @@ class TestHeldData:
 
 
 class TestNoIoBeforeSend:
-    """ "No method does I/O before
-    ``.send()``"."""
+    """No method may perform I/O before ``.send()`` is called."""
 
     def test_an_unknown_template_never_sends_silently(
         self, mailhost, site_sender, deliver
     ):
-        """``TemplateNotFound`` has to reach the caller, whether the builder
-        checks the name eagerly or at ``.send()``.
-
-        *When* it raises is deliberately not pinned -- either reading is
-        defensible and no choice was made between them. What is pinned is that a typo in
-        a template name cannot end with a mail going out, or with none going out
-        and nobody told.
-        """
+        """An unknown template name must raise ``TemplateNotFound``, whether
+        the builder checks it eagerly or at ``.send()``. Either way, no mail
+        may go out, and the failure must not pass silently."""
         with pytest.raises(TemplateNotFound):
             (
                 Email(support.qualified("no_such_template_at_all"))
@@ -214,9 +176,7 @@ class TestNoIoBeforeSend:
         assert mailhost.sent == []
 
     def test_collecting_bad_data_does_not_raise(self, mail):
-        """Every deferred failure in one builder, none of them raising until
-        ``.send()``. This is what "errors surface together"
-        requires of the collection phase."""
+        """Collecting invalid data must not raise until ``.send()`` is called."""
         (
             mail()
             .to(support.UNRESOLVABLE)
@@ -229,19 +189,12 @@ class TestNoIoBeforeSend:
     def test_a_builder_that_is_never_sent_renders_nothing(
         self, mail, monkeypatch, fr_member, deliver
     ):
-        """Rendering is the expensive part and, per the builder's contract, it
-        happens "once per language group" -- inside ``.send()``.
+        """Rendering is expensive and must happen only inside ``.send()``.
 
-        The counter goes on **every** already-imported name that is bound to the
-        real function, rather than on one chosen module. ``from ... import
-        render`` copies the reference, so patching only
-        ``imio.emailkit.render.render`` misses a builder that imported it by
-        name -- and the first assertion would then pass because nothing was being
-        observed at all. (``imio.emailkit.__init__`` also rebinds ``render`` over
-        the submodule, a trap ``test_discovery.py`` documents.)
-
-        The trailing assertion is what makes this test able to fail: it proves
-        the counter is wired into the path ``.send()`` actually takes.
+        The patch covers every already-imported module holding a reference
+        to ``render``, because ``from ... import render`` copies the
+        reference: patching only ``imio.emailkit.render.render`` would miss
+        a builder that imported it by name.
         """
         import sys
 

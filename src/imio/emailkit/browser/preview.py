@@ -1,46 +1,19 @@
 """``@@emailkit-preview`` -- every registered template, rendered.
 
-Manager-only, deliberately plain, and made of two views rather than one:
+Manager-only, made of two views: ``@@emailkit-preview`` is the chrome
+(template list, language switcher, theme-token panel, send-test form);
+``@@emailkit-preview-body`` is the rendered mail alone, loaded by the chrome
+in an iframe so the mail's stylesheet cannot restyle the Plone UI.
 
-``@@emailkit-preview``
-    the chrome -- the template list, the language switcher, the theme-token
-    panel and the send-test form.
-``@@emailkit-preview-body``
-    the rendered mail and nothing else, loaded by the chrome in an ``<iframe>``.
+The preview renders committed fixture data from ``tests/fixtures/<name>.py``
+inside the checkout of the addon that ships the template; a missing fixture
+is expected when the egg is installed as a released egg, not a source
+checkout. A third mode shows the committed ``.pt`` itself, with no
+``render()`` pass and no fixture: ``${...}`` placeholders stay unsubstituted.
 
-**Why two.** A transactional email carries a full stylesheet written for mail
-clients -- ``body { }`` rules, table resets, ``!important`` utilities. Inlining
-that markup into the chrome would let it restyle the Plone UI and let the Plone
-UI flatter it, so the one thing this view exists to show would be the one thing
-it shows wrongly. An iframe is the boring browser-level answer and costs one
-extra registration.
-
-**Fixtures.** The preview renders committed fixture data, which lives in
-``tests/fixtures/<name>.py`` -- inside the *checkout* of whichever addon ships
-the template, not inside the installed package (``tests/`` is not shipped, and
-must not be: it is not importable from a released egg). So the fixture is
-resolved by walking up from the template directory to find the checkout, and its
-absence is reported as a plain fact rather than an error: an egg installed
-without its source tree is the normal production case, and the preview simply
-has nothing to show for that template there.
-
-**Modes.** ``render()`` returns two things and the preview shows both -- the
-HTML part in the iframe, the plaintext part beside it. A third mode shows the
-committed ``.pt`` *itself*, served to the same iframe as ``text/html`` with no
-``render()`` pass at all. It is the only one of the three that needs no fixture,
-which is what it is for: a template being authored before its fixture exists, or
-one installed from an egg with no source tree, is otherwise the one template
-nobody can look at. Nothing is substituted in that mode -- ``${item/title}``
-stands where the value would be and every ``tal:condition`` branch shows at once
--- so it answers "what does this layout look like", never "does this template
-render".
-
-**Send test.** The whole point here is that "browser previews lie, Outlook
-doesn't". The button goes through the ``Email`` builder unchanged -- same
-code path as a production mail -- and always to
-``getAuthenticatedMember()``'s own address. There is deliberately no address
-field: a Manager-only form that mails arbitrary rendered HTML to an
-arbitrary address is a spam relay, and nothing about the feature needs one.
+The send-test button goes through the ``Email`` builder, always to the
+logged-in manager's own address; there is no address field, since a form
+that mails arbitrary HTML to an arbitrary address is a spam relay.
 """
 
 from imio.emailkit.discovery import get_templates
@@ -66,15 +39,13 @@ import traceback
 
 logger = logging.getLogger("imio.emailkit.preview")
 
-#: Languages the switcher offers. FR/NL/DE are first-class and the
-#: package ships those three catalogs plus the English msgid defaults. A site's
-#: own ``plone.available_languages`` is ``['en']`` on a stock install, which
-#: would leave the language switcher with a single entry on exactly the
-#: machine a developer previews on. Site languages are appended, not substituted.
+#: Languages the switcher offers: FR/NL/DE plus the English msgid defaults.
+#: Site languages are appended, since a stock install's
+#: ``plone.available_languages`` is just ``['en']``.
 PREVIEW_LANGUAGES = ("fr", "nl", "de", "en")
 
-#: What the preview shows for the selected template. The first two are the two
-#: halves of ``render()``'s return value; the third is the committed file itself.
+#: What the preview shows: the two halves of ``render()``'s return value, or
+#: the committed file itself.
 MODE_HTML = "html"
 MODE_TEXT = "text"
 MODE_SOURCE = "source"
@@ -101,10 +72,8 @@ MODE_HINTS = {
 #: ships the template.
 FIXTURE_SUBPATH = ("tests", "fixtures")
 
-#: How far above the template directory to look for that checkout.
-#: ``src/imio/emailkit/templates`` -> repository root is four levels up; six
-#: leaves room for a deeper namespace without turning this into a filesystem
-#: crawl, and the walk stops at the first hit either way.
+#: How far above the template directory to look for that checkout. The walk
+#: stops at the first hit either way.
 FIXTURE_SEARCH_DEPTH = 6
 
 NO_FIXTURE = (
@@ -142,13 +111,8 @@ SEND_LANGUAGE_MISMATCH = (
 
 
 def email_builder():
-    """The ``Email`` builder, or ``None`` when it is not importable yet.
-
-    Imported here rather than at module scope so a missing builder degrades to a
-    disabled button instead of an unimportable view: this module is loaded by
-    ZCML at startup, and swallowing an ``ImportError`` up there would hide a real
-    breakage in the builder just as effectively as an absent one.
-    """
+    """The ``Email`` builder, or ``None``. Imported here, not at module scope,
+    so a missing builder degrades to a disabled button, not an import error."""
     try:
         from imio.emailkit import Email
     except ImportError:
@@ -169,10 +133,8 @@ def preview_languages():
 def fixture_path(template):
     """Locate ``tests/fixtures/<basename>.py`` for ``template``, or ``None``.
 
-    Resolved per *template*, not per repository: fixtures are a
-    per-consumer-addon artifact, so a site with three addons shipping templates
-    has three ``tests/fixtures`` directories and each template's own checkout is
-    the only place its fixture can be.
+    Resolved per template: each consumer addon has its own fixtures
+    directory.
     """
     directory = template.html_path.parent
     roots = (directory, *directory.parents)[: FIXTURE_SEARCH_DEPTH + 1]
@@ -184,12 +146,10 @@ def fixture_path(template):
 
 
 def load_fixture(path):
-    """Return a copy of the ``CONTEXT`` mapping defined by the fixture at ``path``.
+    """Return a copy of the ``CONTEXT`` mapping the fixture at ``path`` defines.
 
-    Executed by path rather than imported, because ``tests/fixtures/`` is a
-    directory of data files and not a package -- the same reason, and the same
-    mechanism, as the golden-file harness. Never cached: a developer who edits a
-    fixture expects the next reload to show it.
+    Executed by path, not imported: ``tests/fixtures/`` is a directory of
+    data files, not a package. Never cached, so an edit shows on reload.
     """
     spec = importlib.util.spec_from_file_location(
         f"_emailkit_preview_{path.stem}", path
@@ -202,9 +162,8 @@ def load_fixture(path):
 class PreviewBase(BrowserView):
     """Selection parsing and rendering, shared by the chrome and the iframe body.
 
-    Both views answer the same question -- "template X, in language Y, with its
-    committed fixture" -- and they must answer it identically, or the page would
-    describe one mail while the iframe showed another.
+    Both views must answer "template X, in language Y" identically, or the
+    page would describe one mail while the iframe showed another.
     """
 
     _state = None
@@ -212,7 +171,7 @@ class PreviewBase(BrowserView):
     # -- the current selection ------------------------------------------------
 
     def templates(self):
-        """Every registered template, sorted, verbatim from discovery."""
+        """Every registered template, sorted."""
         registered = get_templates()
         return [registered[name] for name in sorted(registered)]
 
@@ -240,7 +199,7 @@ class PreviewBase(BrowserView):
         return self.mode() == MODE_SOURCE
 
     def unregistered_message(self):
-        """The one error that survives every mode: there is nothing to show."""
+        """The error shown in every mode when nothing is selected."""
         return (
             f"No email template is registered as {self.selected_name()!r}. "
             f"Registered: {', '.join(sorted(get_templates())) or '(none)'}."
@@ -258,12 +217,8 @@ class PreviewBase(BrowserView):
     # -- rendering ------------------------------------------------------------
 
     def state(self):
-        """``{template, fixture, context, html, text, error}``, computed once.
-
-        One dict rather than a method per value because every consumer needs the
-        same slice of it and because ``render()`` must run once per request, not
-        once per question asked about it.
-        """
+        """``{template, fixture, context, html, text, error}``. Cached, since
+        ``render()`` must run once per request."""
         if self._state is None:
             self._state = self._resolve()
         return self._state
@@ -316,17 +271,13 @@ class PreviewBase(BrowserView):
         return self.state()["error"]
 
     def fixture_missing(self):
-        """Whether the selection has no committed fixture. Source mode's cue."""
+        """Whether the selection has no committed fixture."""
         return self.state()["fixture_missing"]
 
     def display_error(self):
-        """What stops the *current mode* from showing anything, or ``None``.
+        """What stops the current mode from showing anything, or ``None``.
 
-        Not the same question as :meth:`error`, which is about the render.
-        Source mode reads a file off disk and needs neither a fixture nor a
-        successful render, so a fixture problem is a note beside it rather than
-        a wall in front of it -- and a template that renders in no language at
-        all is precisely one you want to look at the source of.
+        Not :meth:`error`: source mode needs neither a fixture nor a render.
         """
         if not self.is_source():
             return self.error()
@@ -361,8 +312,7 @@ class PreviewBase(BrowserView):
 class EmailkitPreview(PreviewBase):
     """The preview page. Registered Manager-only on ``IEmailkitLayer``."""
 
-    #: A ``Products.Five`` template, so the preview page is itself jbot-overridable
-    #: -- free, and consistent with how everything else in this package renders.
+    #: A ``Products.Five`` template, so the preview page is itself jbot-overridable.
     index = ViewPageTemplateFile("templates/preview.pt")
 
     def __call__(self):
@@ -371,26 +321,15 @@ class EmailkitPreview(PreviewBase):
         return self.index()
 
     def is_send_test(self):
-        """POST only.
-
-        Not because the CSRF token in the form is insufficient, but because a URL
-        that sends mail when merely *fetched* is a URL something eventually
-        fetches -- a prefetcher, a link checker, somebody's browser history.
-        """
+        """POST only: a URL that sends mail when fetched will get fetched, by
+        a prefetcher, a link checker, or browser history."""
         method = self.request.get("REQUEST_METHOD", "GET").upper()
         return method == "POST" and bool(self.request.form.get("form.button.send_test"))
 
     # -- panels ---------------------------------------------------------------
 
     def template_rows(self):
-        """The template list, with everything the page shows about each entry.
-
-        Assembled here rather than in the template: a page template that has to
-        compute is a page template nobody can read, and the two flags below are
-        the ones a developer actually wants at a glance -- whether a fixture
-        exists (so the preview can render at all) and whether a plaintext twin
-        exists (without one the text part is a deprecated fallback).
-        """
+        """The template list, with everything the page shows about each entry."""
         selected = self.selected_name()
         rows = []
         for template in self.templates():
@@ -407,7 +346,6 @@ class EmailkitPreview(PreviewBase):
         return rows
 
     def language_rows(self):
-        """The language switcher."""
         current = self.language()
         return [
             {
@@ -419,7 +357,6 @@ class EmailkitPreview(PreviewBase):
         ]
 
     def mode_rows(self):
-        """The three things the page can show, as a switcher beside the languages."""
         current = self.mode()
         return [
             {
@@ -435,17 +372,15 @@ class EmailkitPreview(PreviewBase):
         return MODE_HINTS[self.mode()]
 
     def source_url(self):
-        """Source mode for the current selection -- the offer made when the
-        fixture is missing and the other two modes have nothing to show."""
+        """Source mode for the current selection.
+
+        Offered when the fixture is missing and the other modes have nothing
+        to show.
+        """
         return self.page_url(mode=MODE_SOURCE)
 
     def offer_source(self):
-        """Whether the missing fixture is what is on screen instead of a mail.
-
-        The one case where the page should say what to do next: source mode is
-        right there, needs nothing, and is not obvious from an error about a
-        directory that is not shipped.
-        """
+        """Whether to suggest source mode instead of the missing fixture error."""
         return bool(self.display_error()) and self.fixture_missing()
 
     def show_iframe(self):
@@ -459,9 +394,8 @@ class EmailkitPreview(PreviewBase):
     def theme_rows(self):
         """The theme-token panel: the theme tokens as they render now.
 
-        Read through ``render.get_theme()`` -- the very function that injects
-        them into the namespace -- so the panel cannot drift from what the iframe
-        beside it is showing.
+        Read through ``render.get_theme()``, the function that injects them
+        into the namespace, so the panel cannot drift from the iframe.
         """
         theme = get_theme()
         return [
@@ -474,7 +408,6 @@ class EmailkitPreview(PreviewBase):
         ]
 
     def registry_url(self):
-        """The registry control panel, filtered on our records."""
         return (
             f"{api.portal.get().absolute_url()}/portal_registry"
             f"?{urlencode({'q': THEME_REGISTRY_PREFIX})}"
@@ -483,16 +416,15 @@ class EmailkitPreview(PreviewBase):
     def subject(self, template):
         """The registration's subject msgid, translated into the preview language.
 
-        The registration keeps the subject and the builder translates it per
-        recipient language at send time, which makes it the one part of a mail a
-        browser preview would otherwise never show.
+        The builder translates the subject per recipient language at send
+        time, so a browser preview would otherwise never show it.
         """
         if template.subject is None:
             return "(none registered)"
         return zope_translate(template.subject, target_language=self.language())
 
     def text_part(self):
-        """``render()``'s plaintext half. Half the output, and never looked at."""
+        """``render()``'s plaintext half."""
         return self.state()["text"]
 
     def fixture(self):
@@ -500,12 +432,8 @@ class EmailkitPreview(PreviewBase):
         return str(path) if path is not None else ""
 
     def messages(self):
-        """Status messages, as dicts.
-
-        ``Products.statusmessages`` ``Message`` objects carry no security
-        declarations, so ``message/type`` cannot be path-traversed from a
-        template; dicts can, and need nothing.
-        """
+        """Status messages, as dicts: ``Message`` objects carry no security
+        declarations, so a template cannot traverse ``message/type``."""
         return [
             {"type": message.type or "info", "text": message.message}
             for message in IStatusMessage(self.request).show()
@@ -521,25 +449,11 @@ class EmailkitPreview(PreviewBase):
         return (member.getProperty("email", "") or "") if member is not None else ""
 
     def send_language(self):
-        """The language the sent mail will actually be rendered in.
+        """The language the sent mail will actually render in.
 
-        Not necessarily the one in the switcher, and this is where the preview and
-        the builder pull against each other. The preview button is meant to mail
-        "the currently previewed template + fixture + **language**"; the builder
-        gives itself no language argument at all, and has ``.send()`` group
-        recipients by *their own* resolved language, falling back to the site
-        default. Both cannot be true, and the builder's behaviour is the frozen
-        one.
-
-        So rather than fake it -- an inert ``request['LANGUAGE']`` was tried and
-        does nothing, because ``recipients.default_language()`` deliberately reads
-        the site default and not the request -- the view computes the truth from
-        the builder's own public contract (the ``IEmailRecipient`` adapter) and
-        says so next to the button. A developer who wants the mail in Dutch sets
-        Dutch as their own preferred language, which is the mechanism the builder
-        actually provides. Mutating that property on their behalf was rejected: silently
-        rewriting a user's preferences because they clicked a preview button is
-        not a thing a developer tool gets to do.
+        Not necessarily the one in the switcher: ``.send()`` groups recipients
+        by their own resolved language, so this computes the same value
+        through ``IEmailRecipient`` rather than reading the switcher.
         """
         member = self.member()
         if member is None:
@@ -569,9 +483,8 @@ class EmailkitPreview(PreviewBase):
     def send_test(self):
         """Mail the current selection to the logged-in user, then redirect back.
 
-        Redirect rather than render: the status message then survives a refresh
-        without re-sending, which is Plone's ordinary post/redirect/get and the
-        only sane behaviour for a button that puts mail on the wire.
+        Redirect rather than render: the status message then survives a
+        refresh without re-sending, Plone's ordinary post/redirect/get.
         """
         level, message = self._send_test()
         IStatusMessage(self.request).addStatusMessage(message, type=level)
@@ -586,10 +499,8 @@ class EmailkitPreview(PreviewBase):
         state = self.state()
         template = state["template"]
         try:
-            # The builder's contract verbatim, and nothing else. `.to(member)`
-            # rather than `.to(address)` on purpose: it is the recipient the
-            # builder resolves for itself, so no address this form received
-            # can reach the wire.
+            # `.to(member)`, not `.to(address)`: no address this form
+            # received can reach the wire.
             email_builder()(template.name).to(self.member()).subject(
                 f"[emailkit test] {template.name}"
             ).with_context(**dict(state["context"])).send()
@@ -606,11 +517,10 @@ class EmailkitPreview(PreviewBase):
 
 
 class EmailkitPreviewBody(PreviewBase):
-    """The rendered mail alone, for the preview's ``<iframe>``.
+    """The rendered mail alone, for the preview's iframe.
 
-    Returns the mail's own HTML unwrapped and unmodified: what a mail client
-    would be handed, byte for byte, with none of the preview chrome's markup or
-    CSS anywhere near it.
+    Returns the mail's own HTML unwrapped: what a mail client would be
+    handed, byte for byte, with none of the preview chrome's markup or CSS.
     """
 
     def __call__(self):
@@ -619,8 +529,8 @@ class EmailkitPreviewBody(PreviewBase):
         state = self.state()
         response = self.request.response
         if state["error"]:
-            # Plain text on purpose: a traceback is the payload here, and
-            # wrapping it in markup would only invite the browser to reflow it.
+            # Plain text: a traceback is the payload, and markup would only
+            # invite the browser to reflow it.
             response.setHeader("Content-Type", "text/plain; charset=utf-8")
             return state["error"]
         response.setHeader("Content-Type", "text/html; charset=utf-8")
@@ -629,15 +539,11 @@ class EmailkitPreviewBody(PreviewBase):
     def source(self):
         """The committed ``.pt``'s own bytes, served as HTML and nothing else.
 
-        No ``render()`` and no fixture, which is the whole point: this is the
-        one mode that works for a template being authored before its fixture
-        exists. Served as ``text/html`` rather than escaped into a ``<pre>``
-        because what a developer wants from a mail template is to *see* the
-        layout -- the TAL attributes are simply unknown attributes to a browser,
-        and it draws the markup around them.
+        No ``render()`` and no fixture: works for a template with no fixture
+        yet. Not escaped into a ``<pre>``, so a developer sees the layout.
 
         The path goes through ``render.resolved_path``, so a jbot-overridden
-        template shows the override -- the file that would actually be compiled.
+        template shows the file that would actually be compiled.
         """
         response = self.request.response
         template = self.template()

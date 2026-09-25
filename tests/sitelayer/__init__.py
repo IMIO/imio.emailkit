@@ -1,14 +1,7 @@
 """A stand-in for a site/client package that overrides our overrides.
 
-This is the test double for "replace the template markup per site/client:
-register a jbot directory on a *more specific* browser layer". It is
-test support, not a draft of anything shipped.
-
-Phase 0 established that "more specific" only means something for a layer that
-**extends** ``IEmailkitLayer``: for a *sibling* layer, precedence follows
-``getAllUtilitiesRegisteredFor(ILocalBrowserLayerType)`` registration order,
-which is effectively arbitrary. So this package extends it, and
-the test asserting the win is only ever run in that configuration -- writing it
-with a sibling layer would produce a test that passes on one machine and fails on
-the next.
+Test support for a site replacing template markup via a jbot directory on a
+*more specific* browser layer. "More specific" only means something for a
+layer that extends ``IEmailkitLayer``; a sibling layer's precedence is
+arbitrary. So this package extends it.
 """

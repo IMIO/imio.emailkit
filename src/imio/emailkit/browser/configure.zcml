@@ -4,83 +4,37 @@
     i18n_domain="imio.emailkit"
     >
 
-  <!-- The raster assets the kit shell and `KitPill` reference by absolute URL:
-       the v3 head artwork (`art-head.png` with its `art-head-tail.png`), the
-       four pill icons, the two iMio logos, the Wallonie Connect mark of the
-       `user_migrated_to_sso` mail and the Quicksand weights `fonts.css` serves.
+  <!-- Raster assets the kit shell and `KitPill` load by absolute URL. A mail
+       client fetches images over HTTP after the message left the egg, so
+       each asset needs a stable, anonymous URL under the portal.
 
-       The artwork PNGs are crops of the design's own SVG sources, converted to PNG
-       and kept transparent so the card shows through them and an image-blocking
-       client is left with a clean flat rather than a hole. They are the one place
-       a consumer can rebrand the top of the mail: `primary_color` drives
-       `KitCard`'s rail and `KitButton`'s fill but cannot recolour a raster, so a
-       site that needs its own artwork replaces these two files and touches no
-       markup.
+       On IDefaultBrowserLayer, not IEmailkitLayer, because a `:base` site
+       renders its own templates through the kit shell too.
 
-       Mail clients fetch every image over HTTP, so a kit image cannot be a file
-       inside the egg the way a `.pt` is; it has to be a URL the recipient's
-       client can reach while reading the message, days later, logged out. A
-       browser resource directory is the one thing in Plone that is exactly that:
-       a stable, anonymously readable, cacheable URL under the portal.
-
-       Registered on IDefaultBrowserLayer rather than IEmailkitLayer. A `:base`
-       site (the opt-out) keeps stock Plone's default mails but still
-       renders its OWN templates through the kit shell, and those reference the
-       same assets; binding the directory to the layer would give that site a
-       footer logo that 404s.
-
-       PNG and not SVG, at twice the rendered size. Mail clients do not display
-       SVG reliably, and the 2x source is what keeps the 14 px pills and the
-       68 px footer logo sharp on a retina screen.
-
-       The shell composes the URL as `${portal_url}/++resource++imio.emailkit/...`
-       and skips the image entirely when `portal_url` is empty, which is what a
-       render outside a request (a golden file, a unit test) produces. A relative
-       `/++resource++...` in an inbox is a broken image icon, so degrading to no
-       image is the deliberate choice. -->
+       PNG, not SVG: mail clients do not display SVG reliably. -->
   <browser:resourceDirectory
       name="imio.emailkit"
       directory="static"
       />
 
-  <!-- z3c.jbot, for the promise that a site can override the `.pt` files
-       THIS package resolves. No `browser:jbot` directive any more, since this
-       package overrides no stock Plone template now that `default_mails.py` has
-       taken the two views over; but the include is still load-bearing, and in
-       the less obvious direction.
-
-       The WHOLE package, never `file="meta.zcml"` (Phase 0 caveat D1).
-       `meta.zcml` registers only the `browser:jbot` directive; the
+  <!-- z3c.jbot, so a site can override the `.pt` files this package
+       resolves. The WHOLE package, not `file="meta.zcml"`: the
        `ViewPageTemplateFile.__get__` monkeypatches live in
-       `z3c.jbot/configure.zcml`. Those patches are what `render()._page_template`
-       invokes by hand so a consumer's override of one of our templates is picked
-       up, and what keeps stock Plone's `login_help.pt` overridable where
-       `login_help.py` reuses it by absolute path. Without them there is no error
-       and no warning; overrides are simply ignored.
+       `z3c.jbot/configure.zcml`, and without them an override is silently
+       ignored.
 
-       CMFPlone does not include z3c.jbot itself. In a real instance
-       z3c.autoinclude pulls it in, but PLONE_FIXTURE disables autoinclude, so
-       the include has to be here and test layers must not rely on autoinclude.
-  -->
+       CMFPlone does not include z3c.jbot itself, and PLONE_FIXTURE disables
+       autoinclude, so the include has to be here. -->
   <include package="z3c.jbot" />
 
-  <!-- The two remaining Plone default mails, as owned views.
+  <!-- The two remaining Plone default mails, as owned views. Same `name`,
+       `for` and `permission` as the stock registrations, differing only by
+       layer. No `template=`: each class renders a registered template
+       through `render()` and returns the RFC822 document `RegistrationTool`
+       expects.
 
-       They were `z3c.jbot` overrides of stock Plone's page templates until
-       `browser/default_mails.py` took the views over. jbot could reach them, so
-       it was used; the cost was that a stock view rendered them, which meant a
-       foreign dialect, no locale helpers, no `render()` and therefore no
-       discovery, no preview and no golden files. Owning the view makes them
-       ordinary templates, exactly as it already did for `get_username` below.
-
-       Same `name`, same `for` and same `permission` as the stock registrations
-       in `Products/CMFPlone/browser/login/configure.zcml`, differing only by
-       layer. No `template=`: the classes render a registered template through
-       `render()` and return the RFC822 document `RegistrationTool` expects.
-
-       On IEmailkitLayer, which only the `:default` profile installs. That
-       binding IS the opt-out: a `:base` site keeps stock Plone's views
-       and stock Plone's mails. -->
+       On IEmailkitLayer, which only `:default` installs: a `:base` site
+       keeps stock Plone's views and mails. -->
   <browser:page
       name="mail_password_template"
       for="*"
@@ -97,24 +51,14 @@
       layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
-  <!-- The third restyled Plone default mail: the username reminder from the
-       login-help form.
+  <!-- The third restyled default mail: the username reminder from the
+       login-help form. Stock Plone has no template for it, so there is no
+       file for jbot to key on and the view is the only seam.
 
-       Stock Plone has no template for it. It is `SEND_USERNAME_TEMPLATE`, a
-       module-level i18n string in `Products.CMFPlone.browser.login.login_help`,
-       declared text/plain and handed straight to MailHost by
-       `RequestUsername.send_username()`. z3c.jbot keys on a resolved filename and
-       there is no file, so the view is the only seam.
-
-       Same `name`, same `for` and same `permission` as the stock registration in
-       `Products/CMFPlone/browser/login/configure.zcml`, differing only by layer.
-       No `template=`: the class supplies `index` itself, pointing at Plone's own
-       login_help.pt by absolute path, so the form markup is not forked and stays
-       jbot-overridable.
-
-       On IEmailkitLayer, exactly like the two views above, so the opt-out
-       covers this mail too: a `:base` site gets stock Plone's view and stock
-       Plone's plaintext mail. -->
+       Same `name`, `for` and `permission` as the stock registration,
+       differing only by layer. No `template=`: the class supplies `index`
+       itself, pointing at Plone's own login_help.pt, so the form markup
+       stays jbot-overridable. On IEmailkitLayer, like the two views above. -->
   <browser:page
       name="login-help"
       for="plone.base.interfaces.INavigationRoot"
@@ -123,16 +67,9 @@
       layer="imio.emailkit.interfaces.IEmailkitLayer"
       />
 
-  <!-- The kit layout's last resort for the theme tokens, for a consumer whose
-       template is rendered by a stock view rather than by `render()`: neither
-       `theme` nor `options/theme` is in scope there. No template this package
-       ships needs it any more, now that it renders all three of its default
-       mails itself, but the layout keeps the fallback. Registered on
-       IDefaultBrowserLayer rather than IEmailkitLayer so a `:base` consumer
-       rendering its own templates through a stock view has the same escape.
-
-       `get_username` does not need it: its own view renders it through
-       `render()`, which injects `theme` into the flat context directly. -->
+  <!-- Fallback theme tokens for a consumer template rendered by a stock
+       view: `theme` is not in scope there. On IDefaultBrowserLayer, so a
+       `:base` consumer has the same escape. -->
   <browser:page
       name="emailkit_theme"
       for="*"
@@ -140,38 +77,16 @@
       permission="zope2.View"
       />
 
-  <!-- The preview. Two registrations, one feature: the page, and the
-       rendered mail on its own for the page's <iframe>. Splitting them is what
-       keeps the mail's stylesheet (written for mail clients, full of `body {}`
-       rules and !important utilities) out of the Plone UI and vice versa.
+  <!-- The preview: the page, and the rendered mail on its own for the
+       page's iframe, split so the mail's stylesheet cannot restyle the
+       Plone UI. `cmf.ManagePortal`, not `zope2.View`: this renders arbitrary
+       templates against fixture data and can put mail on the wire. On
+       IEmailkitLayer, so a `:base` site has no preview. -->
 
-       `cmf.ManagePortal`, not `zope2.View`: this renders arbitrary registered
-       templates against arbitrary committed fixture data and has a button that
-       puts mail on the wire. Anonymous and ordinary members get Unauthorized.
-
-       On IEmailkitLayer, so the preview only exists where the restyled mails do:
-       a preview that showed stock Plone's markup would be lying about the very
-       thing it exists to show. Consequence, and it is deliberate: a site that
-       installed `:base` for the opt-out has no preview view. That is the
-       opposite call from `emailkit_theme` above, which a `:base` site genuinely
-       needs at render time; nothing renders because of this one.
-
-       (No double hyphen anywhere in this comment: XML forbids it, and ZCML then
-       fails to parse at instance start-up.) -->
-
-  <!-- `cmf.ManagePortal` has to be a REGISTERED permission utility by the time
-       the two `browser:page` actions below execute, and ZCML executes actions in
-       the order they were collected. cookiecutter-zope-instance writes a
-       site.zcml that includes this package BEFORE `<five:loadProducts />`, so
-       Products.CMFCore's permissions.zcml has not run yet and the registrations
-       below die with
-       `ComponentLookupError: (IPermission, 'cmf.ManagePortal')` at start-up.
-
-       Including it here is idempotent (zope.configuration skips an already
-       processed file), so this only ever moves the declaration earlier. Same
-       reasoning, and the same placement, as the z3c.jbot include at the top: the
-       include sits next to the directive that needs it, where the mistake would
-       otherwise be made. -->
+  <!-- `cmf.ManagePortal` must be a registered permission utility before the
+       two `browser:page` actions below run. cookiecutter-zope-instance
+       includes this package before `Products.CMFCore`'s permissions.zcml,
+       so without this include the registrations fail at start-up. -->
   <include
       package="Products.CMFCore"
       file="permissions.zcml"

@@ -1,20 +1,7 @@
 """Render every registered template with its committed fixture, and serve it.
 
-The two-stage dev loop, in its Makefile form. Run it through
-``make preview-emails``, which supplies the Zope configuration this script
-needs.
-
-**Why not ``maizzle --watch``.** It's rejected outright: Maizzle's dev server
-shows *build-time* output -- raw ``${item/title}``, unexpanded ``tal:repeat`` --
-which is "a miserable authoring loop". What a developer needs to look at is the
-mail a citizen receives, which only exists after ``render()`` has run inside a
-Plone site with the real registry and the real translation catalogs. Hence
-``zconsole``: this script needs a ZODB connection, not just a filesystem.
-
-**Deferred:** watching the ``.vue`` sources and live-reloading. Re-run the target
-after ``make build-emails``. What ships here is compile-free: it renders the
-*committed* ``.pt`` files, so it is also a fast way to check what is actually in
-git rather than what is in your working tree.
+Run through ``make preview-emails``. Renders the committed ``.pt`` files
+through ``render()`` inside a real Plone site, not Maizzle's own dev server.
 
 Environment:
 
@@ -31,9 +18,7 @@ import sys
 
 
 REPO = Path(__file__).resolve().parent.parent
-# ``tests/`` is not importable as a package, and the fixtures are data files
-# loaded by path -- the same loader the golden harness uses, so a preview and a
-# golden file can never disagree about what the fixture says.
+# ``tests/`` is not importable as a package.
 sys.path.insert(0, str(REPO / "tests"))
 
 import support  # noqa: E402
@@ -81,7 +66,6 @@ def main():
 
     site = portal()
     setSite(site)
-    # The preview must see what a real request sees, jbot overrides included.
     alsoProvides(site.REQUEST, IEmailkitLayer)
 
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
@@ -116,20 +100,7 @@ def main():
 
 
 def write_source(short, template):
-    """Copy the committed ``.pt`` in beside the rendered previews.
-
-    The one artifact here that needs no fixture, because it is the file itself:
-    a template being authored before its fixture exists -- or one whose fixture
-    is broken, which is when you most want to look at the markup -- is otherwise
-    the one template this loop cannot show you at all. Nothing is substituted,
-    so ``${item/title}`` stands where its value would be and every
-    ``tal:condition`` branch shows at once. That answers "what does this layout
-    look like", never "does this template render"; the rendered previews beside
-    it are what answer the second question.
-
-    Written through ``resolved_path`` so a jbot-overridden template gives the
-    override -- the file ``render()`` compiles, which is the one worth looking at.
-    """
+    """Copy the committed ``.pt`` in beside the rendered previews, unrendered."""
     from imio.emailkit.render import resolved_path
 
     path = resolved_path(template.html_path)
@@ -171,8 +142,6 @@ def write_index(rows):
                     f"<a href='{short}.{language}.html'>{language} html</a> / "
                     f"<a href='{short}.{language}.txt'>txt</a>"
                 )
-        # Always offered, and last: it is the fallback when every cell above
-        # it is a cross.
         cells.append(f"<a href='{short}.pt.html'>.pt</a>")
         body.append(
             f"<tr><th>{html_module.escape(short)}</th>"
@@ -189,9 +158,6 @@ def report(rows):
     for name, language, error in failures:
         print(f"  FAILED {name} [{language}]: {error}")
     if failures:
-        # Exit non-zero: a preview target that reports success while a template
-        # cannot render is the same silent-failure pattern this project keeps
-        # tripping over.
         sys.exit(1)
 
 

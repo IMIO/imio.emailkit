@@ -7,14 +7,7 @@ import pytest
 
 class TestTheMarker:
     def test_marker_matches_the_runtime(self):
-        """The one string this distribution duplicates on purpose.
-
-        ``imio.emailkit.scan`` owns it at runtime; the recipe restates it so that
-        neither buildout nor a build script has to import the Plone runtime to
-        find out what to look for. Duplication is only safe with a test that fails
-        when the two drift, which is this one. Skipped, not passed, where the
-        runtime is not installed -- a skip says "unverified", a pass would lie.
-        """
+        """Fails if the recipe's copy of the marker string drifts from the runtime's."""
         imio_emailkit_scan = pytest.importorskip(
             "imio.emailkit.scan",
             reason="imio.emailkit is not installed in this environment",
@@ -35,7 +28,7 @@ class TestFindingTheMaizzleProject:
     def test_an_emails_directory_without_a_config_is_not_a_maizzle_project(
         self, tmp_path
     ):
-        """The check that stops a content folder called `emails` being picked up."""
+        """A content folder named `emails` must not be picked up."""
         package_dir = tmp_path / "pkg"
         (package_dir / "emails").mkdir(parents=True)
         assert projects.find_emails_dir(package_dir) is None
@@ -55,7 +48,7 @@ class TestFindingTheMaizzleProject:
 
 
 class TestTheProjectRecord:
-    def test_it_records_spec_5s_triple(self, project, consumer):
+    def test_it_records_the_package_and_its_directories(self, project, consumer):
         assert project.package == "acme.notifications"
         assert project.package_dir == consumer
         assert project.templates_dir == consumer / "templates"
@@ -87,7 +80,6 @@ class TestTheProjectRecord:
         assert installed.emails_dir is None
         assert installed.sources_dir is None
         assert installed.vue_sources() == []
-        # templates_dir is still known: it is where the `.pt` are *read* from.
         assert installed.templates_dir == package_dir / "templates"
 
     def test_vue_sources_finds_the_authored_templates(self, project):
@@ -96,12 +88,7 @@ class TestTheProjectRecord:
     def test_vue_sources_includes_the_kit_only_for_the_package_that_ships_it(
         self, project, consumer
     ):
-        """The design system is linted by its owner, and by nobody else.
-
-        A consumer must not be told to fix a file inside an installed egg, and the
-        kit must not escape the lint just because it lives outside
-        ``emails/src/templates``.
-        """
+        """The design system is linted by its owner, not by every consumer."""
         assert project.kit_dir is None
         (consumer / "kit" / "layouts").mkdir(parents=True)
         (consumer / "kit" / "layouts" / "Main.vue").write_text(
@@ -109,11 +96,10 @@ class TestTheProjectRecord:
         )
         owner = projects.make_project("acme.notifications", consumer)
         assert owner.kit_dir == consumer / "kit"
-        # Sorted by full path, so `emails/...` precedes `kit/...`.
         assert [path.name for path in owner.vue_sources()] == ["hello.vue", "Main.vue"]
 
     def test_tests_dir_falls_back_to_the_package(self, root_layout_consumer):
-        """``<root>/tests`` when the checkout has one, else ``<package>/tests``."""
+        """Uses ``<root>/tests`` if it exists, else ``<package>/tests``."""
         project = projects.make_project("acme.roots", root_layout_consumer)
         assert project.tests_dir == root_layout_consumer.parents[2] / "tests"
 
@@ -127,18 +113,11 @@ class TestSelection:
             projects.select([project], "acme.typo")
         message = str(raised.value)
         assert "acme.typo" in message
-        # A --package typo that silently compiled nothing would look exactly like
-        # a successful build, so the message has to name the alternatives.
         assert "acme.notifications" in message
 
 
 def make_dist_dir(tmp_path, dotted="acme.mail", marker=True, src_layout=False):
-    """A minimal on-disk distribution: a dotted package with a ``configure.zcml``.
-
-    ``marker=False`` writes a ZCML file that mentions a *different* namespace, so
-    the marker-scan tests can prove a non-emailkit addon is left alone rather than
-    merely proving an addon with no ZCML at all is.
-    """
+    """A minimal on-disk distribution: a dotted package with a ``configure.zcml``."""
     root = tmp_path / "dist"
     base = root / "src" if src_layout else root
     parts = dotted.split(".")
@@ -155,13 +134,7 @@ def make_dist_dir(tmp_path, dotted="acme.mail", marker=True, src_layout=False):
 
 
 class FakeDist:
-    """Stands in for a ``pkg_resources`` distribution.
-
-    ``top_level`` feeds :func:`projects._top_level_names`'s metadata branch;
-    omitted, the filesystem fallback is exercised instead. ``project_name`` is
-    unrelated -- it is what :func:`projects.kit_dir_from_working_set` compares
-    against, kept here so both collectors can share one fake.
-    """
+    """Stands in for a ``pkg_resources`` distribution."""
 
     def __init__(self, location, project_name="acme.notifications", top_level=()):
         self.location = str(location)
@@ -175,10 +148,7 @@ class FakeDist:
     def get_metadata_lines(self, name):
         if name == "top_level.txt" and self._top_level:
             return list(self._top_level)
-        # Real `pkg_resources` providers raise this (`NullProvider.get_metadata`
-        # opens the file straight off disk) when the metadata directory exists
-        # but the specific file does not, not `KeyError` -- so the fake raises
-        # it too, to keep `_top_level_names`'s except clause honest.
+        # Matches the real FileNotFoundError, not KeyError.
         raise FileNotFoundError(name)
 
     def __str__(self):
@@ -214,12 +184,7 @@ class TestCollectingFromBuildout:
     def test_a_marked_file_outside_a_package_directory_is_skipped(
         self, tmp_path, caplog
     ):
-        """A ``configure.zcml`` with no ``__init__.py`` beside it is not a package.
-
-        Cannot happen for a real Python package, but a stray ``.zcml`` under a
-        data directory should not crash the scan -- it should be logged and
-        skipped, the same way a genuinely broken registration used to be.
-        """
+        """A stray ``.zcml`` with no ``__init__.py`` must be logged and skipped, not crash."""
         root, package_dir = make_dist_dir(tmp_path)
         (package_dir / "__init__.py").unlink()
         dist = FakeDist(root, top_level=["acme"])
@@ -227,12 +192,7 @@ class TestCollectingFromBuildout:
         assert "not a package directory" in caplog.text
 
     def test_two_dists_agreeing_on_a_name_deduplicate_silently(self, tmp_path):
-        """A develop egg shadowing an installed copy is the everyday case.
-
-        Both distributions genuinely have the files (unlike the old entry-point
-        world, where one could point at a module that was not there), so there is
-        nothing to warn about -- whichever dist sorts first simply wins.
-        """
+        """A develop egg shadowing an installed copy: whichever dist sorts first wins."""
         root_a, _dir_a = make_dist_dir(tmp_path / "a")
         root_b, _dir_b = make_dist_dir(tmp_path / "b")
         dists = [
@@ -243,14 +203,7 @@ class TestCollectingFromBuildout:
         assert [p.package for p in found] == ["acme.mail"]
 
     def test_an_ancestor_named_like_a_pruned_dir_does_not_hide_the_dist(self, tmp_path):
-        """PRUNE_DIRS must match the walked subtree, not the absolute path.
-
-        A checkout parked under `.../emails/dist/...` (or under `node_modules`,
-        `.git`, `__pycache__` -- any ancestor happening to share a name with
-        :data:`projects.PRUNE_DIRS`) is a perfectly ordinary thing to have on
-        disk. Only the directories *inside* the dist's own top-level package
-        are supposed to be pruned from the ZCML walk.
-        """
+        """PRUNE_DIRS must match the walked subtree, not the absolute path."""
         outer = tmp_path / "emails"
         root, package_dir = make_dist_dir(outer, src_layout=True)
         dist = FakeDist(root, top_level=["acme"])
@@ -263,12 +216,7 @@ class TestTheWalkCache:
     def test_a_shared_top_level_directory_is_walked_once_per_collection(
         self, tmp_path, monkeypatch
     ):
-        """N dists sharing one namespace top-level should cost one walk, not N.
-
-        ``top_level.txt`` says ``imio`` for every ``imio.*`` dist, so without
-        memoization each of them would re-rglob the whole shared
-        ``site-packages/imio/`` subtree.
-        """
+        """N dists sharing one namespace top-level cost one walk, not N."""
         root, _package_dir = make_dist_dir(tmp_path, dotted="imio.mail")
         calls = []
         original = projects._scan_top_dir
@@ -292,12 +240,7 @@ class TestTheWalkCache:
 
 
 class TestCollectingFromEnvironment:
-    """``from_environment`` needs a real ``imio.emailkit`` to scan against.
-
-    Skipped, not passed, in the buildout-only test environment -- the recipe's
-    own suite runs twice (``make recipe-test``), and this half of the coverage
-    is the Plone-runtime run's job.
-    """
+    """``from_environment`` needs a real ``imio.emailkit``; skips without one."""
 
     def test_a_failed_scan_warns_and_skips_but_others_still_build(
         self, tmp_path, monkeypatch, caplog
@@ -323,8 +266,7 @@ class TestCollectingFromEnvironment:
             encoding="utf-8",
         )
 
-        # Missing the required `subject` -- a genuine consumer mistake, the same
-        # one a real instance would refuse to start on.
+        # Missing the required `subject`.
         bad_root = tmp_path / "bad"
         bad_pkg = bad_root / "acme_bad"
         bad_pkg.mkdir(parents=True)
@@ -361,12 +303,7 @@ class TestCollectingFromEnvironment:
     def test_a_subpackages_parent_relative_directory_is_found_not_crashed(
         self, tmp_path, monkeypatch, caplog
     ):
-        """``directory="../templates"`` is legal (``zcml.py``'s own docstring:
-        "a subpackage's block may point at its parent's files with
-        `../templates`") and used to crash the whole collection:
-        ``templates_dir.relative_to(package_dir)`` cannot express a `..`
-        segment and raised, uncaught, past the per-package guard.
-        """
+        """``directory="../templates"`` is legal and must not crash the collection."""
         pytest.importorskip("imio.emailkit.scan")
         pytest.importorskip("pkg_resources")
         from imio.emailkit import discovery
@@ -407,16 +344,7 @@ class TestCollectingFromEnvironment:
     def test_a_shadowed_dist_resolves_to_the_importable_copy(
         self, tmp_path, monkeypatch
     ):
-        """Two on-disk copies of one package; only one is on ``sys.path``.
-
-        The marker walk finds ZCML on disk regardless of ``sys.path`` -- it
-        never imports anything -- so it can name a directory that Python will
-        never actually import from once a develop egg shadows an installed
-        copy. ``scan.scan_package`` imports the dotted name for real and
-        always executes against whichever copy ``sys.path`` resolves; trusting
-        the marker walk's guess instead used to crash outright, because the
-        two copies do not even share a prefix to be `..`-relative about.
-        """
+        """Two on-disk copies of one package; only the importable one must be used."""
         pytest.importorskip("imio.emailkit.scan")
         pytest.importorskip("pkg_resources")
         from imio.emailkit import discovery
@@ -438,8 +366,7 @@ class TestCollectingFromEnvironment:
             )
             return package_dir
 
-        # Sorts before `importable_root` by `str()`, so it is the copy
-        # `from_environment`'s dedup picks first -- the everyday shadowing case.
+        # Sorts before `importable_root`, so dedup would pick it first.
         not_importable_root = tmp_path / "a_installed"
         importable_root = tmp_path / "z_develop"
         write_copy(not_importable_root)

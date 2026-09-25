@@ -1,4 +1,4 @@
-"""``bin/check-emails``: the staleness gate and the lint delegation."""
+"""``bin/check-emails``: the staleness check and the lint delegation."""
 
 from conftest import invocations
 from conftest import NPX_LOG
@@ -47,7 +47,6 @@ class TestTheStalenessGate:
         assert run_gate(project, kit, binary) == 1
         out = capsys.readouterr().out
         assert check_emails.STALE in out
-        # A per-file diff summary is expected here, not just a verdict.
         assert "hand edited" in out
         assert "+++ fresh build" in out
 
@@ -72,12 +71,7 @@ class TestTheStalenessGate:
     def test_hand_written_templates_outside_the_build_are_left_alone(
         self, wired, capsys
     ):
-        """The same advice about the lint applies here: prefer a miss to a false alarm.
-
-        A browser view's ``.pt`` is nobody's build output. Reporting it as
-        "committed, no longer built" would be a false alarm on a correct file, and a
-        gate that cries wolf is a gate that gets skipped.
-        """
+        """A browser view's ``.pt`` must not be reported as an orphan."""
         project, kit, binary, _logs = wired
         (project.templates_dir / "hello.pt").write_text(
             "<html>built ${title}</html>\n", encoding="utf-8"
@@ -92,13 +86,7 @@ class TestTheStalenessGate:
         assert (views / "preview.pt").exists()
 
     def test_the_twins_are_copied_in_before_the_diff(self, wired):
-        """Otherwise every hand-authored twin would be reported as an ORPHAN.
-
-        ``maizzle build`` empties its output directory, so a twin cannot live there
-        as source; it is copied in after each build. The
-        gate has to reproduce that or it would report a file the build legitimately
-        does not produce.
-        """
+        """Otherwise every hand-authored twin would be reported as an ORPHAN."""
         project, kit, binary, _logs = wired
         (project.twins_dir / "hello.txt.pt").write_text(
             "plain ${title}\n", encoding="utf-8"
@@ -114,7 +102,6 @@ class TestTheStalenessGate:
 
 class TestRestoringTheWorkingTree:
     def test_the_committed_output_is_put_back_byte_for_byte(self, wired):
-        """A check that leaves a build you did not ask for is a check people skip."""
         project, kit, binary, _logs = wired
         committed = project.templates_dir / "hello.pt"
         committed.write_text("<html>hand edited</html>\n", encoding="utf-8")
@@ -143,20 +130,13 @@ class TestRestoringTheWorkingTree:
         assert any("maizzle build" in line for line in invocations(logs, NPX_LOG))
 
 
-#: A stand-in for ``imio.emailkit.lint``, under a name nothing else can shadow, so
-#: these tests assert on the *interface* rather than on whatever the real lint
-#: happens to accept today.
+#: A stand-in for ``imio.emailkit.lint``, under a name nothing else can shadow.
 STUB_MODULE = "emailkit_lint_stub"
 
 
 @pytest.fixture
 def stub_lint(tmp_path, monkeypatch):
-    """Install a fake lint module and reach it exactly the way the gate does.
-
-    Reached by prepending to this process's ``sys.path`` -- which is what
-    ``_child_environment`` turns into the child's ``PYTHONPATH`` -- so the wiring
-    under test is the real wiring, not a shortcut around it.
-    """
+    """Install a fake lint module and reach it exactly the way the check does."""
 
     def install(body):
         root = tmp_path / "stub"
@@ -169,12 +149,10 @@ def stub_lint(tmp_path, monkeypatch):
 
 
 class TestTheLintGate:
-    """The lint gate. Called, never reimplemented."""
-
     def test_it_invokes_the_module_by_the_agreed_interface(
         self, project, tmp_path, stub_lint
     ):
-        """``python -m <module> <paths>`` -- the contract, verbatim."""
+        """``python -m <module> <paths>``, verbatim."""
         stub_lint(f"""
             import sys
             open({str(tmp_path / "argv.txt")!r}, "w").write("\\n".join(sys.argv[1:]))
@@ -193,12 +171,7 @@ class TestTheLintGate:
         assert check_emails.lint_gate([project], module=STUB_MODULE) == 0
 
     def test_a_missing_lint_module_fails_rather_than_skipping(self, project, capsys):
-        """This is "the CI gate".
-
-        A gate that turns itself off when its implementation is missing is worse
-        than no gate, because it reports success. ``--no-lint`` exists so that
-        skipping it is a deliberate, visible choice.
-        """
+        """A missing module must fail loud, not report a false success."""
         assert check_emails.lint_gate([project], module="no_such_lint_module") == 1
         assert "not importable" in capsys.readouterr().err
 
@@ -211,13 +184,7 @@ class TestTheLintGate:
         assert check_emails.lint_gate([installed]) == 0
 
     def test_the_child_gets_this_processs_sys_path(self):
-        """The bug this guards: a buildout script's path lives *inside the script*.
-
-        ``sys.executable`` is then an interpreter that knows nothing about the
-        part's eggs, and the gate reported "No module named 'imio'" on a perfectly
-        good installation -- a configuration failure wearing a
-        missing-dependency costume.
-        """
+        """``sys.executable`` alone knows nothing about the part's eggs."""
         entries = check_emails._child_environment()["PYTHONPATH"].split(os.pathsep)
         for entry in sys.path:
             if entry:

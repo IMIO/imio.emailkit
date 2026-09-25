@@ -6,8 +6,7 @@
 
   <include package="imio.emailkit" file="meta.zcml" />
 
-  <!-- The one template this throwaway addon ships (in-package
-       layout: `emails/` and `templates/` as siblings inside the package). -->
+  <!-- The one template this throwaway addon ships. -->
   <emailkit:templates directory="templates">
     <emailkit:template
         name="demo"

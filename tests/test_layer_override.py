@@ -1,28 +1,11 @@
 """A site package's jbot directory beats ours.
 
-> Replace the template markup per site/client: register a jbot directory on a
-> *more specific* browser layer (the site package's own layer). z3c.jbot layer
-> precedence applies -- the most specific layer wins.
-
-**Why the test double extends ``IEmailkitLayer`` and could not do otherwise.**
-Phase 0 measured this against the request's ``__sro__`` and found the documented
-rule holds only for a layer that *subclasses* ``IEmailkitLayer``. For a **sibling**
-layer, precedence follows ``getAllUtilitiesRegisteredFor(ILocalBrowserLayerType)``
-registration order, which is effectively arbitrary -- so a sibling-layer test
-would pass or fail depending on ZCML load order and prove nothing either way.
-That is the documented rule, and this module is the executable form of it: ``tests/sitelayer/interfaces.py`` extends our layer, and
-the docs must keep saying so.
-
-Only ``mail_password_template`` is covered. The mechanism is per-layer, not
-per-template -- a second identical case would cost a fixture and buy nothing.
-
-**What the site package overrides.** Our own compiled template,
-``imio.emailkit.templates.mail_password_template.pt``, not a stock CMFPlone
-file. This package overrides no stock template any more: it owns the view
-(``browser/default_mails.py``) and renders its own template through
-``render()``. That is what makes "z3c.jbot works on the resolved ``.pt``" the
-single override story for every template the package ships, rather than one
-story for consumers and another for these two.
+A site package can restyle a template by registering a jbot directory on a
+more specific browser layer; z3c.jbot's precedence rule picks that one. The
+test double must extend ``IEmailkitLayer``, not sit beside it as a sibling:
+sibling precedence follows arbitrary registration order and would prove
+nothing. Only ``mail_password_template`` is covered, since the mechanism
+works per layer, not per template.
 """
 
 import support
@@ -36,18 +19,14 @@ TEMPLATE = support.MAIL_PASSWORD
 
 class TestTheSiteLayerExtendsOurs:
     def test_it_really_is_a_subclass(self):
-        """Guard the premise. If someone "simplifies" the test double into a
-        sibling layer, the win below becomes a coin flip that happens to land
-        right on the machine it was written on."""
+        """A sibling layer would make the win below a coin flip."""
         from imio.emailkit.interfaces import IEmailkitLayer
         from sitelayer.interfaces import ISiteLayer
 
         assert ISiteLayer.extends(IEmailkitLayer)
 
     def test_both_layers_are_available(self, site_portal, layers_of):
-        """Ours must be installed for the contest to mean anything: a site layer
-        beating a *missing* override is not precedence, it is the only candidate.
-        """
+        """A site layer beating a missing override is not precedence."""
         from imio.emailkit.interfaces import IEmailkitLayer
 
         assert IEmailkitLayer in layers_of(site_portal)
@@ -65,13 +44,8 @@ class TestTheSiteLayerWins:
         return support.stock_mail_view(portal, request, TEMPLATE)
 
     def test_the_site_file_wins_at_lookup(self, site_portal, site_request):
-        """Resolved through ``render()``'s loader, which is where the jbot
-        descriptor is invoked for our own templates (``render._page_template``).
-
-        Never assert on this alone -- see the module docstring of
-        ``tests/test_jbot_wiring.py``; the render assertions below are what prove
-        the swap had an effect.
-        """
+        """The filename alone does not prove the override took effect;
+        see the render assertions below."""
         from imio.emailkit.render import _page_template
         from imio.emailkit.discovery import get_template
 
@@ -85,8 +59,7 @@ class TestTheSiteLayerWins:
         )
 
     def test_the_site_markup_renders(self, site_portal, site_request, make_member):
-        """The assertion that actually matters -- see ``test_jbot_wiring.py`` for
-        why a filename on its own proves nothing."""
+        """The assertion that actually matters."""
         member = make_member(site_portal)
         view = self._view(site_portal, site_request)
         reset = site_portal.portal_password_reset.requestReset(member.getId())
@@ -99,15 +72,12 @@ class TestTheSiteLayerWins:
         )
 
         assert SITE_MARKER in rendered
-        # The site template reads `site_name` out of the flat render() context,
-        # so this also proves it was really executed rather than resolved. The
-        # subject is no longer the site file's business: it comes from our own
-        # registration, and `DefaultMailView` emits the header.
+        # The site template reads `site_name` from render()'s context, so this
+        # proves the template executed rather than just resolved.
         assert "Site name :" in rendered
 
     def test_our_markup_does_not_render(self, site_portal, site_request, make_member):
-        """The negative half: ours lost, rather than both being concatenated or
-        ours winning while the site file merely appeared in a lookup table."""
+        """The negative half: our markup lost, not just got concatenated."""
         member = make_member(site_portal)
         view = self._view(site_portal, site_request)
         reset = site_portal.portal_password_reset.requestReset(member.getId())

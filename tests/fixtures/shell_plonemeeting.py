@@ -1,57 +1,21 @@
 """A realistic PloneMeeting-shaped legacy body for ``render_shell``.
 
-This fixture is the *evidence* for the phase's central claim -- "zero template
-redesign" -- and gate 4 asks for exactly this: a body carrying "the actual HTML
-idioms those notifications emit", snapshotted so that a change to the kit which
-quietly mangles legacy markup shows up as a diff.
+Snapshotted so a kit change that mangles legacy markup shows as a diff.
+Idioms present: nested tables, ``bgcolor`` zebra rows, inline ``style``, a
+styled ``<a>``, ``&nbsp;``/``&laquo;``/``&raquo;``, unclosed ``<br>``/``<hr>``,
+and ``<b>`` instead of ``<strong>`` -- all real PloneMeeting output, since
+notifications are assembled by string concatenation, not templates.
 
-So the shape below is not decoration. Every idiom in it is one PloneMeeting
-notifications really produce, because they are assembled by string concatenation
-out of `MeetingConfig` mail texts and item data rather than authored as templates:
+Whitespace matters: the data table's rows have no newline between cells,
+which is the only shape where the plaintext extraction's cell separator is
+observable.
 
-* **nested tables** -- an outer layout table wrapping an inner data table, the
-  1990s way of getting a border and padding in Outlook;
-* **``bgcolor`` rows** -- zebra striping done with the presentational attribute,
-  not CSS, which is also what the kit itself has to do for Outlook;
-* **inline ``style``** on cells and paragraphs, unrelated to and unaware of the
-  kit's own inlined CSS -- the collision the plan wants proof about;
-* **a styled ``<a>``** with its own colour and underline, which is what makes
-  "does the legacy link still look like a link inside our shell" answerable;
-* **``&nbsp;``** (French typography uses it before ``:`` and inside quotes) and
-  **``&laquo;``/``&raquo;``**, so an entity that the plaintext extraction has to
-  unescape is present;
-* **a bare ``<br>``** and a bare ``<hr>`` -- void elements written unclosed, which
-  is legal HTML and invalid XML, and therefore the interesting case for anything
-  that might try to re-parse the body;
-* **``<b>``** rather than ``<strong>``, because that is what the legacy editor
-  emitted.
+No ``${...}`` and no ``<html>``/unclosed-tag pathology: both belong in
+``tests/test_render_shell.py`` instead, where broken input is asserted on,
+not frozen into a snapshot.
 
-**Whitespace is part of the fixture.** The data table's rows are written on one
-line each, with no newline between cells, because that is what
-``'<tr><td>%s</td><td>%s</td></tr>' % (...)`` in a loop produces -- and it is the
-only shape in which the plaintext extraction's cell separator is observable at
-all: a newline between cells leaves the separator at end of line, where
-``naive_text`` strips it. The surrounding layout tables keep their indentation, because
-the other half of a legacy body comes from a rich-text field that has newlines.
-Both shapes therefore go through the golden.
-
-Two things are deliberately **absent**.
-
-* **No ``${...}``.** A legacy body may well contain one -- that is the security
-  question of this phase -- but it belongs in ``tests/test_render_shell.py``,
-  where the assertion is that it survives *verbatim*. Putting one here would make
-  the golden harness's own ``test_golden_has_no_unresolved_placeholder`` fire,
-  which exists to catch a snapshot taken on a broken engine and must keep meaning
-  exactly that.
-* **No ``<html>``/``<style>``/unclosed-tag pathology.** Also in
-  ``test_render_shell.py`` (gate 6): those cases are about *what the shell does
-  with broken input*, and a snapshot of broken input would freeze the current
-  answer instead of asserting it.
-
-``subject`` is a **literal string**, not a msgid, because that is what a legacy
-caller has: PloneMeeting computes the subject from the item and the meeting date
-before it ever reaches us. The builder's "a msgid or a literal" is exercised on
-the msgid side by ``test_render_shell.py``'s language gate.
+``subject`` is a literal string, not a msgid, matching what PloneMeeting
+actually passes.
 """
 
 CONTEXT = {

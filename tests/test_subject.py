@@ -1,20 +1,12 @@
 """Where the subject comes from.
 
-> **Subject** comes from the template registration; ``.subject(...)`` exists as
-> an override for edge cases and accepts a msgid or literal string.
+The subject defaults to the template registration's msgid, translated
+per language group. ``.subject(...)`` overrides it, and accepts either a
+msgid, still translated per group, or a literal string, which reaches
+every group untouched.
 
-Two rules, and the second has two halves. The default is the registration's
-msgid, translated per language group. The override
-accepts *either* a msgid -- which must still be translated per group -- *or* a
-literal, which must reach every group untouched. A builder that translated
-literals would mangle "Convocation - seance du 12 aout" into itself in some
-languages and into a msgid-shaped miss in others; a builder that did not
-translate msgids would ship ``email_subject_notification`` to citizens.
-
-Expected values are computed with ``zope.i18n.translate`` rather than typed out,
-for the reason in ``support.translated``: a hardcoded French string turns every
-catalog edit into a test failure *and* passes for a builder that ships the bare
-msgid whenever the catalog has no entry.
+Expected values are computed with ``zope.i18n.translate`` rather than
+typed out, so a catalog edit cannot silently break these tests.
 """
 
 import pytest
@@ -55,8 +47,8 @@ class TestTheDefaultSubject:
     def test_it_comes_from_the_registration(
         self, mail, set_default_language, subject_of
     ):
-        """Comes from the template registration, read out of discovery, so the
-        registration and the expectation cannot drift apart."""
+        """Reads the expected subject out of discovery, so the registration
+        and the expectation cannot drift apart."""
         set_default_language("fr")
 
         subject = subject_of(mail().to(support.PLAIN_ADDRESS))
@@ -64,10 +56,9 @@ class TestTheDefaultSubject:
         assert subject == support.translated(support.registration_subject(), "fr")
 
     def test_it_is_not_the_bare_msgid(self, mail, set_default_language, subject_of):
-        """The failure that looks like success. The subject is stored as an i18n
-        msgid, and ``email_subject_notification`` in an inbox is the visible tip
-        of a missing ``target_language`` -- exactly the bug that ``render()``
-        injecting ``target_language`` avoids."""
+        """The subject is stored as an i18n msgid. A bare msgid like
+        ``email_subject_notification`` reaching the inbox means translation
+        was skipped."""
         set_default_language("fr")
 
         subject = subject_of(mail().to(support.PLAIN_ADDRESS))
@@ -82,9 +73,9 @@ class TestTheDefaultSubject:
     def test_it_is_never_empty_or_a_placeholder(
         self, mail, set_default_language, subject_of
     ):
-        """``Products.MailHost`` substitutes ``[No Subject]`` for a message with
-        no ``Subject`` header, so a builder that forgot the subject entirely
-        produces a *plausible* mail rather than an error."""
+        """``Products.MailHost`` substitutes ``[No Subject]`` when no
+        ``Subject`` header is set, so a missing subject produces a
+        plausible mail, not an error."""
         set_default_language("fr")
 
         subject = subject_of(mail().to(support.PLAIN_ADDRESS))
@@ -97,7 +88,8 @@ class TestTheDefaultSubject:
 
 
 class TestOverrideWithAMsgid:
-    """ "accepts a msgid" -- so it goes through the same per-group translation."""
+    """A msgid override goes through the same per-group translation as the
+    default subject."""
 
     def test_a_msgid_override_is_translated(
         self, mail, set_default_language, subject_of
@@ -124,9 +116,8 @@ class TestOverrideWithAMsgid:
     def test_a_msgid_override_is_translated_per_language_group(
         self, mail, fr_member, nl_member, subjects_by_language
     ):
-        """The override must not opt out of per-language sending -- that
-        would make ``.subject(msgid)`` a trap: it looks i18n-aware and ships one
-        language to everybody."""
+        """The override must not skip per-language translation, or it would
+        ship one language to everybody."""
         msgid = support.message_id(support.OVERRIDE_SUBJECT_MSGID)
 
         subjects = subjects_by_language(
@@ -143,7 +134,7 @@ class TestOverrideWithAMsgid:
 
 
 class TestOverrideWithALiteral:
-    """ "or literal string" -- a literal is not a msgid and must survive."""
+    """A literal is not a msgid and must survive unchanged."""
 
     def test_a_literal_override_reaches_the_header_unchanged(self, mail, subject_of):
         subject = subject_of(
@@ -155,10 +146,8 @@ class TestOverrideWithALiteral:
     def test_a_literal_is_identical_in_every_language_group(
         self, mail, fr_member, nl_member, subjects_by_language
     ):
-        """A literal has no catalog entry, so a builder that ran it through
-        ``translate`` would return it unchanged *by accident* here -- which is
-        fine. What must not happen is per-group divergence, which would mean the
-        literal was being treated as a msgid and resolved against something."""
+        """A literal must reach every language group unchanged, not diverge
+        as if it were a msgid."""
         subjects = subjects_by_language(
             mail().to(fr_member).to(nl_member).subject(support.LITERAL_SUBJECT)
         )
@@ -167,9 +156,7 @@ class TestOverrideWithALiteral:
         assert set(subjects.values()) == {support.LITERAL_SUBJECT}
 
     def test_a_non_ascii_literal_survives_the_headers(self, mail, subject_of):
-        """Subjects are the one header a French or Dutch mail is guaranteed to
-        put non-ASCII in. Broken header encoding shows up as ``=?utf-8?...?=`` in
-        the recipient's inbox, and only in some clients."""
+        """Non-ASCII subjects must not break header encoding."""
         literal = "Séance du conseil communal du 12 août"
 
         subject = subject_of(mail().to(support.PLAIN_ADDRESS).subject(literal))
@@ -179,10 +166,8 @@ class TestOverrideWithALiteral:
 
 class TestTheOverrideDoesNotLeak:
     def test_the_last_call_wins(self, mail, subject_of):
-        """Every method is a plain accumulating setter; a subject is
-        singular, so a second call replaces rather than appends. The failure
-        worth catching is a header set twice -- ``Products.MailHost`` keeps both
-        and clients show whichever they read first."""
+        """A second ``.subject()`` call must replace the first, not add a
+        second header."""
         subject = subject_of(
             mail().to(support.PLAIN_ADDRESS).subject("First").subject("Second")
         )

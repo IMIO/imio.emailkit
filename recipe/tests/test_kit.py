@@ -25,14 +25,7 @@ class TestPathMode:
     def test_the_shim_re_exports_the_real_module_so_kitdir_stays_the_egg(
         self, project, kit
     ):
-        """Why a re-export rather than a re-implementation.
-
-        ``kitBaseConfig()`` derives ``kitDir`` from ``import.meta.url`` of the
-        module it is *defined* in. Re-exporting keeps that the egg's kit directory,
-        so ``components.source`` is an absolute path outside the Maizzle project
-        root -- genuinely zero-copy. A shim that rebuilt the config here would be a
-        copy wearing ``path``'s name.
-        """
+        """Re-exporting keeps ``kitDir`` the egg's directory, not the shim's."""
         shim = project.emails_dir / ".kit" / "maizzle.config.base.js"
         kit_module.wire(project, kit, "path")
         body = shim.read_text(encoding="utf-8")
@@ -64,7 +57,7 @@ class TestCopyMode:
     def test_the_consumers_import_specifier_is_the_same_in_both_modes(
         self, project, kit
     ):
-        """The property that lets a consumer's config ignore ``kit-mode`` entirely."""
+        """Lets a consumer's config ignore ``kit-mode`` entirely."""
         for mode in ("path", "copy"):
             target = kit_module.wire(project, kit, mode)
             assert (target / kit_module.BASE_CONFIG).is_file()
@@ -75,7 +68,7 @@ class TestSwitchingModes:
     def test_switching_from_copy_to_path_leaves_no_copied_kit_behind(
         self, project, kit
     ):
-        """Otherwise Maizzle would keep resolving components out of the stale copy."""
+        """Otherwise Maizzle keeps resolving components out of the stale copy."""
         kit_module.wire(project, kit, "copy")
         assert (project.emails_dir / ".kit" / "layouts").exists()
         kit_module.wire(project, kit, "path")
@@ -98,7 +91,7 @@ class TestHousekeeping:
     def test_the_wiring_ignores_itself_rather_than_editing_a_gitignore(
         self, project, kit
     ):
-        """``.kit/`` is gitignored; the recipe must not touch a consumer's file."""
+        """The recipe must not touch a consumer's ``.gitignore``."""
         target = kit_module.wire(project, kit, "path")
         assert (target / ".gitignore").read_text(encoding="utf-8").strip().endswith("*")
 

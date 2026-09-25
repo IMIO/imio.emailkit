@@ -1,32 +1,13 @@
 """``render_shell(subject, body_html, language=None)``.
 
-Nine gates, minus the two that have their own modules: gate 4 (the
-PloneMeeting-shaped golden) lives in ``tests/test_golden.py`` because it *is*
-the golden harness, and gate 8 (sending shell output through the frozen
-builder) lives in ``tests/test_shell_send.py`` because it needs the sending
-layer.
+Wraps a legacy HTML body in the kit layout without redesigning it.
+``tests/test_golden.py`` covers the golden output, and
+``tests/test_shell_send.py`` covers sending it through the builder.
 
-**The rule this module exists to enforce**, same as ``tests/test_render.py``:
-assert on *substituted values*, never on marker strings. Without the
-``IPageTemplateEngine`` utility ``zope.pagetemplate`` falls back to ``zope.tal``,
-where ``${...}`` passes through verbatim and raises nothing -- so "our marker is in
-the output" can be true while raw placeholders ship.
-
-Phase 3 turns that hazard inside out. For an *authored* template a surviving
-``${...}`` is a defect; for an *injected legacy body* it is the required
-behaviour, and the two must not be confused. Hence the shape of the tests below:
-
-* the shell's **own** markup is held to the usual standard -- no placeholder, no
-  TAL residue, CSS inlined, a11y defaults present;
-* the **injected body** is held to the opposite standard -- byte-for-byte verbatim,
-  never evaluated, never sanitised ("the shell wraps; it does not clean");
-* so the cleanliness assertions run on ``html`` with the injected body *removed*,
-  which is the only way to make both statements at once.
-
-The empirical verification this module is the regression test for: ``structure``
-does NOT evaluate placeholders in an injected body. That finding is why
-``structure`` is considered safe here at all; if these tests go red, that
-conclusion is what changed.
+For the shell's own markup, a surviving ``${...}`` is a defect. For the
+injected legacy body, it is required: the body must render verbatim,
+never evaluated, never sanitised. The cleanliness checks therefore run
+on the html with the injected body removed.
 """
 
 import pytest
@@ -43,16 +24,15 @@ from imio.emailkit import render  # noqa: E402
 # Identities. Chosen so that finding one in the output can only mean one thing.
 # ---------------------------------------------------------------------------
 
-#: A subject with characters that *must* be escaped. Rule 4 reserves
-#: ``structure`` for the body slot, so everything else -- the heading included --
-#: is escaped by Chameleon's default. A subject computed from user-entered content
-#: (an item title, say) is exactly where that matters.
+#: A subject with characters that must be escaped. Only the body slot uses
+#: ``structure``; everything else, including the heading, uses Chameleon's
+#: default escaping.
 SUBJECT_WITH_MARKUP = 'Séance <script>alert("x")</script> & suite'
 
 #: A subject that cannot collide with anything in the kit, for counting.
 SUBJECT_SENTINEL = "SUJET-SENTINELLE-3f9a"
 
-#: The simplest possible legacy body -- gate 1, verbatim.
+#: The simplest possible legacy body, rendered verbatim.
 SIMPLE_BODY = "<p>Body</p>"
 
 #: A marker that appears in no template, no stylesheet and no translation.
@@ -66,9 +46,8 @@ PROBE_LOGO = "https://probe.example.be/logo-probe.png"
 OTHER_LOGO = "https://probe.example.be/logo-other.png"
 PROBE_FOOTER = "<span>Pied de page sonde &mdash; probe-footer-marker</span>"
 
-#: A hidden element whose content is not a comment -- i.e. a preheader. The kit
-#: renders one for an authored template and, per
-#: ``emails/src/templates/shell.vue``, deliberately none for the shell.
+#: A hidden element whose content is not a comment: a preheader. The kit
+#: renders one for an authored template, and none for the shell.
 HIDDEN_ELEMENT = re.compile(
     r"<(?P<tag>div|span|p)[^>]*display:\s*none[^>]*>(?P<inner>.*?)</(?P=tag)\s*>",
     re.IGNORECASE | re.DOTALL,
@@ -81,11 +60,11 @@ COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 
 @pytest.fixture
 def shell(integration):
-    """``shell(subject, body, language="fr")`` -> ``(html, text)``.
+    """``shell(subject, body, language="fr")`` returns ``(html, text)``.
 
-    Bound to the ``integration`` layer because the theme tokens come from
+    Needs the ``integration`` layer: theme tokens come from
     ``plone.app.registry`` and the subject is translated through
-    ``zope.i18n`` -- both need a site.
+    ``zope.i18n``.
     """
 
     def make(subject=SUBJECT_SENTINEL, body=SIMPLE_BODY, language="fr"):
@@ -96,11 +75,10 @@ def shell(integration):
 
 @pytest.fixture
 def authored(integration):
-    """The same kit layout with *authored* content, for parity assertions.
+    """The same kit layout with authored content, for parity checks.
 
-    Gate 2 is "exactly as for an authored template", which is a comparison, not a
-    marker list. Rendering the real registered template in the same language and
-    the same registry state is the only way to make it one.
+    Renders the real registered template in the same language and
+    registry state as the shell, so the two can be compared directly.
     """
 
     def make(language="fr"):
@@ -132,12 +110,11 @@ def set_record(integration):
 
 
 def without_body(html, body):
-    """``html`` with the injected body removed, for the cleanliness assertions.
+    """``html`` with the injected body removed, for the cleanliness checks.
 
-    The injected body is allowed -- required, even -- to contain ``${...}`` and
-    ``tal:`` attributes verbatim. The shell around it is not. Removing the one
-    string the caller handed in is what lets both be asserted, and it fails loudly
-    if the body was *not* emitted verbatim, which is itself the point.
+    The injected body may contain ``${...}`` and ``tal:`` attributes
+    verbatim; the shell around it may not. Removing the body lets both
+    rules be checked separately.
     """
     assert body in html, "the injected body is not in the output verbatim"
     return html.replace(body, "")
@@ -146,9 +123,8 @@ def without_body(html, body):
 def visible_hidden_text(html):
     """The non-comment text inside every ``display: none`` element.
 
-    Empty means "no preheader". The kit's shell keeps one hidden element for
-    Outlook's ``<o:OfficeDocumentSettings>`` conditional comment, which is markup
-    for Word and not text for a human, so comments are stripped before looking.
+    Empty means no preheader. Comments are stripped first, since the
+    shell keeps one hidden element for an Outlook conditional comment.
     """
     return [
         stripped
@@ -158,13 +134,13 @@ def visible_hidden_text(html):
 
 
 # ===========================================================================
-# Gate 1 -- returns (html, text); the body appears unescaped inside the shell
+# Return value: (html, text); the body appears unescaped inside the shell
 # ===========================================================================
 
 
 class TestReturnValue:
     def test_returns_html_and_text(self, shell):
-        """ "Returns ``(html, text)`` exactly as ``render()`` does"."""
+        """Returns ``(html, text)``, like ``render()``."""
         result = shell()
 
         assert isinstance(result, tuple)
@@ -185,11 +161,10 @@ class TestReturnValue:
         assert "<html" not in text.lower()
 
     def test_the_body_is_injected_unescaped(self, shell):
-        """Gate 1. Rule 4's one sanctioned use of ``structure``.
+        """The body slot uses ``structure``, so the body must not be escaped.
 
-        An escaped body is the visible symptom of the wrong idiom and it would
-        turn every migrated notification into a mail full of ``&lt;p&gt;`` -- the
-        exact opposite of "zero template redesign".
+        An escaped body would turn every migrated notification into a
+        mail full of ``&lt;p&gt;``.
         """
         html, _text = shell(body=f"<p>{BODY_SENTINEL}</p>")
 
@@ -197,10 +172,7 @@ class TestReturnValue:
         assert "&lt;p&gt;" not in html
 
     def test_the_body_appears_exactly_once(self, shell):
-        """``Main.vue`` owns the ``body_html`` slot and ``shell.vue`` adds only the
-        heading. A second slot in the shell would duplicate every legacy body --
-        which reads as a rendering bug nobody would attribute to the shell.
-        """
+        """The body must render exactly once, not duplicated by a second slot."""
         body = f"<p>{BODY_SENTINEL}</p>"
 
         html, _text = shell(body=body)
@@ -211,8 +183,8 @@ class TestReturnValue:
         )
 
     def test_the_body_sits_inside_the_document_body(self, shell):
-        """Not merely "present somewhere". A body emitted into ``<head>`` would be
-        invisible in every client while every marker assertion still passed."""
+        """The body must sit inside ``<body>``, not ``<head>``, where it would
+        be invisible."""
         body = f"<p>{BODY_SENTINEL}</p>"
 
         html, _text = shell(body=body)
@@ -220,8 +192,8 @@ class TestReturnValue:
         assert html.index("<body") < html.index(BODY_SENTINEL) < html.index("</body>")
 
     def test_the_shell_around_the_body_is_clean(self, shell):
-        """The shell's own markup is held to ``tests/test_render.py``'s standard:
-        no unsubstituted ``${...}``, no leftover ``tal:``/``i18n:``."""
+        """The shell's own markup must be clean: no unsubstituted ``${...}``,
+        no leftover ``tal:``/``i18n:``."""
         body = f"<p>{BODY_SENTINEL}</p>"
 
         html, text = shell(body=body)
@@ -232,10 +204,10 @@ class TestReturnValue:
         )
 
     def test_the_subject_is_escaped(self, shell):
-        """The other half of rule 4: everything that is *not* the body slot is
-        escaped. A subject is often computed from an item title, so it is
-        user-influenced content in a heading -- and the shell is the one place in
-        this package where escaped and unescaped injection sit side by side.
+        """The subject must be escaped, unlike the body.
+
+        A subject is often computed from an item title, so it can carry
+        user-entered content.
         """
         html, _text = shell(subject=SUBJECT_WITH_MARKUP)
 
@@ -244,9 +216,7 @@ class TestReturnValue:
         assert "&amp; suite" in html
 
     def test_an_empty_subject_collapses_the_heading(self, shell):
-        """An empty string is not a missing name: it renders a mail with no
-        heading rather than raising, so a caller with nothing to say in the
-        heading has a way to say nothing."""
+        """An empty subject renders a mail with no heading, not an error."""
         html, _text = shell(subject="", body=f"<p>{BODY_SENTINEL}</p>")
 
         assert BODY_SENTINEL in html
@@ -256,9 +226,7 @@ class TestReturnValue:
         )
 
     def test_an_empty_body_collapses_the_slot(self, shell):
-        """The mirror case: subject, no body. The shell must still be a valid,
-        complete document -- an exception here would make ``render_shell`` unusable
-        for a notification whose body happens to be empty that day."""
+        """An empty body must still render a valid, complete document."""
         html, text = shell(subject=SUBJECT_SENTINEL, body="")
 
         assert SUBJECT_SENTINEL in html
@@ -268,15 +236,12 @@ class TestReturnValue:
 
 
 class TestTheCompiledShellRequiresASubject:
-    """The compiled shell's own contract, asserted directly on the artifact.
+    """The compiled ``shell.pt`` template, checked directly.
 
-    ``render_shell``'s signature makes ``subject`` mandatory, so the public API can
-    never omit it. The compiled ``shell.pt`` is nonetheless a *shipped file* that
-    ``z3c.jbot`` can override and that a future caller could render another way,
-    and its ``tal:condition="subject"`` is what makes a missing name a loud
-    ``KeyError`` instead of a silently headless mail. Adding a ``| nothing``
-    default to that expression would be a one-character change with no visible
-    symptom; this is the test that would object.
+    ``render_shell`` always passes a subject, but ``shell.pt`` is a
+    shipped file that ``z3c.jbot`` can override. Its
+    ``tal:condition="subject"`` must keep raising a loud ``KeyError`` on
+    a missing name, not render a silently headless mail.
     """
 
     def test_a_missing_subject_name_raises(self, integration):
@@ -290,9 +255,8 @@ class TestTheCompiledShellRequiresASubject:
             render_file(SHELL_TEMPLATE, namespace)
 
     def test_a_missing_body_html_name_renders_a_shell_with_no_body(self, integration):
-        """Deliberately *not* symmetrical, and worth pinning as such: a mail with
-        a heading and no body is a degraded mail, while a mail with no heading at
-        all is a broken one."""
+        """Not symmetrical with the missing-subject case: a mail with a
+        heading and no body is degraded, not broken."""
         from imio.emailkit.render import build_namespace
         from imio.emailkit.render import render_file
         from imio.emailkit.render import SHELL_TEMPLATE
@@ -306,28 +270,22 @@ class TestTheCompiledShellRequiresASubject:
 
 
 # ===========================================================================
-# Gate 2 -- inlined CSS, a11y defaults, lang, layout structure: as authored
+# Kit defaults around a legacy body: inlined CSS, a11y defaults, lang, layout
 # ===========================================================================
 
 
 class TestKitDefaultsAroundALegacyBody:
-    """Gate 2. The shell is the kit layout with the content handed in, so every
-    kit default has to survive the swap. Each of these is a feature that
-    "the kit does, not authors" -- and a legacy body is precisely the case where
-    nobody is watching the markup."""
+    """The shell is the kit layout with a legacy body swapped in. Every kit
+    default must survive that swap."""
 
     def test_the_document_head_is_identical_to_an_authored_templates(
         self, shell, authored
     ):
-        """ "Exactly as for an authored template", asserted as an equality.
+        """The shell's ``<head>`` must equal an authored template's ``<head>``.
 
-        The head is what the layout alone owns: charset, viewport, the
-        colour-scheme meta pair, the dark-mode ``<style>`` block, the ``<html>``
-        attributes. A shell built on a forked layout, or one that lost the
-        dark-mode stylesheet, differs here and nowhere a marker would notice.
-
-        If a template ever legitimately contributes head content, this assertion
-        is the place to narrow the comparison -- deliberately, with a reason.
+        The head holds charset, viewport, the colour-scheme meta pair,
+        the dark-mode ``<style>`` block, and the ``<html>`` attributes;
+        only the layout controls it.
         """
         shell_html, _ = shell()
         authored_html, _ = authored()
@@ -342,16 +300,11 @@ class TestKitDefaultsAroundALegacyBody:
         assert support.A11Y_TABLE_MARKER in html
 
     def test_every_table_in_the_shell_is_presentational(self, shell):
-        """The stronger form, and the one that actually applies ("*all* layout
-        tables"). Only the shell's own tables are counted: a legacy body brings
-        its own data tables, and a data table with ``role="presentation"`` would
-        be an a11y bug in the other direction.
+        """Every layout table in the shell must be presentational.
 
-        ``role="none"`` counts. ARIA 1.1 made it the synonym of
-        ``role="presentation"`` -- identical semantics, identical screen-reader
-        behaviour -- and the kit uses it on the table inside the ``[if mso]``
-        conditional comment. Insisting on one spelling would be a lint rule
-        masquerading as an accessibility assertion.
+        Only the shell's own tables count; a legacy body's data tables
+        must not carry this role. ``role="none"`` counts too: it is an
+        ARIA synonym for ``role="presentation"``.
         """
         body = f"<p>{BODY_SENTINEL}</p>"
 
@@ -368,10 +321,10 @@ class TestKitDefaultsAroundALegacyBody:
         assert unmarked == [], f"layout tables with no presentational role: {unmarked}"
 
     def test_the_logo_has_an_alt_attribute(self, shell, set_record):
-        """ "enforced ``alt`` on the logo/``Img`` component".
+        """The logo image must carry an ``alt`` attribute.
 
-        The logo only renders when the token is set, so the token is set first --
-        otherwise this test would pass by finding no image at all.
+        The token is set first, since the logo only renders when it is
+        set.
         """
         set_record("logo_url", PROBE_LOGO)
 
@@ -383,7 +336,7 @@ class TestKitDefaultsAroundALegacyBody:
         assert "alt=" in tag, f"logo <img> has no alt attribute: {tag}"
 
     def test_lang_is_emitted_on_html(self, shell):
-        """ "the layout emits ``lang="${lang}"`` on ``<html>``"."""
+        """The layout emits ``lang`` on ``<html>``."""
         html, _text = shell(language="fr")
 
         match = support.LANG_ATTRIBUTE.search(html)
@@ -392,9 +345,11 @@ class TestKitDefaultsAroundALegacyBody:
         assert match.group(1).lower().startswith("fr")
 
     def test_css_was_inlined(self, shell):
-        """Phase 0 caveat A1: one ``${...}`` in a literal ``style`` attribute stops
-        Juice inlining document-wide while the build still reports success. The
-        shell is a *separate build output*, so it can lose inlining on its own.
+        """CSS must be inlined in the shell too.
+
+        The shell is a separate build output, so it can lose inlining on
+        its own. A ``${...}`` in a literal ``style`` attribute stops
+        inlining for the whole document while the build still succeeds.
         """
         html, _text = shell()
 
@@ -402,14 +357,12 @@ class TestKitDefaultsAroundALegacyBody:
 
         assert count >= support.MIN_INLINE_STYLES, (
             f"only {count} inline style attributes in the shell: CSS inlining is "
-            "probably dead (Phase 0 caveat A1)"
+            "probably dead"
         )
 
     def test_dark_mode_survives(self, shell, authored):
-        """Dark mode is attribute selectors plus
-        ``data-dark`` hooks. Head parity covers the stylesheet; this covers the
-        hooks, which live in the body and are therefore the half the shell could
-        lose on its own."""
+        """Dark mode needs both the head stylesheet and ``data-dark`` hooks in
+        the body. Head parity covers the stylesheet; this covers the hooks."""
         shell_html, _ = shell()
         authored_html, _ = authored()
 
@@ -417,20 +370,12 @@ class TestKitDefaultsAroundALegacyBody:
         assert shell_html.count("data-dark=") == authored_html.count("data-dark=")
 
     def test_the_shell_renders_no_preheader(self, shell, authored):
-        """Gate 2 as the plan words it says the preheader must be present; the
-        shell deliberately renders none, and this test records that.
+        """The shell renders no preheader, unlike an authored template.
 
-        ``emails/src/templates/shell.vue``'s reasoning: the first visible text of a
-        shell mail is already the subject, so a hidden preheader would spend the
-        whole inbox-snippet budget repeating the subject line the client shows
-        anyway, and the snippet would stop before it reached a single word of the
-        legacy body.
-
-        Asserted as a pair, so that neither half can pass vacuously: the layout's
-        preheader path *works* (the authored template's registration msgid is
-        rendered into a hidden element) and the shell uses *none* of it. A shell
-        that started emitting a preheader, or a layout that lost the feature, each
-        fail exactly one half.
+        A hidden preheader would repeat the subject and use up the inbox
+        snippet before reaching the legacy body. Both halves are
+        checked: the authored template's preheader path works, and the
+        shell uses none of it.
         """
         shell_html, _ = shell()
         authored_html, _ = authored(language="en")
@@ -447,15 +392,13 @@ class TestKitDefaultsAroundALegacyBody:
 
 
 # ===========================================================================
-# Gate 3 -- theme tokens apply to the shell around a legacy body
+# Theme tokens apply to the shell around a legacy body
 # ===========================================================================
 
 
 class TestThemeTokens:
-    """Gate 3. These three records make up "the majority of
-    per-commune needs without touching markup" -- which has to include the
-    migrated PloneMeeting mails, or the shell is the one mail flow where a commune
-    cannot be branded."""
+    """The three theme records must apply to the shell too, or a commune
+    cannot brand its migrated mails."""
 
     def test_changing_the_logo_token_changes_the_shell(self, shell, set_record):
         set_record("logo_url", PROBE_LOGO)
@@ -465,26 +408,17 @@ class TestThemeTokens:
         second, _ = shell()
 
         assert PROBE_LOGO in first, (
-            f"{PROBE_LOGO} never reached the shell: the theme token is not "
-            "rendered (Phase 0 caveat A1 -- it must arrive via tal:attributes)"
+            f"{PROBE_LOGO} never reached the shell: the theme token is not rendered"
+            " (pass it through tal:attributes, not a literal style attribute)"
         )
         assert OTHER_LOGO in second
         assert PROBE_LOGO not in second, "the render cached the old token value"
 
     def test_primary_color_has_no_surface_left_in_the_shell(self, shell, set_record):
-        """The v3 design took the flat colour out of the title band.
+        """The shell has no surface painted with ``primary_color``.
 
-        It was the one place the shell painted `primary_color`: a magenta band
-        holding the subject in white. v3 makes that band #f8f8f8 with ink type
-        under the head artwork, and the token moved to `KitCard`'s rail and
-        `KitButton`'s fill -- neither of which a shell around a legacy body has.
-
-        So the token reaches every other template and no longer reaches this one,
-        and that asymmetry is worth pinning: it is the visible cost of the
-        redesign for the PloneMeeting migration path, not an accident, and if a
-        later change gives the shell a coloured surface again this test is where
-        the decision gets revisited. `tests/test_theme_tokens.py` keeps caveat
-        A1's guard on the four templates that do paint with it.
+        The token reaches every other template through ``KitCard`` and
+        ``KitButton``, but a shell around a legacy body has neither.
         """
         set_record("primary_color", PROBE_COLOR)
 
@@ -493,8 +427,8 @@ class TestThemeTokens:
         assert PROBE_COLOR not in html
 
     def test_the_token_lands_in_a_closed_attribute(self, shell, set_record):
-        """Caveat A1's broken form put the token in the output too, as
-        ``style="background-image:${theme/logo_url"`` -- present and useless."""
+        """The logo token must land inside a closed attribute, not a broken
+        one like ``style="background-image:${theme/logo_url"``."""
         set_record("logo_url", PROBE_LOGO)
 
         html, _text = shell(body=f"<p>{BODY_SENTINEL}</p>")
@@ -512,9 +446,8 @@ class TestThemeTokens:
         assert PROBE_LOGO in html
 
     def test_the_footer_token_is_injected_as_structure(self, shell, set_record):
-        """Rule 4 reserves ``structure`` for two things: the body slot and
-        ``footer_html``. The shell uses both at once, which is the only render in
-        this package where a mistake in one could look like the other."""
+        """``footer_html`` uses ``structure``, like the body slot, so it must
+        not be escaped."""
         set_record("footer_html", PROBE_FOOTER)
 
         html, _text = shell()
@@ -525,7 +458,7 @@ class TestThemeTokens:
         )
 
     def test_tokens_do_not_disturb_the_legacy_body(self, shell, set_record):
-        """The point of gate 3: tokens apply *around* the body, not to it."""
+        """Theme tokens apply around the body, not to it."""
         body = f'<p style="color: #123456;">{BODY_SENTINEL}</p>'
         set_record("logo_url", PROBE_LOGO)
         set_record("footer_html", PROBE_FOOTER)
@@ -537,8 +470,8 @@ class TestThemeTokens:
         assert PROBE_LOGO in html
 
     def test_inlining_still_works_with_a_token_and_a_body(self, shell, set_record):
-        """Caveat A1's other half: the bad token form did not only break the
-        token, it killed inlining for the whole document with the build green."""
+        """A broken token form kills CSS inlining for the whole document
+        while the build still succeeds."""
         set_record("logo_url", PROBE_LOGO)
 
         html, _text = shell(body=f"<p>{BODY_SENTINEL}</p>")
@@ -547,33 +480,26 @@ class TestThemeTokens:
 
 
 # ===========================================================================
-# Gate 5 -- ${...} inside body_html is emitted literally, never evaluated
+# ${...} inside body_html is emitted literally, never evaluated
 # ===========================================================================
 
 
 class TestNoTemplateInjection:
-    """Gate 5, the load-bearing gate of Phase 3 ("the load-bearing risk
-    of this phase; the answer determines whether ``structure`` is safe here at
-    all").
+    """``structure`` must never evaluate ``${...}`` inside an injected body.
 
-    Legacy notification bodies are assembled by string concatenation, so one can
-    contain ``${...}`` by accident or through user-entered content. If Chameleon
-    evaluated it, the injected string would be executable template code with the
-    full render namespace in scope -- a template-injection vulnerability, not a
-    cosmetic defect.
+    Legacy bodies are built by string concatenation and can contain
+    ``${...}`` by accident or from user input. If Chameleon evaluated it,
+    the injected string would run as template code with the full render
+    namespace in scope: a template-injection vulnerability.
 
-    The verification behind this: ``structure``
-    inserts the string as markup *data*, and the compiled template is never
-    re-parsed. These are the regression tests for that conclusion, and they are
-    written so that an evaluation would be *visible* rather than merely
-    unasserted:
+    Each test makes evaluation visible if it happens:
 
-    * a placeholder that resolves to a value the test controls (``${subject}``) is
-      **counted**, so evaluation shows up as one occurrence too many;
-    * a ``${python:...}`` reads an environment variable the test sets, so
-      evaluation shows up as a specific secret string in the output;
-    * every name the render namespace holds gets its own ``${...}``, so a partial
-      evaluation cannot hide behind the ones that happen to be absent.
+    * ``${subject}`` resolves to a known value, so evaluation adds an
+      extra occurrence;
+    * ``${python:...}`` reads an environment variable the test sets, so
+      evaluation reveals a specific value;
+    * every render-namespace name gets its own ``${...}``, so a partial
+      evaluation cannot hide behind an absent one.
     """
 
     def test_a_path_placeholder_survives_verbatim(self, shell):
@@ -586,13 +512,10 @@ class TestNoTemplateInjection:
         assert body in html
 
     def test_a_placeholder_that_would_resolve_is_not_resolved(self, shell):
-        """The counting test, and the sharpest one available.
+        """``${subject}`` is a real namespace name.
 
-        ``${subject}`` is a name that genuinely *is* in the namespace with a value
-        this test chose. Evaluated, the sentinel would appear twice -- once in the
-        heading, once in the body. Emitted as data, exactly once. No other
-        assertion in this module can distinguish "not evaluated" from "the name
-        happened not to resolve".
+        Evaluated, it would appear twice: once in the heading, once in
+        the body. Emitted as data, it appears once.
         """
         html, _text = shell(subject=SUBJECT_SENTINEL, body="<p>${subject}</p>")
 
@@ -603,13 +526,10 @@ class TestNoTemplateInjection:
         assert "<p>${subject}</p>" in html
 
     def test_a_python_expression_is_not_executed(self, shell, monkeypatch):
-        """The ``${python:...}`` form, reading something only the process knows.
+        """A ``${python:...}`` expression in the body must not execute.
 
-        A literal-survival assertion alone would not settle this: a ``python:``
-        expression that raised would also leave no value behind. Reading an
-        environment variable the test sets means the *presence* of that value is
-        the only possible evidence of execution, and its absence is the only
-        possible evidence of none.
+        Reads an environment variable the test sets, so its presence in
+        the output is the only possible evidence of execution.
         """
         readable_only_by_execution = "environ-probe-9c1f"
         monkeypatch.setenv("EMAILKIT_PROBE_VALUE", readable_only_by_execution)
@@ -624,12 +544,11 @@ class TestNoTemplateInjection:
         assert body in html
 
     def test_no_name_in_the_render_namespace_can_be_reached(self, shell, set_record):
-        """Every documented namespace name at once.
+        """No render-namespace name may resolve inside the body, checked
+        for all of them at once.
 
-        A test that probed one name would pass while another leaked. The theme
-        records are set to probe values first, so a ``${theme/primary_color}`` that
-        *did* resolve would produce a string this test can recognise instead of a
-        colour that also legitimately appears in the shell.
+        Theme records are set to probe values first, so a resolved
+        ``${theme/primary_color}`` would produce a recognisable string.
         """
         set_record("primary_color", PROBE_COLOR)
         set_record("logo_url", PROBE_LOGO)
@@ -648,19 +567,12 @@ class TestNoTemplateInjection:
         assert body in html
 
     def test_a_tal_attribute_in_the_body_is_not_executed(self, shell):
-        """The other injection surface, and the one nobody thinks of.
+        """``tal:content`` and ``tal:replace`` attributes in the body must
+        not execute either.
 
-        ``${...}`` is not the only template syntax: ``tal:content`` on an injected
-        element would replace its text and ``tal:replace`` would drop the element.
-        The same mechanism protects both -- the body is data -- so the same test
-        proves both.
-
-        Asserted on *what would change*, not on the expression text: an injected
-        ``tal:content="python:'X'"`` contains the string ``X`` in its attribute
-        whether it ran or not, so the only sound evidence is the element's own
-        content. Hence ``tal:content="subject"`` and the counting trick again: the
-        sentinel is in the namespace, so execution would put it in the body as
-        well as in the heading.
+        Checked on the element's own content, using the same counting
+        trick as ``${subject}``: execution would put the subject
+        sentinel in the body too.
         """
         body = (
             '<p tal:content="subject">original text</p>'
@@ -680,12 +592,11 @@ class TestNoTemplateInjection:
     def test_the_shell_itself_is_still_clean_around_an_injected_placeholder(
         self, shell
     ):
-        """The half a naive reading would get backwards.
+        """The shell around an injected placeholder must still be fully
+        substituted.
 
-        "``${...}`` survives" must not become "the render engine stopped
-        substituting". So with a ``${...}``-carrying body injected, the shell
-        *around* it is asserted to be fully substituted -- which is only checkable
-        because the body is emitted verbatim and can be removed.
+        The body surviving verbatim must not mean the render engine
+        stopped substituting elsewhere.
         """
         body = "<p>${member/fullname} ${python:1 + 1}</p>"
 
@@ -697,42 +608,24 @@ class TestNoTemplateInjection:
 
 
 # ===========================================================================
-# Gate 6 -- pathological input: renders sanely, or fails loudly
+# Pathological input: renders sanely, or fails loudly
 # ===========================================================================
 
 
 class TestPathologicalBodies:
-    """Gate 6, and the honest answer is the same for all three: **every one of
-    them renders, verbatim, and nothing raises.**
+    """The shell does not sanitise or rewrite ``body_html``: it wraps it.
 
-    That is the direct consequence of "no sanitising or rewriting of
-    ``body_html``. The shell wraps; it does not clean." The tests below therefore
-    assert what actually happens rather than what would be nice, and each docstring
-    records the consequence -- including the two where the consequence is a
-    degraded mail that the shell deliberately does not repair (an unbalanced
-    document; a ``<style>`` block most clients drop).
-
-    Writing them turned up one outcome that was neither sane nor loud: a pasted
-    whole document leaked its ``<title>`` into the plaintext part. That was a real
-    defect rather than a documented trade-off, and it was fixed in the extraction --
-    ``test_a_pasted_documents_head_does_not_leak_into_the_plaintext`` is its
-    regression test.
+    Every pathological body here renders verbatim, and nothing raises,
+    even when the result is a degraded mail the shell does not repair.
     """
 
     def test_an_unclosed_tag_renders_verbatim_and_does_not_raise(self, shell):
-        """**Outcome: renders. The document is malformed, by construction.**
+        """An unclosed tag in the body renders verbatim; the shell does not
+        raise or fix it.
 
-        ``<p>Unclosed <b>bold`` is emitted exactly as given, so the shell's own
-        ``</div></td></tr></table>`` trailer closes while the body's ``<b>`` and
-        ``<table>`` are still open. No parser sees this at render time -- the body
-        is data -- so the malformed markup reaches the client, which auto-closes
-        it as browsers and mail clients have always done.
-
-        This is the designed behaviour, not a gap: a shell that "fixed" a
-        consumer's markup would be silently changing mails nobody asked it to
-        change. What the shell does guarantee is that *its own* wrapper
-        is intact, which is what the last two assertions check -- the header, the
-        footer and the closing tags all survive an unbalanced body.
+        The body is never parsed, so the malformed markup reaches the
+        client as given. The shell only guarantees that its own wrapper
+        stays intact.
         """
         body = f"<p>Unclosed <b>{BODY_SENTINEL} and <table><tr><td>cell"
 
@@ -747,17 +640,12 @@ class TestPathologicalBodies:
         )
 
     def test_a_style_block_in_the_body_renders_verbatim(self, shell):
-        """**Outcome: renders. The ``<style>`` lands in the document body.**
+        """A ``<style>`` block in the body lands in the document body, not
+        ``<head>``. The shell does not hoist or fix it.
 
-        Which is invalid placement per the HTML spec and is stripped outright by
-        Gmail and by Outlook.com, so a legacy body relying on its own ``<style>``
-        block will lose that styling in most clients. Not something the shell can
-        fix: hoisting the block into ``<head>`` would mean parsing and rewriting
-        the body, and the block might collide with the kit's own inlined CSS.
-
-        What *is* asserted: the shell's own head stylesheet (dark mode) is
-        untouched, the injected block did not migrate into the head, and the CSS
-        text does not leak into the plaintext part.
+        Checks that the shell's own head stylesheet is untouched, the
+        injected block stays out of the head, and its CSS text does not
+        leak into the plaintext part.
         """
         body = f"<style>.legacy{{color:#ff0000}}</style><p>{BODY_SENTINEL}</p>"
 
@@ -771,20 +659,12 @@ class TestPathologicalBodies:
         assert "#ff0000" not in text, "CSS leaked into the plaintext part"
 
     def test_a_whole_html_document_pasted_in_renders_nested(self, shell):
-        """**Outcome: renders. Two ``<html>`` elements, one inside the other.**
+        """A pasted whole HTML document renders nested inside the shell: two
+        ``<html>`` elements, one inside the other.
 
-        A pasted ``<!DOCTYPE html><html>…</html>`` is emitted verbatim into the
-        slot, so the result is a document containing a document: nested ``<html>``,
-        ``<head>`` and ``<body>``, plus a second ``lang`` declaration. Every mail
-        client tolerates this -- they all normalise, most strip ``<head>`` entirely
-        -- and the visible text renders inside the shell.
-
-        The properties that matter, and are asserted, are that the *outer*
-        document is still ours: our doctype comes first, our ``lang`` is the render
-        language and not the pasted one, and our wrapper closes last. Which is
-        also why the pasted ``lang="nl"`` below is written with the same double
-        quotes our layout uses -- so that a shell which let the inner declaration
-        win would be caught rather than missed on a quoting technicality.
+        Checks that the outer document is still ours: our doctype comes
+        first, our ``lang`` wins over the pasted one, and our wrapper
+        closes last.
         """
         body = (
             '<!DOCTYPE html><html lang="nl"><head><title>Document collé</title>'
@@ -806,14 +686,11 @@ class TestPathologicalBodies:
         assert BODY_SENTINEL in text
 
     def test_a_pasted_documents_head_does_not_leak_into_the_plaintext(self, shell):
-        """A nested ``<head>`` must not contribute its ``<title>`` to text/plain.
+        """A nested ``<head>``'s ``<title>`` must not reach the plaintext
+        part.
 
-        Found by gate 6 as a real leak and fixed rather than left as a known gap:
-        the extraction stripped ``<style>``, ``<script>``, comments and hidden
-        elements but not ``<head>``, so a pasted whole document glued its title to
-        the first line of the body. Only ever visible in the plaintext part --
-        clients drop the nested head from the HTML one -- which is exactly the kind
-        of defect nobody would have noticed in a browser preview.
+        The extraction strips ``<style>``, ``<script>``, comments, and
+        hidden elements, and must strip ``<head>`` too.
         """
         title = "Document collé"
         body = (
@@ -829,19 +706,17 @@ class TestPathologicalBodies:
 
 
 # ===========================================================================
-# Gate 7 -- the plaintext part of an injected body
+# The plaintext part of an injected body
 # ===========================================================================
 
 
 class TestPlaintextPart:
-    """Gate 7. There is deliberately no ``shell.txt.pt`` twin -- its only content
-    would be ``body_html``, which is HTML -- so the plaintext part is a naive
-    extraction of the rendered document. That makes it the one part of
-    ``render_shell``'s output that is *derived* rather than composed, and the part
-    nobody looks at until a client renders only that.
+    """There is no ``shell.txt.pt`` twin. The plaintext part is instead a
+    naive extraction from the rendered html.
 
-    The fixture body is used rather than a toy one: gate 7 is about what happens to
-    real legacy markup -- nested tables, ``&nbsp;``, entities, a bare ``<br>``.
+    Uses a real fixture body, not a toy one, to check what happens to
+    real legacy markup: nested tables, ``&nbsp;``, entities, a bare
+    ``<br>``.
     """
 
     @pytest.fixture
@@ -861,9 +736,8 @@ class TestPlaintextPart:
         )
 
     def test_the_visible_text_of_the_body_survives(self, rendered):
-        """Every sentence of the legacy body, not a sampled one. A stripper that
-        ate table cells or dropped everything after the first ``<table>`` would
-        still pass a single-marker check."""
+        """Every sentence of the legacy body must survive, not a sampled
+        one."""
         _html, text = rendered
 
         for phrase in (
@@ -881,18 +755,11 @@ class TestPlaintextPart:
             assert phrase in text, f"{phrase!r} was lost in the plaintext extraction"
 
     def test_table_cells_are_separated_not_concatenated(self, rendered):
-        """ "Plaintext: table cells get a `` | `` separator".
+        """Table cells get a `` | `` separator in the plaintext part, not run
+        together.
 
-        Legacy notification bodies are table-heavy and ``render_shell`` has no
-        plaintext twin to fall back on, so what this extraction does to a ``<tr>``
-        *is* the plaintext part of every migrated PloneMeeting mail. Concatenated
-        cells produced ``PointDécision`` and ``Budget 2026Approuvé`` -- readable as
-        neither a table nor a sentence, and the kind of defect that only ever shows
-        up in the one client that renders ``text/plain``.
-
-        Both halves are asserted: the separator is there, and the old
-        concatenation is not. The negative half is what keeps this from passing
-        again if a future change puts a newline between cells instead.
+        Checks both that the separator is present and that cells are
+        not concatenated.
         """
         _html, text = rendered
 
@@ -902,9 +769,7 @@ class TestPlaintextPart:
         assert "2026Approuvé" not in text
 
     def test_a_row_stays_on_one_line(self, rendered):
-        """The reason the separator was chosen over a line break: a two-cell row
-        read as two unrelated lines, so nothing said which decision belonged to
-        which point."""
+        """A table row must stay on one line, not split across lines."""
         _html, text = rendered
 
         rows = [line for line in text.splitlines() if "Reporté" in line]
@@ -914,25 +779,22 @@ class TestPlaintextPart:
         )
 
     def test_no_trailing_separator_is_left_at_end_of_line(self, rendered):
-        """The last cell of a row leaves a separator with nothing after it. A
-        plaintext part whose every table line ends in `` |`` looks like a rendering
-        accident, which is what it would be."""
+        """A line must not end with a dangling cell separator."""
         _html, text = rendered
 
         dangling = [line for line in text.splitlines() if line.rstrip().endswith("|")]
         assert dangling == [], f"lines ending in a cell separator: {dangling}"
 
     def test_the_subject_opens_the_plaintext_part(self, rendered, fixture_body):
-        """The subject is the first thing a text-only client sees, which is the
-        stated reason the shell renders no preheader."""
+        """The subject is the first thing a text-only client sees."""
         subject, _body = fixture_body
         _html, text = rendered
 
         assert text.lstrip().startswith(subject)
 
     def test_entities_are_decoded_not_left_literal(self, rendered):
-        """``&nbsp;``, ``&laquo;`` and friends are French typography in these
-        bodies. Left literal they are noise in every line."""
+        """HTML entities like ``&nbsp;`` and ``&laquo;`` must be decoded, not
+        left literal."""
         _html, text = rendered
 
         assert "&nbsp;" not in text
@@ -941,17 +803,16 @@ class TestPlaintextPart:
         assert "«" in text
 
     def test_there_is_no_invisible_filler(self, rendered):
-        """The kit pads its preheader with figure spaces and joins Outlook spacer
-        cells with ``&zwj;``. Both are invisible in HTML and mojibake in a
-        plaintext part -- and the naive extraction sees them after decoding."""
+        """Invisible characters, such as figure spaces and ``&zwj;``, must
+        not reach the plaintext part."""
         _html, text = rendered
 
         found = support.INVISIBLE_CHARACTERS.findall(text)
         assert found == [], f"invisible characters in the plaintext part: {found!r}"
 
     def test_block_structure_became_line_breaks(self, rendered):
-        """A plaintext part where every table row ran together on one line is
-        technically tag-free and unreadable."""
+        """Block elements must become line breaks, not run together on one
+        line."""
         _html, text = rendered
 
         lines = [line for line in text.splitlines() if line.strip()]
@@ -961,9 +822,8 @@ class TestPlaintextPart:
         )
 
     def test_the_css_and_the_dark_mode_stylesheet_are_gone(self, rendered):
-        """The shell's head carries a ``<style>`` block and an mso conditional
-        comment. Either one reaching the plaintext part would put CSS in front of
-        the message."""
+        """The shell's head ``<style>`` block and mso comment must not reach
+        the plaintext part."""
         _html, text = rendered
 
         assert "prefers-color-scheme" not in text
@@ -978,16 +838,11 @@ class TestPlaintextPart:
     def test_there_is_no_plaintext_twin_and_none_is_warned_about(
         self, integration, caplog, fixture_body
     ):
-        """The naive extraction is the shell's *designed* path, not a fallback.
+        """The shell ships no ``.txt.pt`` twin, and rendering it logs no
+        deprecation for a missing twin.
 
-        A template with no ``.txt.pt`` twin gets "a warning at startup" and
-        "a logged deprecation" on every render. For the shell that would be a
-        deprecation warning nobody can ever act on: a twin's only content would be
-        ``body_html``, which is HTML, so the twin would put tags in the plaintext
-        part. Both halves are pinned here -- no twin is shipped, and rendering the
-        shell logs no deprecation -- because the natural "fix" for the log line
-        (adding a ``shell.txt.pt``) would silently make every migrated mail's
-        plaintext part worse.
+        A twin's only content would be ``body_html``, which is HTML, so
+        adding one would put tags in the plaintext part.
         """
         from imio.emailkit.discovery import TEXT_SUFFIX
         from imio.emailkit.render import SHELL_TEMPLATE
@@ -1015,24 +870,20 @@ class TestPlaintextPart:
 
 
 # ===========================================================================
-# Gate 9 -- language: subject msgid translated, lang correct, FR != NL
+# Language: subject msgid translated, lang correct, FR != NL
 # ===========================================================================
 
 
 class TestLanguage:
-    """Gate 9. ``subject`` "accepts a msgid or a literal, like
-    ``.subject()``" and the shell shares ``render()``'s "same namespace, theme
-    tokens and locale helpers -- one code path, not a parallel one".
+    """``subject`` accepts a msgid or a literal. The shell shares
+    ``render()``'s namespace, theme tokens, and locale helpers.
 
-    Expected subjects are *computed* through ``zope.i18n``, never typed in: a
-    hardcoded French string would fail on any catalog edit and -- worse -- would
-    still pass if ``render_shell`` shipped the bare msgid whenever the catalog had
-    no entry.
+    Expected subjects are computed through ``zope.i18n``, not hardcoded,
+    so a catalog edit cannot silently break these tests.
     """
 
-    #: A msgid in this package's own domain whose FR and NL entries genuinely
-    #: differ. ``email_subject_notification`` translates to "Notification" in both
-    #: FR and EN, so it cannot tell "translated" from "passed through".
+    #: A msgid whose FR and NL translations genuinely differ, so a
+    #: passed-through msgid can be told apart from a translated one.
     MSGID = support.OVERRIDE_SUBJECT_MSGID
 
     @pytest.fixture
@@ -1054,8 +905,8 @@ class TestLanguage:
         assert self.MSGID not in html, "the bare msgid reached the output"
 
     def test_a_literal_subject_is_passed_through_unchanged(self, shell):
-        """ "accepts a msgid or literal string". A literal is not a msgid, so
-        no catalog may touch it."""
+        """A literal subject must pass through unchanged; no catalog may
+        touch it."""
         html, _text = shell(subject=SUBJECT_SENTINEL, language="nl")
 
         assert SUBJECT_SENTINEL in html
@@ -1078,9 +929,8 @@ class TestLanguage:
         assert fr_text != nl_text
 
     def test_the_legacy_body_is_not_translated(self, shell, msgid):
-        """The body is the consumer's markup in whatever language they built it.
-        It must come out identical in every language group -- byte-for-byte, since
-        an i18n pass over it would be a silent rewrite of a mail body."""
+        """The legacy body must render identically in every language, byte
+        for byte."""
         body = f"<p>{BODY_SENTINEL} &laquo;&nbsp;texte&nbsp;&raquo;<br></p>"
 
         fr_html, _ = shell(subject=msgid, body=body, language="fr")
@@ -1091,10 +941,8 @@ class TestLanguage:
         assert fr_html.count(BODY_SENTINEL) == nl_html.count(BODY_SENTINEL) == 1
 
     def test_rendering_twice_in_two_languages_does_not_leak(self, shell, msgid):
-        """The compiled shell is cached (one ``PageTemplateFile`` per path). A
-        language cached into the compiled program would ship Dutch to French
-        communes, and the shell is the *shared* template -- every migrated
-        notification in the site goes through this one file."""
+        """The compiled shell is cached and shared by every caller. A cached
+        language must not leak into a later render in another language."""
         first, _ = shell(subject=msgid, language="fr")
         _dutch, _ = shell(subject=msgid, language="nl")
         again, _ = shell(subject=msgid, language="fr")
@@ -1102,10 +950,10 @@ class TestLanguage:
         assert first == again
 
     def test_omitting_the_language_uses_the_negotiated_one(self, shell, integration):
-        """Applied to the sibling: "the negotiated language when omitted".
+        """Omitting the language uses the request's negotiated language.
 
-        Compared against the request's own ``LANGUAGE`` rather than a hardcoded
-        code, so the test states the *rule* and not this layer's happenstance.
+        Compared against the request's own ``LANGUAGE``, not a hardcoded
+        code.
         """
         request = integration["request"]
         negotiated = request.get("LANGUAGE", None)
@@ -1120,18 +968,15 @@ class TestLanguage:
 
 
 class TestPureFunction:
-    """``render()``'s purity, which the golden files and ``@@emailkit-preview`` both
-    rely on. ``render_shell`` shares ``render()``'s code path, so this is a
-    regression test for that sharing rather than a second implementation of it."""
+    """``render_shell`` must be pure, like ``render()``, since it shares the
+    same code path."""
 
     def test_render_shell_is_repeatable(self, shell):
         assert shell() == shell()
 
     def test_two_bodies_do_not_bleed_into_each_other(self, shell):
-        """The shell is one cached compiled template shared by every caller. A
-        body retained between renders would mean one commune's notification
-        appearing in another's mail -- the worst failure this function could
-        have."""
+        """The shell is one cached template shared by every caller. A body
+        must not leak from one render into the next."""
         first, _ = shell(body=f"<p>{BODY_SENTINEL}</p>")
         second, _ = shell(body="<p>autre corps</p>")
 

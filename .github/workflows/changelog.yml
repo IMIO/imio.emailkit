@@ -3,9 +3,7 @@ on:
   pull_request:
     types: [assigned, opened, synchronize, reopened, labeled, unlabeled]
     branches:
-      # main, not the cookieplone template's master: this repository's default
-      # branch is main, and a mismatch here means the check never runs at all --
-      # a green PR that never had a changelog fragment.
+      # This repository's default branch is main, not master.
       - main
 
 jobs:
@@ -22,9 +20,6 @@ jobs:
 
       - name: Check for presence of a Change Log fragment (only pull requests)
         run: |
-          # Fetch the pull request' base branch so towncrier will be able to
-          # compare the current branch with the base branch.
-          # Source: https://github.com/actions/checkout/#fetch-all-branches.
           git fetch --no-tags origin ${BASE_BRANCH}
           towncrier check --dir .
         env:

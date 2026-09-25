@@ -2,39 +2,22 @@
 /**
  * `dummy.complete:convocation` -- one template that uses the whole kit catalog.
  *
- * Deliberately the busiest template in the repository, because it is the one a
- * consumer copies from. Every kit component appears once, and so does every
- * runtime construct that has a rule attached to it.
+ * Meant to be copied from: every kit component appears once.
  *
- * Context keys (see `tests/fixtures/convocation.py`):
- *   title     -- heading
- *   when      -- ISO date string, formatted through the locale helper
- *   place     -- where the session sits
- *   rows      -- list of {title, decision} mappings for the data table
- *   cta_url   -- optional; the button only renders when set
- *   cta_label -- button label
+ * Context keys (see `tests/fixtures/convocation.py`): title, when (ISO date
+ * string), place, rows (list of {title, decision}), cta_url (optional),
+ * cta_label.
  *
- * The five rules this file demonstrates, all of them from failures that produced
- * a **successful build**:
- *
- * 1. `${python: format_date(when)}`, never `${format_date(when)}`. A TAL *path*
- *    expression cannot call a function; the path form raises `Invalid variable
- *    name` at render time.
- * 2. `tal:repeat` on the author's own `<tr>`, never on `<KitDataTable>`
- *    (attribute fallthrough would land it on the wrong element).
- * 3. No `${...}` in a literal `class` or `style` attribute, ever. In `style` the
- *    `{` opens a CSS block, the `}` is eaten and CSS inlining dies for the whole
- *    document; in `class` the `css.safe` rewriter turns `$` into `-` and strips
- *    the braces. Runtime styling goes through
- *    `tal:attributes="style string:…"`, and runtime colours through `bgcolor`.
+ * Rules:
+ * 1. `${python: format_date(when)}`, never `${format_date(when)}`: a TAL
+ *    path expression cannot call a function.
+ * 2. `tal:repeat` on the author's own `<tr>`, never on the data-table
+ *    component (attribute fallthrough would land it on the wrong element).
+ * 3. No `${...}` in a literal `class` or `style` attribute: it breaks CSS
+ *    inlining. Runtime styling uses `tal:attributes`, colours use `bgcolor`.
  * 4. `i18n:domain` on the author's own element when the msgid belongs to the
- *    add-on's own catalog. The kit shell declares `i18n:domain="imio.emailkit"`
- *    on `<html>`, and a nested `i18n:translate` inherits that domain -- so
- *    without the line below this add-on's msgid would be looked up in the wrong
- *    catalog and render its default text, which is indistinguishable from
- *    success.
- * 5. No `--` in any comment, in this file or in the compiled output. Chameleon
- *    refuses to parse it and the `.pt` becomes unloadable at *runtime*.
+ *    add-on's catalog, since the shell's own domain would otherwise apply.
+ * 5. No two consecutive hyphens in any comment: Chameleon cannot parse it.
  */
 </script>
 
@@ -62,10 +45,8 @@
     </KitDataTable>
 
     <!--
-      The label/value pair list, three rows deep, which is what exercises the
-      separator: `KitDataList`'s rule is a `tr + tr` selector, so a single-row
-      list renders identically with the rule and without it. This is the only
-      place in the repository where a wrong one would show up in a golden file.
+      Three rows, to exercise the `tr + tr` row-separator rule: a single
+      row would render the same with or without it.
     -->
     <KitCard>
       <template #overline>
@@ -88,11 +69,7 @@
       </KitDataList>
     </KitCard>
 
-    <!--
-      Two actions on one row. `inline` drops each button's own top margin, which
-      the group supplies once for the pair; without it the row would carry 20 px
-      of margin on the outside and 20 more inside each cell.
-    -->
+    <!-- `inline` drops each button's own top margin; the group supplies it once. -->
     <div tal:condition="cta_url | nothing">
       <KitButtonGroup align="center">
         <template #primary>

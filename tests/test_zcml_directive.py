@@ -16,10 +16,9 @@ import pytest
 import sys
 
 
-#: ``tests/scanfixtures`` is a ``sys.path`` root, not a package: the fixture
-#: addons under it are imported by their own dotted names (``fixture.basic``)
-#: exactly as a real consumer egg would be, so the directive sees a package
-#: whose ``__name__`` is the template namespace.
+#: ``tests/scanfixtures`` is a ``sys.path`` root, not a package, so the
+#: fixture addons import by their own dotted names, like a real consumer
+#: egg, and the directive sees a package with a real ``__name__``.
 SCANFIXTURES = Path(__file__).parent / "scanfixtures"
 if str(SCANFIXTURES) not in sys.path:
     sys.path.insert(0, str(SCANFIXTURES))
@@ -38,12 +37,11 @@ ZCML_TEMPLATE = """\
 
 
 def execute(body, package=fixture.basic):
-    """Run ``body`` as the content of a ZCML file belonging to ``package``.
+    """Runs ``body`` as the content of a ZCML file belonging to ``package``.
 
-    Setting ``machine.package`` is what a real ``<include package=...>`` ends
-    up doing for the file it processes; the directive reads ``context.package``
-    to derive both the namespace and the base the ``directory`` attribute
-    resolves against, and a bare machine carries no package at all.
+    Sets ``machine.package``, since the directive reads
+    ``context.package`` to derive the template namespace and the base
+    the ``directory`` attribute resolves against.
     """
     machine = ConfigurationMachine()
     xmlconfig.registerCommonDirectives(machine)

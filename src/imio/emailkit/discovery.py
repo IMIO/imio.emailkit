@@ -1,20 +1,13 @@
 """The registry of email templates the ``emailkit:templates`` directive fills.
 
-A consumer addon declares its templates in ZCML (see ``meta.zcml`` and
-``zcml.py``); each ``<emailkit:template>`` becomes a configuration action whose
-callable resolves the ``.pt`` / ``.txt.pt`` files on disk and writes one
-:class:`Template` here. Lookup stays namespaced: ``"<package>:<basename>"``.
+A consumer addon declares templates in ZCML. Each ``<emailkit:template>``
+resolves its files on disk and writes one :class:`Template` here, under
+the namespaced name ``"<package>:<basename>"``.
 
-There is no scan and no cache: ZCML execution *is* the startup scan, so the
-"missing plaintext twin" warning lands in the startup log by construction, and
-duplicate registrations are a ``ConfigurationConflictError`` instead of a
-silent overwrite. Re-executing the same ZCML (test layers stack it) simply
-rewrites the same values, which is why :func:`register_template` overwrites
-without complaint -- within one configuration run the action discriminator
-already guarantees uniqueness.
+A duplicate registration raises ``ConfigurationConflictError``.
 
-:func:`overlay` is the test seam: it snapshots the registry so a block can
-register throwaway addons (the dummies) and leave no trace.
+:func:`overlay` is the test seam: it snapshots the registry for
+throwaway test registrations.
 """
 
 from contextlib import contextmanager
@@ -41,26 +34,22 @@ class Template:
 
     #: Namespaced lookup name, ``"<package>:<basename>"``.
     name: str
-    #: The package whose ZCML registered it, i.e. the namespace part of :attr:`name`.
+    #: Package that registered it.
     package: str
-    #: The file stem, i.e. the part after the colon in :attr:`name`.
+    #: File stem, after the colon in :attr:`name`.
     basename: str
-    #: The compiled HTML template. Always present -- a template whose ``.pt``
-    #: is missing is not registered at all.
+    #: Compiled HTML template.
     html_path: Path
-    #: The plaintext twin, or ``None`` when the addon ships none; ``render()``
-    #: then falls back to naive text extraction and logs a deprecation.
+    #: Plaintext twin, or ``None`` (``render()`` then extracts naively).
     text_path: Path | None
-    #: i18n msgid of the subject, from the registration.
+    #: i18n msgid of the subject.
     subject: object = None
-    #: Optional i18n msgid of the hidden inbox-preview line.
+    #: i18n msgid of the preview line.
     preheader: object = None
 
 
 _templates = {}
-#: ``package -> templates directory``; what the build tooling reads to know
-#: where compiled output lands, even for a package whose first build has not
-#: run yet (its directory holds no ``.pt`` to derive the answer from).
+#: Maps package to its templates directory, for the build tooling.
 _directories = {}
 
 
@@ -128,12 +117,7 @@ def overlay():
 
 
 def load_template(package, package_dir, directory, basename, subject, preheader):
-    """Resolve one registration to files on disk, or ``None`` plus a warning.
-
-    Called when configuration actions execute -- at instance startup, or at the
-    end of a build-tool scan -- so every warning below lands where someone
-    deploying can see it, not in the log of whoever sends the first mail.
-    """
+    """Resolve one registration to files on disk, or ``None`` plus a warning."""
     directory_path = (Path(package_dir) / directory).resolve()
     html_path = directory_path / f"{basename}{HTML_SUFFIX}"
     if not html_path.is_file():

@@ -1,13 +1,7 @@
-"""Shim so that the package can be a zc.buildout develop egg.
+"""Shim so the package can be a zc.buildout develop egg.
 
-Same reason as ``imio.emailkit``'s own ``setup.py``, and here it is not merely a
-convenience: ``zc.buildout``'s ``develop`` runs ``setup.py`` directly, and this
-distribution *is* a buildout recipe. Without this file a checkout could not be
-develop-installed by the very tool it extends.
-
-The metadata lives in ``pyproject.toml`` in PEP 621 form and setuptools reads it
-from there; the two arguments below are restated only because
-``check-python-versions`` reads ``setup.py`` statically.
+Metadata lives in ``pyproject.toml``; the arguments below are restated only
+because ``check-python-versions`` reads ``setup.py`` statically.
 """
 
 from setuptools import setup

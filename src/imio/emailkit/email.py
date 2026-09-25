@@ -7,26 +7,9 @@
         .reply_to("noreply@imio.be").with_context(item=item, meeting=meeting) \\
         .attach(convocation_pdf, filename="convocation.pdf").send()
 
-**This API is frozen.** The methods are exactly the nine names and there are
-no others. Every one of them appends to a list or sets a field and returns
-``self``; none of them touches the site, the registry, the filesystem or the
-network. Everything that can fail happens inside :meth:`Email.send`, which is what
-makes "it holds data, it does not grow behaviour" checkable rather than
-aspirational: if a method here ever needs an ``if``, the design is wrong.
-
-The two neighbouring modules hold the polymorphism, on purpose:
-:mod:`imio.emailkit.recipients` turns strings/userids/members into
-``IEmailRecipient``, :mod:`imio.emailkit.attachments` turns five kinds of source
-into bytes. Rendering is :func:`imio.emailkit.render.render`, unchanged and not
-duplicated.
-
-Two notes on the module name and the imports below. This module is
-``imio.emailkit.email`` and it imports the standard library's ``email`` package;
-under Python 3's absolute imports those do not collide -- ``from email.message
-import EmailMessage`` here resolves to the stdlib, because this module is only
-ever reachable as ``imio.emailkit.email``. And ``policy.SMTP`` rather than the
-default policy: it is the default with CRLF line endings, which is what
-``MailHost`` hands to ``smtplib`` verbatim.
+**This API is frozen**: exactly nine methods, each setting a field and
+returning ``self``. Everything that can fail happens inside
+:meth:`Email.send`.
 """
 
 from email.headerregistry import Address
@@ -50,10 +33,9 @@ import logging
 
 logger = logging.getLogger("imio.emailkit.email")
 
-#: Fields whose recipients are grouped by language and become message headers.
-#: ``bcc`` is here too: ``MailHost`` strips the ``Bcc`` header after collecting
-#: envelope recipients from it, which is exactly the behaviour we want and the
-#: reason ``send()`` never passes ``mto`` explicitly.
+#: Recipient fields grouped by language, each becoming a message header.
+#: ``MailHost`` strips the ``Bcc`` header after reading envelope recipients
+#: from it, so ``send()`` never passes ``mto`` explicitly.
 RECIPIENT_FIELDS = ("to", "cc", "bcc")
 
 #: Header name per recipient field.
@@ -66,10 +48,8 @@ class Email:
     :param name: namespaced template name, e.g.
         ``"imio.pm.notifications:item_published"``
 
-    The template is *not* looked up here. ``Email("typo")`` is legal and silent;
-    ``TemplateNotFound`` arrives from :meth:`send`. That is deliberate and matches
-    how recipients and attachments behave -- one place where things fail, one place
-    to look.
+    The template is not looked up here: ``TemplateNotFound`` raises only
+    from :meth:`send`.
     """
 
     def __init__(self, name):
@@ -96,37 +76,27 @@ class Email:
     def bcc(self, value):
         """Add Bcc recipients. Same accepted values as :meth:`to`.
 
-        The ``Bcc`` header is removed before the message goes out, by ``MailHost``,
-        after it has collected the envelope recipients from it. Blind means blind.
+        ``MailHost`` removes the ``Bcc`` header after it reads the envelope
+        recipients from it. Blind means blind.
         """
         self._recipients["bcc"].extend(flatten(value))
         return self
 
     def reply_to(self, value):
-        """Set the ``Reply-To`` addresses. Same accepted values as :meth:`to`.
-
-        A literal address is the common case here. The
-        same values are accepted because it is the same header machinery and the
-        same resolution rules -- ``.reply_to(item_author)`` should not need the
-        caller to dig out an address by hand, and a second, str-only code path for
-        one header would be the thing that eventually disagrees with the first.
-        """
+        """Set the ``Reply-To`` addresses. Same accepted values as :meth:`to`."""
         self._reply_to.extend(flatten(value))
         return self
 
     def sender(self, value):
-        """Override the ``From`` address. Same accepted values as :meth:`to`.
-
-        Omitted, ``From`` is the site's configured sender.
+        """Override the ``From`` address. Same accepted values as :meth:`to`;
+        omitted, ``From`` is the site's configured sender.
         """
         self._sender = flatten(value)
         return self
 
     def subject(self, value):
-        """Override the subject; an i18n msgid or a literal string.
-
-        Omitted, the subject is the msgid in the template's registration,
-        translated per language group.
+        """Override the subject: an i18n msgid or literal string. Omitted, the
+        subject is the msgid in the template's registration.
         """
         self._subject = value
         return self
@@ -141,8 +111,8 @@ class Email:
 
         ``source`` is raw ``bytes``, a filesystem path, an open binary file, a
         ``NamedFile``/``NamedBlobFile`` value, or a Plone File/Image content
-        object. ``filename`` and ``mimetype`` are inferred where the source carries
-        them and required for ``bytes``; nothing is read until :meth:`send`.
+        object. ``filename`` and ``mimetype`` are required for ``bytes``, else
+        inferred. Nothing is read until :meth:`send`.
         """
         self._attachments.append((source, filename, mimetype))
         return self
@@ -152,26 +122,14 @@ class Email:
     def send(self, immediate=False):
         """Resolve, render per language group, and hand each message to ``MailHost``.
 
-        :param immediate: bypass the transaction and talk to the MTA now. The only
-            escape hatch here; leave it alone unless you know why you want it.
-        :returns: the :class:`~email.message.EmailMessage` objects handed to
-            ``MailHost``, one per language group, in group order. Not shown in
-            the usage example above, which discards it -- but returning what
-            was built costs nothing and is what makes the preview view's send-test
-            and the test suite's assertions possible without re-deriving it.
+        :param immediate: bypass the transaction and send now.
+        :returns: the built :class:`~email.message.EmailMessage` objects.
         :raises TemplateNotFound: no template registered under :attr:`name`
         :raises RecipientError: any recipient could not be resolved
         :raises AttachmentError: any attachment could not be resolved
 
-        Resolution happens before the first render so that a mistyped userid does
-        not surface only after half the language groups have been queued.
-        Deliberately in this order: recipients first, because that is the argument
-        callers get wrong most often, and both are reported exhaustively within
-        their own kind.
-
-        By default delivery is the transaction-bound ``MailHost`` send, so an
-        aborted transaction sends nothing -- ``zope.sendmail`` joins a data manager
-        to the current transaction and only talks to the MTA in ``tpc_finish``.
+        Recipients and attachments resolve before any render. Delivery is
+        transaction-bound by default.
         """
         template = get_template(self.name)
         resolved = {
@@ -187,11 +145,9 @@ class Email:
         parts = attachment_sources.resolve(self._attachments)
         sender = self._resolve_sender()
 
-        # Every group is rendered and assembled before *any* of them is handed
-        # over. With the default delivery an abort would undo a partial run
-        # anyway, but `immediate=True` has no transaction to hide behind: a
-        # template error in the Dutch group would otherwise leave the French mail
-        # already on the wire and no way to tell.
+        # Build every group before sending any of them. With `immediate=True`
+        # there is no transaction to undo a partial run: a later template
+        # error must not leave an earlier mail already sent.
         groups = []
         for language, fields in recipient_sources.group_by_language(
             resolved, recipient_sources.default_language()
@@ -213,10 +169,9 @@ class Email:
 
         mailhost = getUtility(IMailHost)
         for language, fields, message in groups:
-            # No `mto`/`mfrom`: MailHost's own `_mungeHeaders` collects envelope
-            # recipients from the To/Cc/Bcc headers and then deletes Bcc. Passing
-            # `mto` would *overwrite* the To header with the full list -- Bcc
-            # addresses included, in front of everyone.
+            # No `mto`: MailHost's `_mungeHeaders` reads envelope recipients
+            # from the To/Cc/Bcc headers, then deletes Bcc. Passing `mto`
+            # would overwrite the To header, exposing Bcc addresses.
             mailhost.send(message, immediate=immediate)
             logger.info(
                 "%s %s to %s recipient(s) in %r",
@@ -230,12 +185,7 @@ class Email:
     # -- internals ----------------------------------------------------------
 
     def _resolve_subject(self, template, language):
-        """The subject for one language group: the override, else the registration.
-
-        Both go through ``zope.i18n.translate``, which returns a plain string
-        unchanged and translates a msgid into ``language`` -- so "accepts a
-        msgid or literal string" needs no branch here.
-        """
+        """The subject for one language group: the override, else the registration."""
         subject = self._subject if self._subject is not None else template.subject
         if subject is None:
             raise EmailkitError(
@@ -246,12 +196,7 @@ class Email:
         return zope_translate(subject, target_language=language)
 
     def _resolve_sender(self):
-        """``From``: the ``.sender()`` override, else the site's configured sender.
-
-        Failing here rather than letting ``MailHost`` raise
-        ``"Message missing SMTP Header 'From'"``: that message is true but says
-        nothing about *which* of the two registry records to go and fill in.
-        """
+        """``From``: the ``.sender()`` override, else the site's configured sender."""
         if self._sender is not None:
             return format_addresses(recipient_sources.resolve(self._sender))
         registry = queryUtility(IRegistry)
@@ -272,15 +217,10 @@ class Email:
 def flatten(value):
     """Flatten one ``.to()``-style argument into a list of scalar values.
 
-    This accepts "an email string, a Plone member object, a userid, or an iterable
-    of those", nested freely -- ``.cc(meeting_managers)`` where that is a list of
-    lists is nobody's mistake worth an exception.
-
-    ``__iter__`` is the test, not ``__getitem__``: Zope objects are littered with
-    ``__getitem__`` (it is how traversal works), so duck-typing on it would explode
-    a content object into its children. Strings are scalars here even though they
-    iterate, for obvious reasons; ``None`` flattens to nothing, so
-    ``.cc(maybe_someone)`` needs no guard at the call site.
+    Accepts an email string, a Plone member, a userid, or a nested
+    iterable of those; ``None`` flattens to nothing. Tests ``__iter__``,
+    not ``__getitem__``, since Zope content objects use the latter for
+    traversal.
     """
     if value is None:
         return []
@@ -297,10 +237,7 @@ def flatten(value):
 def format_addresses(recipients):
     """Render resolved recipients as one header value: ``Name <a@b.c>, …``.
 
-    ``Address`` rather than ``email.utils.formataddr`` so that a display name
-    containing a comma, a quote or a non-ASCII character is the header registry's
-    problem and not ours -- the failure mode of getting this wrong by hand is a
-    header that splits into two recipients.
+    Uses ``Address``, not ``email.utils.formataddr``, to escape names safely.
     """
     return ", ".join(str(as_address(recipient)) for recipient in recipients)
 
@@ -308,12 +245,8 @@ def format_addresses(recipients):
 def as_address(recipient):
     """One resolved recipient as an :class:`email.headerregistry.Address`.
 
-    ``parseaddr`` even though the default ``str`` adapter already normalises: a
-    Plone member's ``email`` property is free text a human typed into a form, and
-    ``"Alice <alice@commune.be>"`` in that field would otherwise become the
-    username half of the address. ``rpartition`` because the domain is what
-    follows the *last* ``@``; ``recipients.resolve()`` has already guaranteed
-    there is one.
+    Parses with ``parseaddr``: a member's ``email`` property is free text,
+    so a name embedded in it must be split out first.
     """
     display_name, address = parseaddr(recipient.email)
     username, _, domain = address.rpartition("@")
@@ -327,15 +260,8 @@ def as_address(recipient):
 def build_message(sender, fields, reply_to, subject, html, text, attachments):
     """Assemble the message: ``set_content(text)`` then the HTML alternative.
 
-    The result is ``multipart/alternative`` -- plaintext first, HTML second, which
-    is the order that makes a text-only client show the text part -- wrapped in
-    ``multipart/mixed`` by ``add_attachment`` as soon as there is one attachment.
-    Attachments are identical across language groups, so the same resolved
-    bytes are reused for every message.
-
-    ``policy.SMTP`` gives CRLF line endings, RFC 2047 headers, and a suitable
-    transfer encoding per part; nothing here is hand-rolled and callers never see
-    any of it.
+    Plaintext first, HTML second, in ``multipart/alternative``: a
+    text-only client then shows the text part.
     """
     message = EmailMessage(policy=SMTP_POLICY)
     message["From"] = sender

@@ -2,21 +2,12 @@
 /**
  * `dummy.minimal:notification` -- the smallest template that is still correct.
  *
- * Everything a template needs and nothing more: the shell and a paragraph. No
- * preheader, no plaintext twin, no components beyond `KitMain`.
+ * Context keys (see `tests/fixtures/notification.py`): title (banner
+ * heading, rendered by the shell), intro (lead paragraph).
  *
- * Context keys, which must match `tests/fixtures/notification.py` exactly:
- *   title  -- the banner heading, rendered by the SHELL and not by this file
- *   intro  -- lead paragraph
- *
- * There is no `<h1>` here, and that is the v2 layout rather than an omission:
- * `KitMain` reads `title` from the render context and puts it in the coloured
- * banner. A template that keeps its own heading as well now shows the title
- * twice -- which is the one thing to check when porting a pre-v2 template.
- *
- * Note what else is *not* here, because the kit owns it: `role="presentation"`,
- * `lang`, `i18n:domain`, the charset and viewport meta tags, dark mode, the
- * header logo and the footer. An author never writes those.
+ * No `<h1>` here: the shell already puts `title` in the banner. Also not
+ * here, since the kit owns it: `role="presentation"`, `lang`,
+ * `i18n:domain`, meta tags, dark mode, the header logo and the footer.
  */
 </script>
 

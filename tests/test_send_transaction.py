@@ -1,27 +1,16 @@
 """Transaction safety, and the one escape hatch.
 
-> **Transaction safety by default:** delivery via ``IMailHost`` queued send -- an
-> aborted transaction sends nothing. ``.send(immediate=True)`` is the escape
-> hatch.
+Delivery goes through ``IMailHost``'s queue: an aborted transaction sends
+nothing. ``.send(immediate=True)`` bypasses the queue.
 
-The contract names the test outright: "Transaction abort test: ``.send()`` + abort ->
-MailHost queue empty."
+An empty queue alone proves nothing: a builder that never queued
+anything, a swallowed message, or a caught exception all leave the queue
+empty too. So every assertion is paired with its opposite: abort cancels
+a real queued delivery (``mailer.aborted``), commit delivers it, and
+nothing is delivered before either happens.
 
-**An empty queue proves nothing on its own.** A builder that never queued
-anything, a MailHost double that swallows messages, a ``.send()`` that raised and
-was caught -- all three leave the queue empty and turn the headline test green
-for the wrong reason. So every assertion here is paired with its opposite:
-
-* abort -> nothing delivered **and** the queued delivery was actively cancelled
-  (``mailer.aborted``, which only increments if a ``MailDataManager`` really was
-  joined to the transaction);
-* commit -> the message *is* delivered, so the abort case is a difference rather
-  than a constant;
-* before either -> nothing has been delivered yet, which is what "queued" means.
-
-That triangle is only observable because the MailHost double replaces
-``_makeMailer`` rather than ``_send``: the real ``Products.MailHost`` and
-``zope.sendmail`` code above it still runs. See
+The MailHost double replaces ``_makeMailer``, not ``_send``, so the real
+``Products.MailHost`` and ``zope.sendmail`` code still runs. See
 ``imio.emailkit.testing.install_recording_mailhost``.
 """
 
@@ -42,20 +31,17 @@ def queued(mail, mailhost, site_sender):
 
 class TestQueuedIsTheDefault:
     def test_nothing_is_delivered_before_the_transaction_ends(self, queued):
-        """ "Queued" has to mean *not yet sent*. A builder that opened an SMTP
-        connection inside ``.send()`` would pass every content assertion in this
-        suite and make the transaction guarantee unimplementable."""
+        """Queued must mean not yet sent, not merely not yet checked."""
         assert queued.sent == [], (
             f"{len(queued.sent)} message(s) already delivered before commit: "
             "the send was not queued"
         )
 
     def test_a_delivery_really_was_joined_to_the_transaction(self, queued):
-        """The other half: queued, not *dropped*.
+        """Queued must mean joined to the transaction, not dropped.
 
-        Proved by aborting and counting the cancellations -- ``onAbort`` only
-        fires for a ``MailDataManager`` that was genuinely joined to the current
-        transaction, so a non-zero count is positive evidence that the message
+        ``onAbort`` only fires for a ``MailDataManager`` genuinely joined
+        to the transaction, so a non-zero count is evidence the message
         was in flight.
         """
         transaction.abort()
@@ -67,8 +53,6 @@ class TestQueuedIsTheDefault:
 
 
 class TestAbortSendsNothing:
-    """The named test."""
-
     def test_abort_leaves_the_queue_empty(self, queued):
         transaction.abort()
 
@@ -80,10 +64,8 @@ class TestAbortSendsNothing:
     def test_abort_after_several_language_groups_sends_none_of_them(
         self, mail, mailhost, site_sender, fr_member, nl_member
     ):
-        """Per-language sending emits several messages from one ``.send()``. All
-        of them are one transaction's worth, so an abort must take all of them --
-        a partial rollback would deliver to the French commune and not the Dutch
-        one, from an operation the caller believes failed."""
+        """An abort must cancel every language group's message, not just
+        one."""
         mail().to(fr_member).to(nl_member).send()
 
         transaction.abort()
@@ -97,9 +79,7 @@ class TestAbortSendsNothing:
     def test_abort_also_cancels_a_mail_with_an_attachment(
         self, mail, mailhost, site_sender
     ):
-        """Attachments go through ``add_attachment`` at assembly time, which is
-        real work; a builder that streamed the file straight to the MTA to avoid
-        holding it in memory would lose the guarantee here and nowhere else."""
+        """An attachment must not bypass the transaction guarantee."""
         mail().to(support.PLAIN_ADDRESS).attach(b"%PDF-1.7\n", filename="a.pdf").send()
 
         transaction.abort()
@@ -108,7 +88,7 @@ class TestAbortSendsNothing:
 
 
 class TestCommitSends:
-    """The non-vacuity control for everything above."""
+    """Confirms a commit delivers, so the abort tests above are meaningful."""
 
     def test_commit_delivers_exactly_one_message(self, queued):
         transaction.commit()
@@ -149,9 +129,7 @@ class TestImmediateIsTheEscapeHatch:
         )
 
     def test_immediate_survives_an_abort(self, mail, mailhost, site_sender):
-        """The defining property. "Escape hatch" means the caller has taken the
-        transaction guarantee off, deliberately: the mail is gone and a later
-        rollback cannot recall it."""
+        """An immediate send is not cancelled by a later abort."""
         mail().to(support.PLAIN_ADDRESS).send(immediate=True)
 
         transaction.abort()
@@ -164,9 +142,8 @@ class TestImmediateIsTheEscapeHatch:
     def test_immediate_joins_nothing_to_the_transaction(
         self, mail, mailhost, site_sender
     ):
-        """Nothing to cancel, because nothing was queued. If ``aborted`` were
-        non-zero the builder would have queued *and* sent immediately -- a
-        duplicate delivery on commit."""
+        """An immediate send must not also queue a delivery, or commit
+        would double-send."""
         mail().to(support.PLAIN_ADDRESS).send(immediate=True)
 
         transaction.abort()
@@ -178,9 +155,8 @@ class TestImmediateIsTheEscapeHatch:
     def test_immediate_produces_the_same_message_as_queued(
         self, mail, mailhost, set_default_language, site_sender
     ):
-        """The escape hatch changes *when*, never *what*. A separate assembly
-        path for immediate sends would drift, and it would drift on the code path
-        used for the mails somebody chose to bypass the queue for."""
+        """An immediate send must produce the same message as a queued
+        one."""
         set_default_language("fr")
 
         mail().to(support.PLAIN_ADDRESS).send(immediate=True)
@@ -198,9 +174,8 @@ class TestImmediateIsTheEscapeHatch:
         )
 
     def test_immediate_is_not_the_default(self, mail, mailhost, site_sender):
-        """Restating the word "default" as an assertion, because the two
-        behaviours differ only in a flag and a wrong default would be invisible
-        until the first failed transaction sent a mail it should not have."""
+        """``.send()`` with no arguments must queue, not deliver
+        immediately."""
         mail().to(support.PLAIN_ADDRESS).send()
 
         assert mailhost.sent == [], ".send() with no arguments delivered immediately"
@@ -210,8 +185,7 @@ class TestNothingIsSentWithoutSend:
     def test_a_builder_that_is_never_sent_queues_nothing(
         self, mail, mailhost, site_sender, fr_member
     ):
-        """The builder "holds data, it does not grow behavior".
-        "No method does I/O before ``.send()``"."""
+        """No builder method does I/O before ``.send()``."""
         (
             mail()
             .to(fr_member)

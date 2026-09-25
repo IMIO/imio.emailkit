@@ -1,9 +1,10 @@
 /*
- * This project's CSS entry. It only reaches the kit's locked, email-safe entry
- * -- the design system is not extended here: consumers compose layouts
- * and components, they do not extend the Tailwind config.
+ * This project's CSS entry. It only reaches the kit's locked, email-safe
+ * entry: consumers compose layouts and components, they do not extend the
+ * Tailwind config.
  *
- * A consumer addon's copy of this file points at the kit inside the installed
- * `imio.emailkit` egg; here the kit is a sibling in the same checkout.
+ * A consumer addon's copy of this file points at the kit inside the
+ * installed `imio.emailkit` egg; here the kit is a sibling in the same
+ * checkout.
  */
 @import "../src/imio/emailkit/kit/tailwind.css";

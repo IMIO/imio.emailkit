@@ -1,23 +1,21 @@
 # Two dummy consumer add-ons
 
-Discovery needs tests with two dummy add-ons that also serve as living
-documentation. This is them. They are the smallest complete answer to *"how do
-I ship an email template from my add-on?"*, and they are executed by CI, so they
-cannot rot into a stale README.
+These two dummy add-ons provide discovery tests and double as living
+documentation — the smallest answer to *"how do I ship an email template?"*.
+CI keeps them current.
 
 | | `dummy.minimal` | `dummy.complete` |
 |---|---|---|
 | templates | 1 | 2 |
-| `directory` attribute | omitted (defaults to `templates`) | stated |
+| `directory` attribute | omitted (default `templates`) | stated |
 | `preheader` msgid | none | on both templates |
-| `.txt.pt` twin | none — falls back to automatic plaintext extraction | hand-authored, both templates |
+| `.txt.pt` twin | none (auto plaintext fallback) | hand-authored, both templates |
 | golden languages | `fr` | `fr` + `en` |
 | kit components | `KitMain` only | `KitMain`, `KitPanel`, `KitButton`, `KitDataTable` |
 | runtime constructs | `${...}` only | `${...}`, `tal:condition`, `tal:repeat`, `${python: format_date(...)}`, `i18n:translate` |
 
-Read `dummy.minimal` first: it is the floor, and it is short. Then read
-`dummy.complete/emails/src/templates/convocation.vue`, which is the busiest
-template in the repository on purpose.
+Read `dummy.minimal` first, then
+`dummy.complete/emails/src/templates/convocation.vue`, the busiest template here.
 
 ## The seven files an add-on needs
 
@@ -37,7 +35,7 @@ dummy/complete/
     └── golden/convocation.fr.html    # snapshots
 ```
 
-where `configure.zcml` is the whole registration:
+`configure.zcml` is the whole registration:
 
 ```xml
 <configure
@@ -59,14 +57,13 @@ where `configure.zcml` is the whole registration:
 </configure>
 ```
 
-Nothing in `__init__.py`, and no `MessageFactory`: the msgid domain of `subject` and
-`preheader` is the file's `i18n_domain`, and the lookup namespace is the package the
-file belongs to, so neither can disagree with reality. A real add-on's ZCML is
-executed by Zope's autoinclude at startup, which is also where the "missing
-plaintext twin" warnings land.
+No `__init__.py`, no `MessageFactory`: the msgid domain is the file's
+`i18n_domain`, the lookup namespace its own package. Zope's autoinclude runs
+a real add-on's ZCML at startup, where "missing plaintext twin" warnings
+appear too.
 
-Two `MANIFEST.in` lines are needed as well, because the compiled output must ship and
-the Maizzle project must not:
+Two `MANIFEST.in` lines: ship the compiled output, prune the Maizzle
+project.
 
 ```
 recursive-include src/dummy/complete/templates *.pt
@@ -75,9 +72,8 @@ prune src/dummy/complete/emails
 
 ## The same template basename in three distributions
 
-`notification` is registered by `dummy.minimal`, by `dummy.complete` **and** by
-`imio.emailkit` itself. There is no clash, because every lookup is namespaced by the
-registering package:
+`notification` is registered by `dummy.minimal`, `dummy.complete`, **and**
+`imio.emailkit`: no clash, since every lookup is namespaced by package.
 
 ```python
 render("dummy.minimal:notification", context=…)     # three different files,
@@ -86,40 +82,31 @@ render("imio.emailkit:notification", context=…)
 render("notification", context=…)                   # TemplateNotFound, on purpose
 ```
 
-The bare name resolving to nothing is deliberate: accepting it would make the answer
-depend on the order the three packages' ZCML happens to execute in.
-`tests/test_discovery_dummies.py` asserts all four of those lines.
+The bare name resolves to nothing by design: the answer never depends on
+ZCML load order. `tests/test_discovery_dummies.py` asserts all four lines.
 
 ## Registering through ZCML, without being installed
 
-The registration itself is not special-cased for the tests: each dummy carries the
-`configure.zcml` shown above, exactly as a real consumer does. What a real consumer
-gets for free is *execution* — it is pip-installed, and Zope's autoinclude runs its
-ZCML at startup.
+Each dummy carries the same `configure.zcml` a real consumer would use; a
+real add-on gets *execution* for free via pip install and Zope's
+autoinclude. Living in another package's test tree, these two instead run
+their ZCML through `tests/dummyaddons.py`, via
+`imio.emailkit.scan.scan_package()`, scoped to a fixture so the rest of the
+suite sees only `imio.emailkit`'s templates
+(`tests/test_dummy_isolation.py` guards this). Teardown removes the two
+registrations directly — see `installed()`.
 
-These two live inside another package's test tree, so `tests/dummyaddons.py` runs
-their ZCML on purpose, through `imio.emailkit.scan.scan_package()` — the same
-permissive-machine scan the build tooling uses on a real consumer, over the same
-directive handler and into the same registry as an instance start. Nothing is
-monkeypatched and no private API is used.
-
-It is scoped to a fixture, so the rest of the suite sees only `imio.emailkit`'s own
-templates; `tests/test_dummy_isolation.py` is the guard on that. Teardown removes the
-two add-ons' registrations rather than restoring a whole-registry snapshot, because
-the Plone test layer loads the *host's* ZCML lazily and can do so from inside such a
-block — see `installed()` for the measurement.
-
-A real add-on needs none of this. It is pip-installed, and its ZCML is simply run.
+A real add-on needs none of this.
 
 ## Running their CI contract
 
-The same CI contract applies to these two as to any consumer:
+The same CI checks apply here, like any consumer:
 
 ```bash
-# gate 1 -- build output is not stale, and the authoring lint (needs Node)
+# the staleness check, plus the authoring lint (needs Node)
 pytest tests/test_consumer_ci.py -q
 
-# gate 2 -- runtime rendering is intact
+# runtime rendering stays intact
 pytest tests/dummies -q
 
 # the authoring lint on its own
@@ -129,30 +116,27 @@ python -m imio.emailkit.lint tests/dummies
 EMAILKIT_UPDATE_GOLDEN=1 pytest tests/dummies -q -rs
 ```
 
-Note that `make update-golden` only regenerates *this* package's snapshots
-(`tests/test_golden.py`); the dummies' are regenerated with the command above.
+`make update-golden` regenerates only *this* package's snapshots
+(`tests/test_golden.py`); use the command above for the dummies'.
 
-`tests/test_consumer_ci.py` also runs both gates **backwards** — it tampers with a
-compiled template and with a snapshot and asserts each gate goes red, naming the
-file. A gate that has only ever been seen green is not known to be a gate.
+`tests/test_consumer_ci.py` also runs both checks **backwards**: it tampers
+with a compiled template and a snapshot, asserting each check fails and
+names the file.
 
-Two differences from a real add-on, both artefacts of living inside
-`imio.emailkit`'s own test tree:
+Two differences from a real add-on come from living in `imio.emailkit`'s
+test tree:
 
-- the test modules are called `test_minimal_emails.py` / `test_complete_emails.py`
-  rather than `test_emails.py`, because pytest requires unique test-module
-  basenames within one rootdir;
-- `emails/` has no `package.json` and no `node_modules`. The staleness test
-  symlinks the checkout's Maizzle install in for the duration of the build and
-  removes it afterwards — `MANIFEST.in` does `graft tests` and setuptools' file walk
-  follows symlinks, so a link left lying around puts ~20 000 files from
-  `node_modules` into the sdist, and it is gitignored so nothing would tell you.
-  The symlink itself is not optional: without a `node_modules` ancestor, Tailwind
-  cannot resolve the `@import "@maizzle/tailwindcss"` the shell emits, and **Maizzle
-  ships the uncompiled stylesheet with exit code 0** (measured: 5.3 KB of output
-  with inlined styles becomes 3.5 KB with none, and the build says
-  "Built 1 template").
+- Test modules are named `test_minimal_emails.py` / `test_complete_emails.py`,
+  not `test_emails.py`: pytest requires unique basenames per rootdir.
+- `emails/` has no `package.json` or `node_modules`. The staleness test
+  symlinks in the checkout's Maizzle install for the build, then removes it.
+  Never leave that symlink: `MANIFEST.in`'s `graft tests` plus setuptools'
+  symlink-following puts ~20 000 `node_modules` files into the sdist,
+  silently (it is gitignored). The symlink is also required: without a
+  `node_modules` ancestor, Tailwind cannot resolve
+  `@import "@maizzle/tailwindcss"`, and **Maizzle ships the uncompiled
+  stylesheet with exit code 0** (output shrinks from 5.3 KB to 3.5 KB; the
+  build still reports "Built 1 template").
 
-Nothing else here is a shortcut: the `.vue` sources are compiled by the real Maizzle
-build against the real kit, and the `.pt` files in `templates/` are that build's
-committed output.
+The real Maizzle build compiles `.vue` sources against the real kit;
+`templates/*.pt` is its committed output.

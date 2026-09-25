@@ -18,21 +18,14 @@ class TestSetupUninstall:
         assert installer.is_product_installed(PACKAGE_NAME) is False
 
     def test_browserlayer_not_registered(self, browser_layers):
-        """A leftover ``IEmailkitLayer`` would keep jbot swapping the stock mail
-        templates for files whose add-on is gone."""
+        """A leftover layer would keep jbot swapping in a gone add-on's templates."""
         from imio.emailkit.interfaces import IEmailkitLayer
 
         assert IEmailkitLayer not in browser_layers
 
     def test_theme_records_removed(self, portal):
-        """The three theme tokens must go with the add-on.
-
-        A record whose defining interface is no longer importable makes the
-        registry control panel raise. Requires a ``profiles/uninstall`` shipping
-        ``registry.xml`` with ``remove="true"`` -- the Phase 1 plan lists the two
-        install profiles only, so a failure here is a genuine gap, not a
-        mis-specified test.
-        """
+        """The three theme tokens must go with the add-on, or the registry
+        control panel raises on the now-unimportable interface."""
         from plone.registry.interfaces import IRegistry
         from zope.component import getUtility
 

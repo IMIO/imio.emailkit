@@ -7,9 +7,8 @@ class HiddenProfiles:
     def getNonInstallableProfiles(self):
         """Hide uninstall profile from site-creation and quickinstaller.
 
-        ``imio.emailkit:base`` is deliberately NOT hidden: installing it
-        instead of ``:default`` is the documented opt-out, so it has
-        to be offered.
+        ``imio.emailkit:base`` stays visible: installing it instead of
+        ``:default`` is how a site opts out.
         """
         return [
             "imio.emailkit:uninstall",

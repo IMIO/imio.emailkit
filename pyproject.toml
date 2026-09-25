@@ -4,10 +4,7 @@ dynamic = ["version"]
 description = "Transactional email templating and sending for the iMio Plone ecosystem, built on Maizzle 6"
 readme = "README.md"
 license = "GPL-2.0-only"
-# Upper bound on purpose: an open ">=3.12" would claim support for interpreters
-# that have never run this suite. 3.14 IS claimed and IS tested -- the CI matrix
-# runs 3.12/3.13/3.14 against Plone 6.1 and 6.2 on every commit -- so the cap
-# sits above it. Narrowing this later breaks consumers; widening it is free.
+# CI tests only 3.12/3.13/3.14.
 requires-python = ">=3.12,<3.15"
 authors = [{ name = "Antoine Duchêne", email = "antoine.duchene@imio.be" }]
 keywords = ["CMS", "Plone", "Python", "email", "Maizzle"]
@@ -54,16 +51,8 @@ target = "plone"
 managed = false
 
 [build-system]
-# setuptools rather than the hatchling the cookieplone template ships:
-# zc.buildout's ``develop`` runs ``setup.py`` directly, so a PEP 517 only
-# package cannot be a develop egg in the iMio buildouts.
-#
-# >=77 and not the 68.2 this said until the first release: `license` below is a
-# PEP 639 SPDX expression, and setuptools only understands that form from 77.0.
-# Under 68.2-76.x it fails config validation outright. It built anyway because
-# PEP 517 isolation quietly fetches the newest setuptools -- so the floor was
-# never exercised, and any constrained, offline or --no-build-isolation build
-# would have hit it.
+# setuptools, not hatchling: zc.buildout's ``develop`` needs ``setup.py``.
+# >=77: needed to understand the PEP 639 SPDX `license` expression below.
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
@@ -75,20 +64,12 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-# PEP 420: the ``imio`` namespace has no __init__.py on purpose.
+# PEP 420 namespace package: no __init__.py, by design.
 namespaces = true
 
 [tool.setuptools.package-data]
-# `.pt` covers both the compiled templates and the jbot overrides. The kit's
-# `.vue`/`.js`/`.css` sources ship too: the design system stays inside
-# the egg so `bin/compile-emails` can resolve it from the installed
-# distribution, which means they are package data, not dev-only files.
-#
-# `.png` and `.woff2` are `browser/static/`: the v3 brand cuts, the pill icons,
-# the two iMio logos and the two Quicksand weights the kit shell serves through
-# its `++resource++imio.emailkit` directory. A wheel that dropped them would install
-# a package whose every mail has broken images and no brand face, and nothing at
-# import time would say so.
+# Ships the kit's `.vue`/`.js`/`.css` sources too, so `bin/compile-emails`
+# can resolve the design system from the installed distribution.
 "*" = [
     "*.zcml", "*.xml", "*.pt", "*.pot", "*.po", "*.mo", "*.txt",
     "*.css", "*.js", "*.vue", "*.png", "*.woff2",
@@ -137,12 +118,8 @@ showcontent = true
 target-version = "py312"
 line-length = 88
 fix = true
-# `.claude/` holds agent definitions whose fenced examples are illustrative, not
-# runnable.
-#
-# `docs/` is excluded because ruff's preview formatter rewrites fenced Python
-# blocks in markdown: it once collapsed the builder's fluent chain onto one line,
-# which is a change to prose that no formatter is entitled to make.
+# `.claude/` has illustrative, non-runnable examples. `docs/` is excluded
+# because ruff's preview formatter rewrites fenced Python blocks in prose.
 exclude = [".claude", "docs"]
 lint.select = [
     "YTT", "S", "B", "A", "C4", "T10", "SIM", "C90",
@@ -164,13 +141,8 @@ preview = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501", "RUF001", "S101"]
-# `src/imio/emailkit/golden.py` is the "provided test base class" for consumer suites. It ships in
-# the egg, so it is library code as far as ruff is concerned and S101 fires on it --
-# but it *is* test code: a pytest base class that consumer add-ons subclass, whose
-# `assert actual == expected, <diff>` statements are what pytest reports as a test
-# failure. Raising `AssertionError` by hand would satisfy the rule and read worse,
-# and `python -O` (which is what S101 protects against) does not run test suites.
-# Scoped to the one file and the one rule; the rest of the package has no exemption.
+# A pytest base class that consumer add-ons subclass; its `assert` calls are
+# test assertions, not a library concern.
 "src/imio/emailkit/golden.py" = ["S101"]
 
 [tool.pytest.ini_options]
@@ -182,11 +154,7 @@ branch = true
 parallel = true
 omit = ["src/imio/emailkit/locales/*.py"]
 
-# check-manifest runs as a zest.releaser prerelease hook. Its default ignore
-# list does not know that this repository is a dev harness wrapped around one
-# shipped package, so without this it reports every one of these as "in VCS but
-# missing from the sdist" and the release stops to ask about it. The sdist
-# contents are asserted directly at release time instead; see MANIFEST.in.
+# Without this list, check-manifest stops every release to ask about it.
 [tool.check-manifest]
 ignore = [
     "docs",
@@ -206,23 +174,13 @@ ignore = [
     "instance.yaml",
     ".editorconfig",
 ]
-# The compiled catalogs are committed on purpose: a released egg has to ship
-# translations, and nothing in an installed distribution can run msgfmt. That is
-# a deliberate exception to "auto-generated files should not be versioned", and
-# without this check-manifest raises it as a problem -- which zest.releaser then
-# turns into "MANIFEST.in has problems. Continue?", answered `no` under
-# --no-input, aborting every automated release.
+# The compiled catalogs are committed: an installed egg cannot run msgfmt.
 ignore-bad-ideas = [
     "src/imio/emailkit/locales/*/LC_MESSAGES/*.mo",
 ]
 
 [tool.zest-releaser]
 python-file-with-version = "src/imio/emailkit/__init__.py"
-# Prefixed because this repository ships TWO distributions and git has one tag
-# namespace. A bare "1.0.0b1" is not just ambiguous: zest.releaser's `_make_tag`
-# returns early when the tag already exists instead of failing, and `_release`
-# then builds from whatever that tag points at -- so the second distribution
-# released under a colliding tag is built from the first one's commit and
-# published, silently, at the wrong version.
+# Prefixed: this repository ships two distributions sharing one tag namespace.
 tag-format = "imio.emailkit-{version}"
 tag-message = "Release imio.emailkit {version}"

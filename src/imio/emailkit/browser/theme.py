@@ -1,17 +1,12 @@
-"""``@@emailkit_theme`` -- the theme tokens for templates we do not render.
+"""``@@emailkit_theme`` -- the theme tokens for templates rendered by a stock view.
 
-The promise is that a site can restyle its mails through the three
-``imio.emailkit.theme.*`` registry records alone. ``render()`` delivers them as
-the ``theme`` name in its namespace, but the two Plone default mails are
-rendered by a *stock CMFPlone view*, which knows nothing about us: neither
-``theme`` nor ``options/theme`` exists there. The kit layout's last fallback is
-this view, and without it those two mails silently fall back to the hard-coded
-kit colour and ignore the registry entirely -- the promise would hold for every
-template except the two the package ships.
+A stock CMFPlone view knows nothing about the ``imio.emailkit.theme.*``
+registry records that ``render()`` normally injects as ``theme``. This is the
+fallback for templates rendered that way, so they still pick up the registry.
 
-Returns a plain mapping on purpose. A view *instance* would need AccessControl
-declarations before ``theme/primary_color`` could traverse it from a template;
-a dict needs nothing and cannot grow behaviour.
+Returns a plain mapping: a view instance would need AccessControl
+declarations before ``theme/primary_color`` could traverse it from a
+template, while a dict needs nothing.
 """
 
 from imio.emailkit.render import get_theme

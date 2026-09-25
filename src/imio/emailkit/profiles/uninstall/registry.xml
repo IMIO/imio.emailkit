@@ -5,16 +5,10 @@
 
   <!-- Remove the three theme tokens along with the add-on.
 
-       This deliberately overrides the usual Plone instinct of never destroying
-       settings on uninstall. These records are defined by an interface that
-       ships in this egg, and `plone.app.registry` resolves that interface when
-       it reads them: once the egg is gone, `IEmailkitTheme` is no longer
-       importable and the registry control panel raises on the orphaned records.
-       A broken control panel is a hard, site-wide failure; the three values
-       lost are branding for mails that no longer exist.
-
-       Reinstalling re-creates the records from the interface defaults, so the
-       only real cost is re-entering a logo URL and a colour. -->
+       `plone.app.registry` resolves `IEmailkitTheme` to read these records.
+       Once the egg is gone, the interface is no longer importable, and the
+       registry control panel raises on the orphaned records. Reinstalling
+       re-creates the records from the interface defaults. -->
   <records interface="imio.emailkit.interfaces.IEmailkitTheme"
            prefix="imio.emailkit.theme"
            remove="true"

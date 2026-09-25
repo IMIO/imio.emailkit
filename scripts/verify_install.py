@@ -1,15 +1,7 @@
-"""Verify a real, installed site against the exit criteria: installed on one
-production site; stock mails restyled; opt-out and layer-override both
-verified.
-
-Run against a live ZODB, not a test fixture:
+"""Verify a real, installed site: profile applied, mails restyled, opt-out
+and layer-override both working. Run against a live ZODB:
 
     .venv/bin/zconsole run instance/etc/zope.conf scripts/verify_install.py
-
-A production site is not ours to deploy, so this covers the verifiable part
-on a real instance built from this repo: the profile is applied, the layer is
-live, the stock mail views render our compiled templates, and ``render()``
-works through the ZODB rather than a fixture.
 """
 
 from pathlib import Path
@@ -56,9 +48,8 @@ def main(app):
     ]
     check("the three theme records exist", all(t in registry.records for t in tokens))
 
-    # 4 -- the stock mail views render OUR templates.
-    # The layer is applied to the published request by a subscriber, which does
-    # not fire for a zconsole request, so mark it explicitly.
+    # 4 -- the stock mail views render our templates.
+    # A subscriber normally applies the layer; it does not fire for zconsole.
     from imio.emailkit.interfaces import IEmailkitLayer
 
     alsoProvides(request, IEmailkitLayer)
@@ -69,7 +60,7 @@ def main(app):
         view = PasswordResetToolView(site, request)
         template = getattr(view, "index", None) or site.restrictedTraverse(name)
         filename = getattr(template, "filename", "") or ""
-        del filename  # only the resolved override path matters, checked below
+        del filename  # only the resolved path matters, checked below
 
         resolved = site.restrictedTraverse(name)
         path = getattr(getattr(resolved, "index", resolved), "filename", "")
@@ -82,12 +73,9 @@ def main(app):
     # 5 -- render() works against the real site
     from imio.emailkit import render
 
-    # Use the committed fixture, so this also proves the data the golden tests
-    # run on works against a real site and not only a test layer.
     import sys
 
-    # zconsole exec()s this file, so __file__ does not exist; it is run from
-    # the repo root.
+    # zconsole exec()s this file, so __file__ does not exist.
     sys.path.insert(0, str(Path.cwd() / "tests"))
     from fixtures.notification import CONTEXT
 
@@ -112,7 +100,7 @@ def main(app):
         )
         failed += not ok
     print()
-    print("ALL EXIT-CRITERION CHECKS PASSED" if not failed else f"FAILURES: {failed}")
+    print("ALL CHECKS PASSED" if not failed else f"FAILURES: {failed}")
     return failed
 
 

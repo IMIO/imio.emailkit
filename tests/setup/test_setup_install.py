@@ -13,8 +13,7 @@ class TestSetupInstall:
         assert installer.is_product_installed(PACKAGE_NAME) is True
 
     def test_browserlayer(self, browser_layers):
-        """The jbot directory is registered on a dedicated browser layer, and
-        that layer is installed by the ``:default`` profile."""
+        """``:default`` installs the browser layer the jbot directory needs."""
         from imio.emailkit.interfaces import IEmailkitLayer
 
         assert IEmailkitLayer in browser_layers
@@ -23,11 +22,5 @@ class TestSetupInstall:
         assert profile_last_version(f"{PACKAGE_NAME}:default") == "1000"
 
     def test_default_profile_extends_base(self, profile_last_version):
-        """``:default`` extends ``:base``.
-
-        Applying ``:default`` alone must therefore leave ``:base`` recorded as
-        applied. If this fails, the two profiles are siblings and a site that
-        installed ``:default`` never got the runtime records -- while every test
-        that only ever looks at ``:default`` stays green.
-        """
+        """``:default`` extends ``:base``, so it also records ``:base`` applied."""
         assert profile_last_version(f"{PACKAGE_NAME}:base") == "1000"

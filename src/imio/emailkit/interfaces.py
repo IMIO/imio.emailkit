@@ -8,17 +8,10 @@ from zope.publisher.interfaces.browser import IDefaultBrowserLayer
 
 
 class IEmailkitLayer(IDefaultBrowserLayer):
-    """Browser layer carrying the z3c.jbot overrides of Plone's default mails.
+    """Browser layer that activates the z3c.jbot overrides of Plone's stock mails.
 
-    This layer is what *activates* the restyled stock mails, and it is
-    installed by the ``imio.emailkit:default`` profile only. ``:base`` ships the
-    runtime without it, which is the opt-out: the jbot directory is bound to
-    this layer in ``browser/configure.zcml``, so the overrides are inert until
-    the layer is installed.
-
-    A site package overriding our templates in turn must declare a layer that
-    **extends** this one -- z3c.jbot precedence is only a guarantee for child
-    layers, not for siblings.
+    Installed only by ``imio.emailkit:default``. An overriding layer must
+    extend this one for jbot precedence to apply.
     """
 
 
@@ -31,16 +24,9 @@ THEME_REGISTRY_PREFIX = "imio.emailkit.theme"
 class IEmailkitTheme(Interface):
     """The three runtime-variable branding tokens.
 
-    Everything else in the design system is Tailwind, fixed at build time; these
-    are the only values a site may change without recompiling. The field
-    defaults below are the single source of truth -- ``profiles/base`` declares
-    the records from this interface and ships no values of its own, so a default
-    is written once, here.
-
-    Only ``primary_color`` carries a real default. ``logo_url`` and
-    ``footer_html`` default to empty on purpose: a URL is site-specific and
-    footer wording is user-facing text, which the house convention leaves to
-    i18n and to the site rather than freezing it in a profile.
+    Everything else in the design system is fixed Tailwind. ``profiles/base``
+    builds its records from this interface; the defaults below are the
+    only source of truth.
     """
 
     logo_url = schema.TextLine(
@@ -61,10 +47,8 @@ class IEmailkitTheme(Interface):
             "example ``#e6007e``."
         ),
         required=False,
-        # iMio magenta, the same value the kit layout falls back to when no
-        # registry is reachable. Kept in step with `kit/tailwind.css` on purpose:
-        # two different "brand colours" in one package is a bug waiting to be
-        # noticed by a client.
+        # iMio magenta. Must match the fallback in `kit/tailwind.css`: two
+        # different brand colors in one package would be a visible bug.
         default="#e6007e",
         missing_value="",
     )
@@ -82,18 +66,10 @@ class IEmailkitTheme(Interface):
 
 
 class IEmailRecipient(Interface):
-    """The one thing ``.to()``/``.cc()``/``.bcc()`` resolve a value to.
+    """What ``.to()``/``.cc()``/``.bcc()`` resolve every value to.
 
-    Those methods take "an email string, a Plone member object, a userid, or
-    an iterable of those", and resolution goes through a single adapter. So
-    the builder holds whatever it was handed and, at ``.send()``, adapts each
-    value to this interface. Adding a new kind of recipient is one adapter
-    registration and no change to the builder -- which is what keeps "it
-    holds data, it does not grow behaviour" true.
-
-    An adapter that cannot resolve its value returns ``None`` (the ordinary
-    zope.component "not adaptable" answer); ``recipients.resolve()`` turns that
-    into :class:`RecipientError`. It must never invent an address.
+    The builder adapts each value to this interface at ``.send()``. An
+    adapter that cannot resolve returns ``None``, never an invented address.
     """
 
     email = Attribute("address")
@@ -108,9 +84,7 @@ class EmailkitError(Exception):
 class TemplateNotFound(EmailkitError):
     """No template is registered under the requested name.
 
-    The available names travel with the error: the mistake
-    is nearly always a typo or a template whose ZCML never registered, and both
-    are obvious once the list is in front of you.
+    Carries the available names, to help catch a typo.
     """
 
     def __init__(self, name, available=()):
@@ -123,13 +97,7 @@ class TemplateNotFound(EmailkitError):
 
 
 class _CollectedError(EmailkitError):
-    """Base of the two ``.send()``-time errors that report *every* problem.
-
-    Both are raised at ``.send()`` rather than at collection time, and the
-    reason is this class: a caller who mistyped three userids should learn about
-    three, not fix one and run again. So resolution collects problems and raises
-    once.
-    """
+    """Base of the two ``.send()``-time errors that report every problem at once."""
 
     def __init__(self, problems):
         self.problems = list(problems)
@@ -142,18 +110,13 @@ class _CollectedError(EmailkitError):
 class RecipientError(_CollectedError):
     """One or more recipients could not be resolved.
 
-    Raised at ``.send()``. Never a silent drop: a mail that quietly reaches four
-    of five people is the failure mode this exception exists to make impossible.
+    Raised at ``.send()`` instead of a silent drop.
     """
 
     _headline = "Unresolvable recipient(s)"
 
 
 class AttachmentError(_CollectedError):
-    """One or more attachments could not be resolved.
-
-    Raised at ``.send()``, for an unreadable source or for missing filename /
-    mimetype that could not be inferred.
-    """
+    """One or more attachments could not be resolved. Raised at ``.send()``."""
 
     _headline = "Unusable attachment(s)"

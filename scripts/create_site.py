@@ -15,9 +15,7 @@ truthy = frozenset(("t", "true", "y", "yes", "on", "1"))
 
 
 def asbool(s):
-    """Return the boolean value ``True`` if the case-lowered value of string
-    input ``s`` is a :term:`truthy string`. If ``s`` is already one of the
-    boolean values ``True`` or ``False``, return it."""
+    """Return ``True`` if the lower-cased string ``s`` is a truthy string."""
     if s is None:
         return False
     if isinstance(s, bool):
@@ -29,8 +27,6 @@ def asbool(s):
 DELETE_EXISTING = asbool(os.getenv("DELETE_EXISTING"))
 
 # ``:base`` installs the runtime without the Plone default mail overrides.
-# ``PROFILE=base make create-site`` builds a site to check the opt-out by
-# hand; ``:default`` stays the default.
 PROFILE = os.getenv("PROFILE", "default")
 
 app = makerequest(globals()["app"])
@@ -53,10 +49,7 @@ payload = {
     "profile_id": _DEFAULT_PROFILE,
     "distribution_name": "classic",
     "setup_content": False,
-    # French, not English: the two mails this add-on restyles are the first thing
-    # a reviewer looks at, and FR is what iMio's clients receive. A site created
-    # in English silently exercises the one language whose translations cannot be
-    # wrong (Phase 0, caveat A3).
+    # French: the language iMio's clients receive.
     "default_language": "fr",
     "portal_timezone": "Europe/Brussels",
 }

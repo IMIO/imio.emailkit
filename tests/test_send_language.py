@@ -1,23 +1,15 @@
 """Per-language sending, the headline feature of the builder.
 
-> **Per-language sending:** ``.send()`` groups recipients by resolved language,
-> renders once per language group (subject msgid translated accordingly), and
-> emits one message per group. FR/NL communes are handled with no caller effort.
+``.send()`` groups recipients by resolved language, renders once per
+language group, and emits one message per group.
 
-Three things have to hold at once, and each fails on its own:
+Three things must hold: the count (one message per language), the
+partition (every recipient in their own language's group), and the
+content (that group's translated subject and rendered body).
 
-1. **the count** -- one message per *language*, not per recipient and not one
-   message for everybody;
-2. **the partition** -- every recipient in the group whose language they asked
-   for, and in no other;
-3. **the content** -- that group's subject translation *and* that group's
-   rendered body.
-
-(3) is where this goes wrong quietly. A builder that groups correctly but renders
-once and reuses the result sends Dutch recipients a French body under a Dutch
-subject, and every count-based assertion still passes. So the body assertions
-here compare against ``render(..., language=...)`` -- a pure function, the
-same one the golden files pin -- rather than against a marker.
+Body assertions compare against ``render(..., language=...)`` rather
+than a marker. A builder that renders once and reuses the result would
+still pass count- and header-based checks alone.
 """
 
 import pytest
@@ -29,11 +21,11 @@ Email = support.require_builder()
 
 @pytest.fixture
 def by_language(deliver, sent):
-    """``by_language(email)`` -> ``{lang: SentMail}`` after a real commit.
+    """``by_language(email)`` returns ``{lang: SentMail}`` after a real commit.
 
-    Keyed off the ``lang`` attribute the kit layout emits on ``<html>`` from the
-    render language, because that is the one piece of evidence that comes
-    from the *body* rather than from the builder's own bookkeeping.
+    Keyed off the ``lang`` attribute the kit layout emits on ``<html>``,
+    since that comes from the rendered body, not the builder's own
+    bookkeeping.
     """
 
     def send_and_group(email):
@@ -69,9 +61,8 @@ class TestTwoLanguagesTwoMessages:
     def test_each_message_goes_only_to_its_own_group(
         self, mail, fr_member, nl_member, by_language
     ):
-        """The partition. Cross-contamination here means somebody receives a
-        mail in a language they did not ask for while also appearing in a
-        stranger's ``To`` header -- a privacy problem on top of an i18n one."""
+        """Each recipient must land only in their own language group, not in
+        another recipient's message."""
         grouped = by_language(mail().to(fr_member).to(nl_member))
 
         assert set(grouped) == {"fr", "nl"}, f"language groups: {sorted(grouped)}"
@@ -95,11 +86,8 @@ class TestTwoLanguagesTwoMessages:
     def test_the_two_subjects_actually_differ(
         self, mail, fr_member, nl_member, by_language
     ):
-        """The guard on the test above. ``translated()`` returns the bare msgid
-        when the catalog has no entry, so comparing against it would pass for a
-        builder that never translated anything at all -- as long as it never
-        translated *consistently*. These two catalog entries genuinely differ, so
-        equal subjects mean the translation step did not happen."""
+        """Guards the test above: the two catalog entries genuinely differ,
+        so equal subjects mean no translation happened."""
         grouped = by_language(mail().to(fr_member).to(nl_member))
 
         assert support.subject_of(grouped["fr"].message) != support.subject_of(
@@ -109,13 +97,8 @@ class TestTwoLanguagesTwoMessages:
     def test_each_message_carries_its_own_rendered_body(
         self, mail, fr_member, nl_member, by_language, notification_context
     ):
-        """The assertion this module exists for: the body is ``render()``'s
-        output *for that group's language*, byte for byte.
-
-        Not "contains a French word" -- Phase 0 proved marker assertions coexist
-        with raw ``${}`` reaching the inbox, and a reused body coexists with
-        every count and header assertion passing.
-        """
+        """Each group's body must equal ``render()``'s output for that
+        language, byte for byte, not just contain a word of it."""
         from imio.emailkit import render
 
         grouped = by_language(mail().to(fr_member).to(nl_member))
@@ -136,8 +119,7 @@ class TestTwoLanguagesTwoMessages:
             )
 
     def test_the_two_bodies_differ(self, mail, fr_member, nl_member, by_language):
-        """Same guard, applied to the body: if both groups got the same HTML the
-        render-once-and-reuse bug is present, whatever the subjects say."""
+        """The two groups' bodies must differ, whatever the subjects say."""
         grouped = by_language(mail().to(fr_member).to(nl_member))
 
         assert support.html_of(grouped["fr"].message) != support.html_of(
@@ -157,9 +139,7 @@ class TestGroupingIsByLanguageNotByRecipient:
     def test_two_recipients_of_one_language_share_one_message(
         self, mail, fr_member, make_recipient_member, deliver, sent
     ):
-        """ "One message per group", not one per person. A builder that emitted
-        one message each would work, look fine, and quietly turn a 400-recipient
-        convocation into 400 SMTP transactions."""
+        """One message per language group, not one per person."""
         second = make_recipient_member(
             dict(
                 support.FR_MEMBER,
@@ -181,10 +161,8 @@ class TestGroupingIsByLanguageNotByRecipient:
         ])
 
     def test_cc_and_bcc_are_grouped_too(self, mail, fr_member, nl_member, by_language):
-        """A Cc recipient has a language like anybody else. Leaving Cc/Bcc out of
-        the grouping would either send them the wrong language or -- worse -- put
-        the same Cc address on every group's message, i.e. one copy per
-        language."""
+        """A Cc recipient is grouped by language too, not left out or
+        duplicated across every group's message."""
         grouped = by_language(mail().to(fr_member).cc(nl_member))
 
         assert set(grouped) == {"fr", "nl"}, (
@@ -196,14 +174,13 @@ class TestGroupingIsByLanguageNotByRecipient:
 
 
 class TestTheFallbackLanguage:
-    """A recipient with no language falls back to "the site default"."""
+    """A recipient with no language falls back to the site default."""
 
     def test_a_plain_address_renders_in_the_site_default(
         self, mail, set_default_language, by_language
     ):
-        """A bare address has no member behind it, so
-        ``IEmailRecipient.language`` is ``None`` -- the interface says so explicitly
-        ("may be ``None``")."""
+        """A bare address has no member, so ``IEmailRecipient.language`` is
+        ``None``."""
         set_default_language("nl")
 
         grouped = by_language(mail().to(support.PLAIN_ADDRESS))
@@ -216,9 +193,8 @@ class TestTheFallbackLanguage:
     def test_the_fallback_follows_the_site(
         self, mail, set_default_language, by_language
     ):
-        """The other half: change the site default and the fallback moves with
-        it. Without this, a hardcoded ``"en"`` (or ``"fr"``, which would look
-        right in Wallonia) passes the test above."""
+        """The fallback must follow the site default, not a hardcoded
+        language."""
         set_default_language("de")
 
         grouped = by_language(mail().to(support.PLAIN_ADDRESS))
@@ -233,8 +209,8 @@ class TestTheFallbackLanguage:
         set_default_language,
         by_language,
     ):
-        """Most Plone members never set a preferred language, so this is the
-        common case, not the edge one."""
+        """Most Plone members never set a preferred language, so this is
+        common, not an edge case."""
         set_default_language("nl")
         make_recipient_member(dict(support.FR_MEMBER, userid="no_lang"))
         mail_portal.portal_membership.getMemberById("no_lang").setMemberProperties({
@@ -248,10 +224,8 @@ class TestTheFallbackLanguage:
     def test_an_address_and_a_member_of_the_default_language_share_a_group(
         self, mail, set_default_language, fr_member, deliver, sent
     ):
-        """Grouping is by resolved language, so a recipient whose language *is*
-        the site default must land in the same group as one who asked for it
-        explicitly -- not in a separate "unknown" group producing two messages
-        with identical bodies."""
+        """A recipient whose language is the site default must share a group
+        with one who asked for it explicitly, not get a separate group."""
         set_default_language("fr")
 
         email = mail().to(support.PLAIN_ADDRESS).to(fr_member)
@@ -270,8 +244,7 @@ class TestThreeLanguages:
     def test_fr_nl_de_yields_three_messages(
         self, mail, fr_member, nl_member, make_recipient_member, by_language
     ):
-        """FR/NL/DE are first-class languages. Two groups can be produced by an
-        accidental binary split; three cannot."""
+        """FR, NL, and DE are each their own group, not a binary split."""
         de_member = make_recipient_member(
             dict(
                 support.NL_MEMBER,

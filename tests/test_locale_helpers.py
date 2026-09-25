@@ -1,13 +1,7 @@
 """Locale-aware formatting helpers.
 
-The justification for these helpers is the test's own: they exist "so no template ever
-reinvents French date formatting (half would get it wrong)". Which means the
-assertion that matters is not "a string came back" but **"FR and EN come back
-different"**. A helper that ignores its language argument returns a perfectly
-plausible string for every locale, and the bug reaches production as
-``08/12/2026`` on a French commune's invitation -- read by everyone as 8 December.
-
-So every test here is a *differential* one.
+Every test compares FR and EN output, since a helper that ignores its
+language argument still returns a plausible string for either.
 """
 
 from datetime import date
@@ -30,9 +24,7 @@ format_date, format_datetime, format_number = support.require_contract(
 from imio.emailkit import render  # noqa: E402
 
 
-#: 12 August -- unambiguous only under a locale that puts the day first, which is
-#: exactly what makes it a usable probe. A day <= 12 would be silently valid in
-#: both orders and prove nothing.
+#: 12 August: unambiguous between day-first and month-first locales.
 PROBE_DATE = date(2026, 8, 12)
 PROBE_DATETIME = datetime(2026, 8, 12, 17, 30, 0)
 PROBE_NUMBER = 1234.5
@@ -45,14 +37,8 @@ class TestFormatDate:
         assert format_date(PROBE_DATE, "fr") != format_date(PROBE_DATE, "en")
 
     def test_fr_puts_the_day_before_the_month(self, integration):
-        """Not a cosmetic preference: with the month first, 12/08 reads as
-        12 August in Namur and 8 December in Boston.
-
-        Asserted as *ordering* rather than as "the first number is 12", because
-        the helper's default length is the caller's choice and a long format
-        writes the month as a word. Ordering is the thing that carries meaning in
-        every format.
-        """
+        """Checked as ordering, not position, since a long format spells
+        the month as a word."""
         formatted = format_date(PROBE_DATE, "fr")
         day, month = _positions(formatted, "12", ("08", "8", "août", "aout"))
 
@@ -69,9 +55,8 @@ class TestFormatDate:
         assert month < day, f"English date is not month-first: {formatted!r}"
 
     def test_the_month_name_itself_is_localised(self, integration):
-        """When the format spells the month out, it must be spelled out in the
-        render language -- an English month name in a French mail is the most
-        visible possible failure of a "locale-aware" helper."""
+        """An English month name in a French mail is the most visible
+        failure a locale-aware helper can have."""
         fr = format_date(PROBE_DATE, "fr")
         en = format_date(PROBE_DATE, "en")
 
@@ -85,13 +70,10 @@ class TestFormatDate:
 
     @pytest.mark.parametrize("language", LANGUAGES)
     def test_every_shipped_language_formats(self, integration, language):
-        """FR/NL/DE are the promised languages; a helper that raises on one of
-        them turns a translated mail into a 500."""
+        """A raise here turns a translated mail into a server error."""
         assert format_date(PROBE_DATE, language)
 
     def test_de_is_supported(self, integration):
-        """German is in the first-class i18n list even though no catalog ships
-        yet -- the *formatting* side has no catalog to ship."""
         assert format_date(PROBE_DATE, "de")
 
 
@@ -102,7 +84,7 @@ class TestFormatDatetime:
         )
 
     def test_fr_uses_a_24_hour_clock_and_en_does_not(self, integration):
-        """17:30 vs 5:30 PM. Getting this wrong halves the information."""
+        """17:30 vs 5:30 PM."""
         fr = format_datetime(PROBE_DATETIME, "fr")
         en = format_datetime(PROBE_DATETIME, "en")
 
@@ -132,11 +114,8 @@ class TestFormatNumber:
 
 
 class TestHelpersAreBoundToTheRenderLanguage:
-    """The helpers are bound to the render language.
-
-    The helpers being correct and the *render* handing them the right language
-    are two independent failures. This is the second one.
-    """
+    """A correct helper and a render that hands it the right language are
+    two independent things; this checks the second one."""
 
     TEMPLATE = support.NOTIFICATION
 
@@ -168,7 +147,7 @@ class TestHelpersAreBoundToTheRenderLanguage:
 
 
 def _positions(text, day_token, month_tokens):
-    """Index of the day and of the earliest recognised month token."""
+    """Return the index of the day and of the earliest month token found."""
     day = text.find(day_token)
     found = [text.find(token) for token in month_tokens if text.find(token) != -1]
     return (day if day != -1 else None), (min(found) if found else None)

@@ -1,39 +1,37 @@
 ---
 name: emailkit
-description: Author, test and ship transactional email templates with imio.emailkit (Maizzle 6 + Chameleon, Plone). Use whenever you touch a .vue email template, a compiled .pt under templates/, an emails/ Maizzle project, a KitMain/KitPill/KitCard/KitDataList/KitDataRow/KitButton/KitButtonGroup/KitPanel/KitDataTable component, an <emailkit:templates> ZCML registration, a tests/fixtures/*.py or tests/golden/* snapshot, render()/render_shell()/Email(), or theme tokens (logo_url, primary_color, footer_html). Also use when an email renders wrong, ships raw ${...} placeholders, loses its CSS, or fails to parse at runtime.
+description: Author, test and ship transactional email templates with imio.emailkit (Maizzle 6 + Chameleon, Plone). Use for a .vue email template, a compiled .pt under templates/, an emails/ Maizzle project, a KitMain/KitPill/KitCard/KitDataList/KitDataRow/KitButton/KitButtonGroup/KitPanel/KitDataTable component, an <emailkit:templates> ZCML registration, a tests/fixtures/*.py or tests/golden/* snapshot, render()/render_shell()/Email(), or theme tokens (logo_url, primary_color, footer_html). Also use when an email renders wrong, ships a raw ${...} placeholder, loses CSS, or fails to parse at runtime.
 ---
 
 # imio.emailkit — authoring emails
 
-Two stages, one seam. **Build** (Node, dev/CI only): Maizzle 6 compiles
-`emails/src/templates/*.vue` + Tailwind into email-safe HTML, renamed `.pt` and
-**committed to git**. **Runtime** (Python only): Chameleon renders the committed
-`.pt` with real data. Vue owns `{{ }}`, Chameleon owns `${ }`, so they never
-collide.
+**Build** (Node, dev/CI only): Maizzle 6 compiles `emails/src/templates/*.vue`
++ Tailwind into email-safe HTML, renamed `.pt` and **committed to git**.
+**Runtime** (Python only): Chameleon renders the committed `.pt` with real
+data. Vue owns `{{ }}`; Chameleon owns `${ }`. They never collide.
 
 You write `.vue`. Production renders `.pt`. Never hand-edit a `.pt`.
 
 ## Read this first: the build tells you almost nothing
 
-Every rule below comes from a real failure in this project, and **every one of them
-produced a successful build with exit code 0**. Maizzle catches its own errors and
-ships. A browser preview looks fine. The mail is broken in the inbox, or the
-template will not even parse at runtime.
+Every rule below is a real failure that still built with exit code 0 —
+Maizzle misses these errors, and a browser preview looks fine. The mail
+breaks in the inbox, or fails to parse at runtime.
 
-The only trustworthy gates are the two in the CI contract:
+Only two checks prove a template works:
 
-1. **staleness** — `bin/check-emails --package <self>`: the committed `.pt` matches
-   a fresh build.
-2. **golden files** — rendering assertions on *substituted values*, never on marker
-   strings.
+1. **staleness** — `bin/check-emails --package <self>`: the committed `.pt`
+   matches a fresh build.
+2. **golden files** — check rendered output against real substituted values,
+   not marker strings.
 
-If you change a template and do not run both, you do not know whether it works.
+Run both after every change.
 
 ---
 
 ## The silent-failure catalogue
 
-### 1. `${...}` in a literal `style` attribute kills CSS inlining document-wide
+### 1. `${...}` in a literal `style` kills CSS inlining
 
 ```html
 <!-- WRONG. Build succeeds. -->
@@ -44,15 +42,12 @@ If you change a template and do not run both, you do not know whether it works.
 <td tal:attributes="style string:background-color: ${primary_color}">
 ```
 
-Juice parses every `style` attribute as CSS, so `{` opens a block and the closing
-`}` is eaten: the output is `style="background-color:${theme/primary_color"`, which
-at runtime is not an expression at all, just broken text. Worse, **inlining stops
-for the whole document**. Measured on one identical template: 31 inline styles with
-the correct form, **6** with a single bad one. Nothing warns.
+Juice parses `style` as CSS: `{` opens a block, and `}` is eaten, leaving
+broken text, not an expression. Inlining then stops for **the whole
+document**, with no warning.
 
-Prefer `bgcolor` for colours (never parsed as CSS, and the most bulletproof way to
-colour a cell in mail anyway); use `tal:attributes="style string:…"` when you
-genuinely need CSS.
+Use `bgcolor` for colours — never parsed as CSS. Use
+`tal:attributes="style string:…"` for real CSS.
 
 ### 2. `${...}` in a literal `class` attribute is corrupted
 
@@ -61,65 +56,52 @@ genuinely need CSS.
 <td class="${row_class}">
 ```
 
-`css.safe` rewrites selector-unsafe characters: `$` becomes `-` and the braces are
-stripped. Separately, the authoring rules forbid **runtime-computed class values**
-outright — Tailwind's scanner and `removeUnusedCSS` only see build-time markup, so
-a class assembled at runtime has had its CSS purged before the mail is sent.
-Conditional styling goes through `tal:attributes="style string:…"` with literal
+`css.safe` rewrites `$` to `-`, strips the braces. Runtime-computed **class
+values are forbidden** — Tailwind sees only build-time markup, so a runtime
+class loses its CSS. Use `tal:attributes="style string:…"` with literal
 values.
 
-### 3. `--` anywhere in a comment makes the compiled `.pt` unparseable at runtime
+### 3. `--` in any comment breaks the compiled `.pt` at runtime
 
-Chameleon refuses `--` inside an HTML comment (`ParseError: The string '--' is not
-allowed in a comment`). An ordinary em-dash-style authoring comment therefore breaks
-the template **at render time**, long after a green build. Use `;` or a full stop.
+Chameleon rejects `--` inside an HTML comment (`ParseError: The string '--' is
+not allowed in a comment`), failing **at render time**, after a green build.
+Use `;` or a full stop. The kit strips `.vue` comments in `afterTransform`;
+the rule still hits **ZCML and GenericSetup XML**, which nothing strips.
 
-The kit strips authoring comments in `afterTransform`, which makes this structurally
-impossible in *your* comments — but the same rule applies to **ZCML and GenericSetup
-XML**, which nothing strips. It has cost time four separate times, once blocking
-instance startup.
+Trap: `<Outlook :open="…" />` with an empty slot emits `<!--[endif]---->`. Give
+it real slot content, or use `v-html`.
 
-A related trap: `<Outlook :open="…" />` with an **empty slot** emits
-`<!--[endif]---->` — a `--` in a comment. Give `<Outlook>` real slot content, or use
-`v-html`.
+### 4. Writing `<style>` in prose inside a comment breaks the lint
 
-### 4. Writing `<style>` in prose inside an HTML comment breaks the lint
+`markup_only` in the lint blanks everything between a literal `<style>` and
+the next `</style>`, comments included. A comment naming the element swallows
+its own `-->`; the lint then flags the next comment's `<!--` as a stray `--`.
+Write `&lt;style&gt;` in prose.
 
-`markup_only` in the authoring lint blanks everything between a literal `<style>`
-and the next `</style>`, comments included. A comment that mentions the element by
-name therefore swallows its own `-->`, and the *next* comment's `<!--` is reported
-as a stray `--` at a line that looks innocent. Spell it `&lt;style&gt;` in prose.
-Same shape as the trap below, which has a named rule; this one does not.
+### 5. A component name inside a comment swallows the real block
 
-### 5. Naming the raw-escape component inside a comment swallows the real block
+Maizzle's global regex for its raw/escape component also matches inside HTML
+comments. Naming that component in angle brackets inside a comment deletes the
+real block. Never do it.
 
-Maizzle extracts its raw/escape component with a naive global regex that also
-matches **inside HTML comments**. Mentioning that component's name in angle
-brackets in a comment silently swallows the real block and deletes it from the
-output. Do not write component names in angle brackets inside comments.
+### 6. No `i18n:domain` renders `i18n:translate` untranslated
 
-### 6. No `i18n:domain` means `i18n:translate` renders the msgid untranslated
-
-…and that is **indistinguishable from success**, because the msgid's default text
-appears in the output either way. The kit's `Main.vue` declares
-`i18n:domain="imio.emailkit"` on `<html>`, so kit strings translate.
-
-**A nested `i18n:translate` inherits that domain.** If the msgid belongs to *your*
-add-on's catalog, say so on your own element:
+The msgid's default text still shows — looks like success. The kit's
+`Main.vue` sets `i18n:domain="imio.emailkit"` on `<html>`; nested
+`i18n:translate` inherits it. For your catalog, set your own domain:
 
 ```html
 <p i18n:domain="my.addon" i18n:translate="email_intro">Default text.</p>
 ```
 
-Without the `i18n:domain`, your msgid is looked up in `imio.emailkit`'s catalog,
-misses, and renders its default in every language. Snapshot two languages
-(`languages = ("fr", "en")`) and a translation that stopped resolving shows up as
-identical snapshots rather than as nothing at all.
+Without it, your msgid misses `imio.emailkit`'s catalog and renders its
+default everywhere. Snapshot two languages (`languages = ("fr", "en")`): a
+broken translation then shows as two identical snapshots, not a gap.
 
 ### 7. `${helper(x)}` must be `${python: helper(x)}`
 
 TAL **path** expressions cannot call functions. `${format_date(when)}` raises
-`Invalid variable name`. This one fails loudly, but you will hit it constantly:
+`Invalid variable name` — common, and loud:
 
 ```html
 <!-- WRONG -->  ${format_date(when)}
@@ -128,102 +110,91 @@ TAL **path** expressions cannot call functions. `${format_date(when)}` raises
 
 Same for `tal:content`: `tal:content="python: format_date(when)"`.
 
-### 8. Theme tokens go via `tal:attributes` or `bgcolor`, never a literal `style`
+### 8. Theme tokens: `tal:attributes` or `bgcolor`, never a literal `style`
 
-An early version of this rule showed `style="background-color: ${theme/primary_color}"`
-as an example. That is failure 1. The rule has since been amended; the three tokens,
-their registry records and the locked-kit model are unchanged.
+Same failure as #1. Read a theme token with `bgcolor` or `tal:attributes`,
+never inside a literal `style`.
 
-### 9. A legacy body's own `<style>` block is dropped by Gmail and Outlook.com
+### 9. A legacy `<style>` block is dropped by Gmail and Outlook.com
 
-`render_shell(subject, body_html)` injects legacy HTML into the shell's content
-well, which is inside `<body>` — invalid placement for `<style>`, and Gmail and
-Outlook.com strip it. The shell wraps and does **not** rewrite, so it will not hoist
-the block into `<head>`. Inline `style="…"` attributes in the injected body survive
-untouched: convert the block to inline styles before migrating. It looks perfect in
-a browser preview, so you cannot discover this before real clients do.
+`render_shell(subject, body_html)` injects legacy HTML inside `<body>`, where
+`<style>` is invalid, so Gmail and Outlook.com strip it. The shell wraps but
+does **not** rewrite it into `<head>`. Inline `style="…"` survives: convert
+the block to inline styles first — only real clients show the bug.
 
 ### 10. A top-level SFC `<style>` block never reaches the email
 
-Standard Vue semantics: the bundler extracts it. Purge then strips the
-now-orphaned class from the `class` attribute too, so the markup silently loses
-both rule and class. Custom CSS must be a real `<style>` **element** inside
-`<template>`, or live in the kit's CSS entry.
+The bundler extracts it; purge then strips the now-orphaned class too, so the
+markup loses both rule and class. Write custom CSS as a real `<style>`
+**element** inside `<template>`, or add it to the kit's CSS entry.
 
 ### 11. `maizzle build` empties its output directory, silently
 
-It has already deleted a committed hand-authored plaintext twin. Maizzle 6.0.7
-exposes no `output.clean` / `emptyOutDir` option. So **hand-authored `.txt.pt`
-twins live in `emails/twins/`** and are copied into `templates/` after the build.
-Never keep the only copy of anything in an output directory.
+It deletes any hand-authored file placed there, twins included — Maizzle
+6.0.7 has no `output.clean` / `emptyOutDir` option. Keep **hand-authored
+`.txt.pt` twins in `emails/twins/`**, copy them into `templates/` after the
+build. Never keep the only copy of anything in an output directory.
 
 ### 12. Dark-mode rules keyed on a class are deleted by purge
 
-`css.purge` models only `class=` and `id=`, so a class-keyed
-`@media (prefers-color-scheme: dark)` rule is stripped with a successful build. The
-kit keys dark mode on `data-dark="page|surface|body|muted"` **attribute** selectors,
-which purge cannot see and therefore cannot remove. If you add a dark rule, key it
-on an attribute.
+`css.purge` tracks only `class=` and `id=`, so a class-keyed
+`@media (prefers-color-scheme: dark)` rule is stripped with a green build. Key
+dark mode on `data-dark="page|surface|body|muted"` **attribute** selectors,
+which purge cannot see.
 
 ### 13. A new `emails/` project with no `node_modules` ships uncompiled CSS
 
-Tailwind resolves the `@import "@maizzle/tailwindcss"` that the shell emits by
-walking up from the **template's** directory. With no `node_modules` ancestor the
-resolution fails, **Maizzle catches the CSS error and exits 0**, and the build
-prints "Built 1 template". Measured on one template: 5.3 KB of output with inlined
-styles becomes 3.5 KB with none. Same root cause as the kit's own no-bare-imports
-rule — the kit lives in a Python egg, and `site-packages` has no `node_modules`
-above it.
+Tailwind resolves the shell's `@import "@maizzle/tailwindcss"` by walking up
+from the **template's** directory. With no `node_modules` ancestor, resolution
+fails, but **Maizzle still exits 0** with no inlined styles — same cause as
+the kit's no-bare-imports rule: it lives in a Python egg, and `site-packages`
+has no `node_modules` above it.
 
-So: if a rebuild's output suddenly gets much smaller, check for inline `style`
-attributes before anything else. `MIN_INLINE_STYLES`-style assertions exist for
-this reason.
+If a rebuild shrinks a lot, check for inline `style` attributes first.
+`MIN_INLINE_STYLES`-style assertions catch this.
 
-### 14. Rewording an existing msgid ships it untranslated
+### 14. Rewording a msgid ships it untranslated
 
-`python -m imio.emailkit.locales` marks an entry `#, fuzzy` when the msgid's
-English default changes, and **msgfmt skips fuzzy entries**. So a msgid you
-reworded and correctly retranslated in all three `.po` files renders in English,
-while the sync reports "0 added, 0 removed", the `.mo` timestamps come out newer
-than the `.po` files, and `make update-golden` regenerates the snapshots from the
-same broken catalogs so they agree with the bug.
+`python -m imio.emailkit.locales` marks a changed msgid `#, fuzzy`; **msgfmt
+skips fuzzy entries**, so a reworded, retranslated msgid still renders in
+English. The sync reports "0 added, 0 removed", and `make update-golden`
+regenerates snapshots from the same broken catalogs, agreeing with the bug.
 
-After rewording an existing msgid: strip the `#, fuzzy` lines, recompile, and read
-the rendered mail in a language you can check.
+After rewording: strip the `#, fuzzy` lines, recompile, and read the mail in a
+language you can check.
 
 ```bash
 grep -rn '^#, fuzzy' src/imio/emailkit/locales/   # must be empty
 python -c "import gettext; print(gettext.GNUTranslations(open('src/imio/emailkit/locales/fr/LC_MESSAGES/imio.emailkit.mo','rb')).gettext('<msgid>'))"
 ```
 
-A msgid echoed back to you is an untranslated one.
+A msgid echoed back to you is untranslated.
 
 ### 15. Injected names beat your context
 
-`render()` injects `theme`, `lang`, `target_language`, `portal_url`, `translate`,
-`format_date`, `format_datetime`, `format_number` — and those win over keys of the
-same name in your context, because the kit layout uses them unconditionally. Do not
-name a context key `theme`, `lang` or `preheader`; `preheader` comes from the
-registration, not from the caller.
+`render()` injects `theme`, `lang`, `target_language`, `portal_url`,
+`translate`, `format_date`, `format_datetime`, `format_number`. These always
+win over a same-named context key, since the kit layout uses them
+unconditionally. Never name a context key `theme`, `lang`, or `preheader` —
+`preheader` comes from the registration, not the caller.
 
 ---
 
-## Authoring rules (enforced by the lint in `bin/check-emails`)
+## Authoring rules (`bin/check-emails` lint)
 
 | Rule | Why |
 |---|---|
-| No `tal:` / `i18n:` attributes **on a kit component** | Vue attribute fallthrough lands them on whichever element happens to be the component's root. Put them on your own `<tr>` / `<div>` instead. |
+| No `tal:` / `i18n:` attributes **on a kit component** | Vue attribute fallthrough lands them on the component's root — put them on your own `<tr>` / `<div>`. |
 | No runtime-computed `class` values | Tailwind purge only sees build-time markup. |
 | No `${...}` in a literal `class` or `style` attribute, ever | Failures 1 and 2. |
-| `alt` on every image | RGAA applies to iMio's clients; the lint fails without it. |
-| `structure` only for `body_html` and `footer_html` | `${...}` is HTML-escaped by default, and that default is right. |
-| No `--` in any comment, anywhere in the repo | Failure 3, and it reaches ZCML and XML too. |
-| Kit files and `.vue` templates stay **import-free** of bare specifiers | The kit ships inside a Python egg, and a `site-packages` directory has no `node_modules` ancestor for Vite to walk up to. Maizzle auto-imports every component. |
+| `alt` on every image | RGAA applies to iMio's clients; lint fails without it. |
+| `structure` only for `body_html` and `footer_html` | `${...}` is HTML-escaped by default — the right default. |
+| No `--` in any comment, anywhere in the repo | Failure 3, reaching ZCML and XML too. |
+| Kit files and `.vue` templates stay **import-free** of bare specifiers | The kit ships in a Python egg; `site-packages` has no `node_modules` ancestor. Maizzle auto-imports everything. |
 
-`structure` is safe from template injection: Chameleon compiles the *template*, and
-an injected string is inserted as markup data that is never re-parsed as TAL —
-verified, including `${python: __import__(…)}` in a body. It is still inserted
-**unescaped**, which is the entire point of the slot.
+`structure` is safe against template injection. Chameleon compiles the
+**template**; an injected string becomes markup data, never re-parsed as TAL.
+It stays **unescaped** — the slot's purpose.
 
 ### Run the lint
 
@@ -232,38 +203,35 @@ python -m imio.emailkit.lint emails/          # or any .vue file / directory
 python -m imio.emailkit.lint --list-rules     # what each rule catches, and the fix
 ```
 
-Eight rules, each one a failure from the catalogue above:
-`tal-on-component`, `runtime-class`, `style-placeholder`, `class-placeholder`,
-`missing-alt`, `comment-double-dash`, `raw-in-comment`, `path-call`. It is gate 2
-of `bin/check-emails`, so CI runs it whether you do or not.
+Eight rules, one per catalogue failure: `tal-on-component`, `runtime-class`,
+`style-placeholder`, `class-placeholder`, `missing-alt`,
+`comment-double-dash`, `raw-in-comment`, `path-call`. `bin/check-emails`
+always runs it.
 
 ---
 
 ## Kit component catalog
 
-The kit is **locked**: compose these, do not extend the Tailwind config. Components
-are auto-imported and prefixed `Kit`.
+The kit is **locked**: compose these, do not extend the Tailwind config.
+Components auto-import, prefixed `Kit`.
 
 ### `<KitMain>` — the shell (`layouts/Main.vue`)
 
-Wrap every template in it. It owns the whole document and you never write any of
-this yourself: `<html lang="${lang}">`, charset/viewport/format-detection/colour-scheme
-meta, the MSO document settings, `i18n:domain`, `role="presentation"` on layout
-tables, the responsive and dark-mode `<style>`, the hidden preheader div, and the
-four bands of the v3 design —
+Wrap every template in it. It owns the whole document: meta tags, MSO
+settings, `i18n:domain`, table roles, responsive/dark-mode `<style>`, the
+hidden preheader div — and four bands:
 
-1. **white band** — the head artwork as a background, the `logo_url` logo with an
-   enforced translatable `alt`, and the `pill` slot on the right;
-2. **title band** — `#f8f8f8` closed by a 1 px rule, with the artwork's tail
-   running down into it, holding the title and optional subtitle in ink;
-3. **content well** — your markup, plus the `body_html` injection point;
+1. **white band** — head artwork background, `logo_url` logo (translatable
+   `alt`), `pill` slot on the right.
+2. **title band** — `#f8f8f8`, closed by a 1 px rule; holds title and
+   optional subtitle.
+3. **content well** — your markup, plus the `body_html` injection point.
 4. **negative footer** — `footer_html` or a translated default, then the iMio
    logo.
 
-The head artwork is v3's whole subject, and it is shell-owned: a template never
-references it. `primary_color` no longer paints the title band; it is
-`KitCard`'s rail and `KitButton`'s fill, and the brand colour at the top of the
-mail is now the artwork, which is iMio magenta for every consumer.
+The head artwork is shell-owned (a template never references it) and carries
+the brand colour, iMio magenta for every consumer. `primary_color` colours
+only `KitCard`'s rail and `KitButton`'s fill.
 
 ```html
 <template>
@@ -287,35 +255,31 @@ mail is now the artwork, which is iMio magenta for every consumer.
 </template>
 ```
 
-**The title is the shell's, not yours.** Do not write an `<h1>` in the content
-well; it would sit under a band that already has one. Two ways to fill it:
+**The title band belongs to the shell.** Do not write an `<h1>` in the content
+well:
 
 | Shape | Use when | How |
 |---|---|---|
-| `#title` / `#subtitle` slot | the title is **wording** | the only shape that can carry `i18n:translate` |
-| `title` / `subtitle` in the render context | the title is **data** | nothing to write — the shell reads the names itself |
+| `#title` / `#subtitle` slot | the title is **wording** | only shape carrying `i18n:translate` |
+| `title` / `subtitle` in the render context | the title is **data** | nothing to write — shell reads the names |
 
-A template that supplies neither gets the band's closing 1 px `#d2d2d2` rule and
-no band, so a template that predates the title band still renders.
+Neither set: the band gets its closing 1 px `#d2d2d2` rule, no content.
 
-> **Porting a pre-v2 template:** delete its `<h1>`. If its context already has a
-> `title`, the shell is now rendering that in the title band and the old `<h1>`
-> prints it a second time. This is the one thing the upgrade breaks, and it is visible on
-> the first preview.
+> **`<h1>` plus a context `title`?** Delete the `<h1>` — the shell renders
+> `title` in the band, so both print, visible on first preview.
 
-`#mentions` is the centred small print between the body and the footer — a
-copy-this-link fallback, why you received this. Put it there rather than at the
-end of the body: the shell centres it, sizes it and gives it the dark-mode hook.
+`#mentions`: centred small print between body and footer, the copy-this-link
+fallback and why-you-got-this text. Keep it here, not at the body's end — the
+shell centres, sizes, and dark-mode-hooks it.
 
-`#preheader` is a **build-time** fallback for templates a stock Plone view renders
-(they never see `render()`'s context). The runtime msgid from the registration
-always wins when present.
+`#preheader`: **build-time** fallback for templates a stock Plone view renders
+(no `render()` context). The registration's runtime msgid wins when present.
 
 ### `<KitPill tone>` — the status badge
 
-Goes in `KitMain`'s `pill` slot. `tone` is `info` (default), `success`, `warning`
-or `danger`, resolved at **build** time. One per mail; it says in two words what
-kind of message this is.
+In `KitMain`'s `pill` slot. `tone`: `info` (default), `success`, `warning`,
+`danger`, resolved at **build** time. One per mail, naming the message's kind
+in two words.
 
 ```html
 <template #pill>
@@ -325,22 +289,20 @@ kind of message this is.
 </template>
 ```
 
-**The pill is white on every tone.** It sits on the head artwork, not on white, so
-a tinted fill there is either washed out or a second colour against the brand. The
-tone is a coloured disc baked into the 14 px icon: blue, green, yellow, red.
+**White on every tone** — a tinted fill on the head artwork would wash out or
+clash with brand colour. The tone is a coloured disc in the 14 px icon: blue,
+green, yellow, red.
 
-That icon disappears when the render had no request to build an absolute URL from
-(a golden file, a unit test), and a client that blocks remote images drops it too.
-That is deliberate — a relative image URL in an inbox is a broken-image icon — and
-the pill stays legible without it, as a bold label on white. What it loses is the
-colour, all of it, so write a label that carries the meaning on its own.
+Icon disappears with no absolute-URL request (golden files, unit tests) or
+when a client blocks remote images — deliberate: a relative image URL shows
+as broken. Pill stays a legible bold label on white, minus colour — write a
+label that carries the meaning alone.
 
 ### `<KitCard>` — the rail card
 
-The block that holds what the mail is *about*: the content submitted for review,
-the account that was created. A tinted panel with a 6 px `primary_color` rail. Its
-`overline` names the kind of thing, its `title` names the thing, and the default
-slot takes a lead paragraph and/or a `KitDataList`.
+What the mail is *about* — content submitted for review, an account created.
+Tinted panel, 6 px `primary_color` rail. `overline`: kind of thing. `title`:
+the thing. Default slot: lead paragraph and/or `KitDataList`.
 
 ```html
 <KitCard>
@@ -354,10 +316,10 @@ slot takes a lead paragraph and/or a `KitDataList`.
 
 ### `<KitDataList>` / `<KitDataRow>` — label/value rows
 
-A fixed handful of facts inside a card: who, when, where. Presentational, no
-header — that is what makes it not a `KitDataTable`. `KitDataRow` carries the two
-cells; `label-width` is `'130'` (default) or `'120'`, a **string**, so it is
-written as a plain attribute:
+Fixed handful of facts in a card: who, when, where. Presentational, no
+header — unlike `KitDataTable`. `KitDataRow` carries the two cells.
+`label-width`: `'130'` (default) or `'120'`, a **string**, as a plain
+attribute:
 
 ```html
 <KitDataList>
@@ -372,26 +334,24 @@ written as a plain attribute:
 </KitDataList>
 ```
 
-The 1 px rule between rows is **not** yours to write: `tailwind.css` hangs a
-`tr + tr > td` selector off `KitDataList`'s class, so it is a top border on every
-row but the first. It has to be that way round — a bottom border needs omitting on
-the *last* row, and nothing in an email can say "last" (`:last-child` does not
-survive CSS inlining).
+Do not write the 1 px rule between rows: `tailwind.css` hangs a
+`tr + tr > td` selector off `KitDataList`'s class, drawing a top border on
+every row but the first. A bottom border needs omitting on the *last* row —
+nothing in email can select "last" (`:last-child` does not survive CSS
+inlining).
 
-`KitDataRow` may be a component where `KitDataTable`'s rows may not: a data list is
-a fixed handful of pairs, never a `tal:repeat`, so the no-`tal:`-on-a-component rule
-does not bite. If you do need a repeat here, write a plain `<tr>` with the cell
-classes spelled out; it still gets the rule between rows.
+`KitDataRow` can be a component where `KitDataTable`'s rows cannot: a data
+list is fixed pairs, never a `tal:repeat`. For a repeat, write a plain `<tr>`
+with the cell classes spelled out; it still gets the rule between rows.
 
 ### `<KitButton href align variant inline>` — the call to action
 
-A single-cell table holding a **block** anchor that carries the padding, so the
-whole rectangle is a click target; the cell repeats the values in
-`mso-padding-alt` for Word's renderer. `href` takes a `${...}` placeholder (`href`
-is not CSS). `align` is `left` | `center` | `right`. `variant` is `solid`
-(default, filled with `primary_color`) or `outline` (a `#b3004b` rule, for a
-secondary action). Colour comes from `primary_color`, which the shell defines — so
-it only works inside `<KitMain>`.
+Single-cell table, **block** anchor carries the padding — the whole rectangle
+is a click target. Cell repeats padding in `mso-padding-alt` for Word. `href`
+takes `${...}` (not CSS). `align`: `left` | `center` | `right`. `variant`:
+`solid` (default, `primary_color` fill) or `outline` (`#b3004b` rule,
+secondary action). Colour is `primary_color` (shell-defined) — works only
+inside `<KitMain>`.
 
 ```html
 <div tal:condition="cta_url | nothing">
@@ -399,15 +359,15 @@ it only works inside `<KitMain>`.
 </div>
 ```
 
-Note the `tal:condition` on a plain `<div>`, not on the component. Outlook renders
-the button square: it ignores `border-radius`, and the VML fix needs a width in
-pixels that a translated label makes unknowable.
+Put `tal:condition` on the plain `<div>`, not the component. Outlook renders
+the button square, ignoring `border-radius`; the VML fix needs a pixel width,
+which a translated label cannot give.
 
 ### `<KitButtonGroup align>` — two actions on one row
 
-Each `KitButton` is its own table and two tables do not share a line in mail, so
-the row has to be markup. `inline` drops each button's own top margin, which the
-group supplies once for the pair.
+Each `KitButton` is its own table; two cannot share a line in mail, so the
+group builds the row. `inline` drops each button's top margin, supplied once
+by the group for the pair.
 
 ```html
 <KitButtonGroup align="center">
@@ -420,16 +380,16 @@ group supplies once for the pair.
 </KitButtonGroup>
 ```
 
-Two **named** slots, because a component cannot wrap children it has not been told
-about and the 12 px gap would have nowhere to live. `#secondary` is optional. The
-cells stay side by side on a phone; a pair whose labels do not fit on one line
-wants two stacked `KitButton`s instead.
+Two **named** slots hold the buttons — a component cannot wrap untold-about
+children, and the 12 px gap needs a home. `#secondary` is optional. Cells stay
+side by side on a phone; labels that do not fit on one line want two stacked
+`KitButton`s instead.
 
 ### `<KitPanel tone>` — the callout
 
-A bordered block for the one condition attached to the message: how long the link
-lasts, what happens if you ignore it. `tone` is `accent` (default, pink) or
-`neutral`, resolved at **build** time. The optional `overline` names the condition.
+Bordered block for one condition: how long a link lasts, what happens if
+ignored. `tone`: `accent` (default, pink) or `neutral`, resolved at **build**
+time. Optional `overline` names the condition.
 
 ```html
 <KitPanel>
@@ -440,12 +400,12 @@ lasts, what happens if you ignore it. `tone` is `accent` (default, pink) or
 </KitPanel>
 ```
 
-### `<KitDataTable>` — table chrome for real tabular data
+### `<KitDataTable>` — chrome for tabular data
 
-For many rows of the same shape with a header naming the columns. The one table in
-the kit that is **not** `role="presentation"` — marking a data table as
-presentational hides its structure from screen readers. Rows are yours, because
-`tal:` may not go on the component:
+Many rows of the same shape, header naming the columns. The one table in the
+kit **not** `role="presentation"`: marking it presentational would hide
+structure from screen readers. Write rows yourself — `tal:` cannot go on the
+component:
 
 ```html
 <KitDataTable>
@@ -459,12 +419,13 @@ presentational hides its structure from screen readers. Rows are yours, because
 </KitDataTable>
 ```
 
-Header cells want `scope="col"`; the kit cannot add it, the cells come from the slot.
+Add `scope="col"` to header cells yourself; the kit cannot, since cells come
+from the slot.
 
 ### Theme tokens
 
-Three runtime-variable branding values, from `plone.app.registry`. Everything else
-is Tailwind, fixed at build time.
+Three branding values, set at runtime from `plone.app.registry`; everything
+else is Tailwind, fixed at build time.
 
 | Token | Registry record |
 |---|---|
@@ -472,8 +433,8 @@ is Tailwind, fixed at build time.
 | `primary_color` | `imio.emailkit.theme.primary_color` |
 | `footer_html` | `imio.emailkit.theme.footer_html` |
 
-The shell defines them; read them as `${primary_color}` inside `bgcolor` or
-`tal:attributes`, never in a literal `style`.
+The shell defines them. Read as `${primary_color}` inside `bgcolor` or
+`tal:attributes`, never inside a literal `style`.
 
 ---
 
@@ -504,43 +465,42 @@ One `<emailkit:templates>` block per add-on, in its own `configure.zcml`:
 </configure>
 ```
 
-- Lookups are namespaced: `my.addon:item_published`. The package half of the name
-  is derived from the ZCML file's own package — the bare basename resolves to
-  nothing, on purpose — two add-ons will eventually both ship `item_published`.
-- **The subject lives in the registration**, as a msgid, translated per recipient
-  language at send time. Not in the template, not in a sidecar.
-- **Always give a default text.** Without it an untranslated subject reaches the
-  inbox as the bare msgid.
-- `preheader` is the hidden inbox-preview line, the highest-visibility email
-  feature everyone forgets. Every inbox shows it; omitted, the client fills it with
-  whatever body copy comes first. Keep it under ~100 characters.
-- **One block per package; duplicate template names conflict.** A second
-  `<emailkit:templates>` in the same package, or two templates with the same
-  `name`, is a `ConfigurationConflictError` at startup — not a silent overwrite.
-- **i18n caveat:** `i18ndude` never extracts from ZCML. If the add-on rebuilds its
-  `.pot` with it, restate the same msgids in a small `msgids.py` (see
-  `src/imio/emailkit/msgids.py` for the pattern this package uses on itself).
+- Lookups are namespaced: `my.addon:item_published`, from the ZCML file's own
+  package — the bare basename resolves to nothing, since add-ons can share a
+  template name.
+- **The subject lives in the registration** — a msgid, translated per
+  recipient language at send time, never in the template or a sidecar.
+- **Always give a default text.** Without one, an untranslated subject shows
+  as the bare msgid.
+- `preheader`: the hidden inbox-preview line, shown by every inbox. If
+  omitted, the client uses whatever body copy comes first — keep it under
+  ~100 characters.
+- **One block per package; duplicate names conflict.** A second
+  `<emailkit:templates>` in one package, or two templates sharing a `name`,
+  raises `ConfigurationConflictError` at startup — never a silent overwrite.
+- `i18ndude` never extracts from ZCML. If your add-on rebuilds its `.pot`, add
+  the same msgids to a small `msgids.py` (see `src/imio/emailkit/msgids.py`).
 - `MANIFEST.in`: `recursive-include …/templates *.pt` **and** `prune …/emails`.
 
-Overrides need no new mechanism: `z3c.jbot` works on the resolved `.pt`. A site
-layer that overrides ours must **extend** `IEmailkitLayer` — for a *sibling* layer
-precedence is effectively arbitrary.
+`z3c.jbot` overrides work on the resolved `.pt`, no extra setup needed. A site
+layer overriding ours must **extend** `IEmailkitLayer`; sibling-layer
+precedence is otherwise arbitrary.
 
 ---
 
 ## Plaintext twins
 
-`<name>.txt.pt` is the plaintext half, hand-authored, source-controlled in
-`emails/twins/`, copied into `templates/` after the build.
+`<name>.txt.pt`: the plaintext half. Hand-author it in `emails/twins/`, copy
+it into `templates/` after the build.
 
-**Never generate one.** Maizzle's plaintext output keeps `${}` but destroys every
-`tal:`/`i18n:` construct: conditionals vanish, header lines come out empty,
-`i18n:translate` freezes at the English default. A generated twin ships a
-plausible-looking body with the wrong content in the wrong language.
+**Never generate one.** Maizzle's plaintext output keeps `${}` but destroys
+every `tal:`/`i18n:` construct — conditionals vanish, header lines empty,
+`i18n:translate` freezes at English. A generated twin ships a plausible body
+with wrong content, wrong language.
 
-Without a twin, the naive extraction runs, warns once at startup, logs a
-deprecation — and **drops every link**, because the URL lives in an `<a href>` the
-extraction throws away. Any template with a call to action wants a twin.
+Without a twin, a naive extraction runs instead: it warns once, logs a
+deprecation, and **drops every link**, since the URL lives in an `<a href>` it
+discards. Any template with a call to action needs a twin.
 
 ```html
 <tal:body
@@ -554,12 +514,12 @@ extraction throws away. Any template with a call to action wants a twin.
 ```
 
 A twin is a **template**: keep the placeholders, they run at send time.
-`tal:omit-tag=""` is how you emit text without emitting tags — a stray real tag
-reaches a plaintext reader as literal markup.
+`tal:omit-tag=""` emits text without tags. A stray real tag reaches a
+plaintext reader as literal markup.
 
 ---
 
-## The fixture / golden workflow
+## Fixture / golden workflow
 
 ```
 tests/
@@ -591,35 +551,35 @@ CONTEXT = {
 }
 ```
 
-Rules that make the fixture worth having:
+Fixture rules:
 
-- **One key per `${...}`, and no more.** The fixture is the contract: add a
-  placeholder without adding the key and the golden test fails loudly. That is the
-  feature.
-- **Omit what `render()` injects** — `lang`, `theme` and its tokens, `preheader`.
-  Pinning them hides a broken injection and pins every snapshot to one language.
-- **Plain data, not objects.** A plain Python instance needs
-  `__allow_access_to_unprotected_subobjects__` before `${item/title}` traverses;
-  mappings and ISO strings just work.
+- **One key per `${...}`, no more.** The fixture is the contract: a
+  placeholder with no matching key fails the golden test loudly.
+- **Omit what `render()` injects** — `lang`, `theme` and its tokens,
+  `preheader`. Pinning them hides a broken injection and locks snapshots to
+  one language.
+- **Use plain data, not objects.** A plain Python instance needs
+  `__allow_access_to_unprotected_subobjects__` before `${item/title}` can
+  traverse it; mappings and ISO strings work without it.
 - **Include non-ASCII text.** A charset regression shows up nowhere else.
-- **Cover both branches of a `tal:condition`** across your fixtures: one that
-  supplies `cta_url` and one that does not.
+- **Cover both branches of every `tal:condition`**: one fixture with
+  `cta_url`, one without.
 
-The same fixtures feed `bin/preview-emails` and `@@emailkit-preview`, so keeping
-them realistic is not cosmetic.
+`bin/preview-emails` and `@@emailkit-preview` use the same fixtures — keep
+them realistic.
 
 ### Regenerating snapshots
 
-Deliberate, never a side effect of a failure:
+Do this on purpose, never as a side effect of a failing test:
 
 ```bash
 EMAILKIT_UPDATE_GOLDEN=1 pytest tests/ -q -rs   # writes, reports every one as skipped
 git diff                                        # review before committing
 ```
 
-A snapshot that repairs itself when it breaks is not a snapshot. The harness also
-audits the *committed* snapshot for raw `${...}`, so a regeneration run on a broken
-engine cannot bake a placeholder in and be confirmed for ever.
+A snapshot that repairs itself when it breaks is not a snapshot. The harness
+checks the *committed* snapshot for raw `${...}`, so a broken engine cannot
+bake in a placeholder and pass forever.
 
 ---
 
@@ -637,52 +597,49 @@ Email("my.addon:item_published").to(member).to("greffe@commune.be").cc(
 ).send()
 ```
 
-- The builder holds data and does not grow behaviour. Nine methods, frozen: `to`,
-  `cc`, `bcc`, `reply_to`, `sender`, `subject`, `with_context`, `attach`, `send`.
-- Recipients accept, in any mix: an address, a member, a userid, or an iterable.
-  `.send()` **groups by resolved language** and renders once per group, so FR/NL
-  communes need no caller effort. There is no per-send language argument, by design.
-- Unresolvable recipients, zero recipients, a missing subject, an unset
-  `plone.email_from_address`, and unguessable attachment metadata all raise at
-  `.send()`. Fail loud, never silent drop.
-- Delivery is **queued**: an aborted transaction sends nothing.
-  `.send(immediate=True)` is the escape hatch.
-- Migrating existing mail code: `render_shell(subject, body_html)` wraps a legacy
-  body in the kit shell with no template work. Or keep the builder and pass the
-  legacy markup as `body_html` in the context of a registered template — the layout
-  defines that slot for every template, and that route keeps the registration's
-  subject, the preheader and the hand-authored twin.
+- The builder holds data, not behaviour: nine fixed methods — `to`, `cc`,
+  `bcc`, `reply_to`, `sender`, `subject`, `with_context`, `attach`, `send`.
+- Recipients: any mix of an address, a member, a userid, or an iterable.
+  `.send()` **groups by resolved language**, rendering once per group — FR/NL
+  communes need no extra code. No per-send language argument.
+- `.send()` raises on unresolvable or zero recipients, a missing subject, an
+  unset `plone.email_from_address`, or unguessable attachment metadata —
+  fails loud, never drops silently.
+- Delivery is **queued**: an aborted transaction sends nothing. Use
+  `.send(immediate=True)` to send anyway.
+- To migrate mail code, call `render_shell(subject, body_html)` to wrap a
+  legacy body with no template work, or pass it as `body_html` in a
+  registered template's context — keeping the registration's subject,
+  preheader, and hand-authored twin.
 
-## The Plone default mails are ordinary templates
+## Plone default mails are ordinary templates
 
-`mail_password_template`, `registered_notify_template` and `get_username` restyle
-mails stock Plone sends, and there is **nothing special about authoring them**.
-This package registers its own views for all three (`browser/default_mails.py`,
-`browser/login_help.py`), each of which builds a flat context and calls
-`render()`, so they are registered, discovered, previewable and golden-tested
-like any consumer template. Same `${...}`, same `i18n:domain`, same locale
-helpers, same twins.
+`mail_password_template`, `registered_notify_template` and `get_username`
+restyle stock Plone mails — authoring them is **not special**. This
+package's own views for all three (`browser/default_mails.py`,
+`browser/login_help.py`) build a flat context and call `render()`, so they
+are registered, discovered, previewable and golden-tested like any consumer
+template: same `${...}`, `i18n:domain`, locale helpers, twins.
 
-Two used to be `z3c.jbot` overrides rendered by a stock CMFPlone view, and that
-forced a second dialect — `${options/member}`, `${python: member.getProperty('email')}`,
-no locale helpers, no `theme`, and a hand-written `Subject:` header emitted from
-`useDoctype()`. If you find markup like that in a `.vue`, it is pre-2026-09-11 and
-wants converting.
+Markup using `${options/member}`, `${python: member.getProperty('email')}`, no
+locale helpers, no `theme`, or a hand-written `Subject:` header from
+`useDoctype()` belongs to a different dialect. Convert it to `render()`, the
+kit's locale helpers, and a ZCML-registered subject.
 
-What stays in Python, in the view, is the only part that cannot be a template:
-`RegistrationTool` parses `Subject`/`To`/`From` back out of the returned string, so
-`DefaultMailView.header_block` builds an RFC822 preamble. The subject it uses is the
-template's registration msgid — so **set the subject in ZCML**, like everywhere else,
-never in the template.
+One part stays in Python — it cannot be a template: `RegistrationTool` parses
+`Subject`/`To`/`From` out of the returned string, so
+`DefaultMailView.header_block` builds an RFC822 preamble. Its subject is the
+template's registration msgid: **set the subject in ZCML**, never in the
+template.
 
-If you add a context key, add it to `build_context` *and* to the fixture; the golden
-test is what tells you when you forgot.
+If you add a context key, add it to `build_context` **and** the fixture — the
+golden test catches a forgotten one.
 
-## The Wallonie Connect migration mail
+## Wallonie Connect migration mail
 
-`imio.emailkit:user_migrated_to_sso` tells a user that their local account now
-logs in through Wallonie Connect. The kit owns the template, its translations and
-the Wallonie Connect mark, so a consumer only sends it:
+`imio.emailkit:user_migrated_to_sso` tells a user their local account now logs
+in through Wallonie Connect. The kit owns the template, translations, and
+mark — a consumer only sends it:
 
 ```python
 Email("imio.emailkit:user_migrated_to_sso").to(member).with_context(
@@ -695,7 +652,7 @@ Email("imio.emailkit:user_migrated_to_sso").to(member).with_context(
 ).send()
 ```
 
-The subject names no product: it is one registered msgid for every consumer.
+The subject names no product: one registered msgid serves every consumer.
 
 ## Checklist before you commit
 
@@ -703,10 +660,10 @@ The subject names no product: it is one registered msgid for every consumer.
 - [ ] no `${...}` in a literal `class` or `style`; colours on `bgcolor`
 - [ ] no `tal:` / `i18n:` on a kit component
 - [ ] no `--` in any comment
-- [ ] `i18n:domain` on your own element for your own msgids
+- [ ] `i18n:domain` on your element for your msgids
 - [ ] helpers called as `${python: …}`
 - [ ] `alt` on every image
-- [ ] fixture updated for every new placeholder
+- [ ] fixture updated for new placeholders
 - [ ] twin updated, in `emails/twins/`
-- [ ] snapshots regenerated deliberately and the diff reviewed
+- [ ] snapshots regenerated on purpose, diff reviewed
 - [ ] staleness gate green, golden gate green

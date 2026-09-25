@@ -1,8 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Removing the layer restores Plone's stock mails, which is the whole of what
-     `:default` added. The `imio.emailkit.theme.*` records go too; see
-     registry.xml next to this file for why that overrides the usual instinct of
-     never destroying settings on uninstall. -->
+<!-- Removing the layer restores Plone's stock mails. See registry.xml next to
+     this file for why the theme records are removed too. -->
 <layers>
   <layer name="imio.emailkit"
          remove="true"

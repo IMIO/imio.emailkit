@@ -3,15 +3,11 @@
     i18n_domain="imio.emailkit"
     >
 
-  <!-- Recipient resolution goes through a single adapter, and these
-       are the two defaults it ships (for `str` and Plone members). Adding a
-       third kind of recipient (a group, a PloneMeeting role, a mailing-list
-       object) is one more line here and no change to the `Email` builder, which
-       is the whole point of the interface. -->
+  <!-- Default recipient adapters, for a `str` and for a Plone member.
+       Add a new recipient kind as one more adapter line. -->
 
-  <!-- No `for=` / `provides=` attributes: both come from the @adapter and
-       @implementer decorators on the factories, which keeps the declaration next
-       to the code that has to honour it. -->
+  <!-- No `for=`/`provides=` attributes. The @adapter and @implementer
+       decorators on the factories supply them. -->
   <adapter factory=".recipients.recipient_from_string" />
   <adapter factory=".recipients.recipient_from_member" />
 

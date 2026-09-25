@@ -1,19 +1,8 @@
 """Context data for ``imio.emailkit:registered_notify_template``.
 
-The keys are exactly what
-``imio.emailkit.browser.default_mails.RegisteredNotifyView.build_context``
-returns.
-
-``expires`` is a real ``datetime``, which is what the view passes too (converted
-from the Zope ``DateTime`` ``portal_password_reset`` hands out). An ISO string
-would work at render time -- ``format_datetime`` coerces one -- but it would be
-the one fixture value that never appears in the output verbatim, because the
-template formats it; the "every fixture value reaches the html" check would then
-have to special-case it. "Plain data, not objects" is about Zope path traversal,
-and this value is reached by a ``python:`` call, not traversed.
-
-Absent on purpose, because ``render()`` supplies them: ``lang``, ``theme`` and
-its tokens, ``preheader``.
+Keys match ``RegisteredNotifyView.build_context``. ``expires`` is a real
+``datetime``, matching what the view passes. ``lang``, ``theme`` and its
+tokens, and ``preheader`` are absent, since ``render()`` supplies them.
 """
 
 import datetime

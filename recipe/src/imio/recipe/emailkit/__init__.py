@@ -7,19 +7,13 @@
     # kit-mode = path | copy       (default: path)
     # node-bin = node
 
-What it does: resolves the part's eggs, collects the packages whose ZCML
-registers ``<emailkit:templates>``, records ``(package, emails_dir,
-templates_dir)`` for each, resolves the design kit from the ``imio.emailkit``
-egg, and generates three scripts.
+The recipe resolves the part's eggs, finds the packages whose ZCML
+registers ``<emailkit:templates>``, resolves the design kit from the
+``imio.emailkit`` egg, and generates three scripts.
 
-**What it does not do, and must never do by default: compile.** Compiling at
-buildout time by default would make Node a production dependency across ~350
-applications and couple deployments to npm availability. So
-``compile-on-install`` defaults to false, and with that default this module
-imports nothing that knows Node exists, touches no ``emails/`` directory, and
-runs no subprocess. It does not even *import* the consumer's code:
-discovery at install time greps each dist's ZCML for the emailkit marker on the
-filesystem only, so a buildout run stays a buildout run.
+It never compiles by default. With ``compile-on-install`` false, this
+module never imports Node or the consumer's code; it only scans each
+dist's ZCML on disk for the emailkit marker.
 """
 
 from imio.recipe.emailkit import projects as projects_module
@@ -38,15 +32,11 @@ SCRIPTS = (
     ("preview-emails", "imio.recipe.emailkit.preview_emails", "main"),
 )
 
-#: This distribution has to be on the generated scripts' own path: they *are* its
-#: entry points. Requested as an extra requirement rather than assumed to be in
-#: the part's ``eggs``, which a consumer's ``${instance:eggs}`` has no reason to
-#: mention.
+#: An extra requirement, so it lands on the generated scripts' own path.
 SELF = "imio.recipe.emailkit"
 
 DEFAULTS = {
-    # Defaults spelled out so `.installed.cfg` records them and a
-    # `buildout -v` run shows what is in force.
+    # Spelled out so `.installed.cfg` and `buildout -v` show what is in force.
     "compile-on-install": "false",
     "kit-mode": "path",
     "node-bin": "node",
@@ -67,17 +57,15 @@ class Recipe:
                 f"[{name}] kit-mode must be `path` or `copy`, not "
                 f"{options['kit-mode']!r}."
             )
-        # `eggs` defaults to the part name in zc.recipe.egg, which for a part
-        # called `emails` would try to resolve a distribution named `emails`. An
-        # empty default and an explicit error is a much better failure.
+        # `eggs` defaults to the part name, which would try to resolve a
+        # distribution named after the part. Fail loud instead.
         if not options.get("eggs", "").strip():
             raise user_error(
                 f"[{name}] needs an `eggs` option naming the distributions to "
                 f"scan for `emailkit:templates` ZCML registrations. "
                 f"For example: `eggs = ${{instance:eggs}}`."
             )
-        # Imported here rather than at module scope so that the import error, if
-        # zc.recipe.egg is somehow absent, names this part.
+        # Imported here so a missing zc.recipe.egg names this part.
         import zc.recipe.egg
 
         self.egg = zc.recipe.egg.Egg(buildout, name, options)
@@ -93,26 +81,20 @@ class Recipe:
         generated = list(self._scripts(working_set, kit_dir))
 
         if compile_on_install(self.options):
-            # Opt-in, never the default. Reached only when the
-            # deployment has explicitly said it accepts Node at deploy time.
+            # Opt-in only; reached when Node is accepted at deploy time.
             self._compile(found, kit_dir)
 
         return generated
 
-    # A part that only generates scripts has nothing to migrate, and the paths it
-    # writes are derived from options buildout has already compared. Rerunning
-    # install on update keeps the scripts in step with a changed `eggs` list.
+    # Generating scripts is all this part does, so update reruns install.
     update = install
 
     # -- pieces -----------------------------------------------------------
 
     def _record(self, found, kit_dir):
-        """The discovery record, written to the log and to ``.installed.cfg``.
+        """Write the discovery record to the log and to ``.installed.cfg``.
 
-        Written into the options so ``.installed.cfg`` carries it: when a mail
-        turns out to be missing in production, "which packages did this buildout
-        think ship templates" is the first question, and it should be answerable
-        without rerunning anything.
+        Answers "which packages ship templates" without rerunning anything.
         """
         self.options["kit-directory"] = str(kit_dir)
         self.options["packages"] = "\n".join(project.package for project in found)
@@ -160,10 +142,8 @@ class Recipe:
     def _arguments(self, kit_dir):
         """The ``config=`` literal the generated scripts are called with.
 
-        Only *settings* are baked in, never the discovered package list: a develop
-        checkout changes between buildout runs, so the scripts rediscover at run
-        time. Baking in a stale list would be wrong in exactly the way nobody
-        notices.
+        Only settings are baked in. A develop checkout changes between
+        buildout runs, so the scripts rediscover packages each run.
         """
         config = {
             "kit_mode": self.options["kit-mode"],
@@ -175,8 +155,7 @@ class Recipe:
 
     def _compile(self, found, kit_dir):
         """``compile-on-install = true``. Opt-in; never the default."""
-        # Imported *here*, inside the opt-in branch, so that a default buildout
-        # run never even loads the module that knows how to spawn npm.
+        # Imported here so a default run never loads the module that spawns npm.
         from imio.recipe.emailkit import compile_emails
         from imio.recipe.emailkit import node as node_module
 
@@ -208,9 +187,7 @@ class Recipe:
 def compile_on_install(options):
     """Read ``compile-on-install`` the way buildout reads a boolean.
 
-    Anything but a recognised true value is false, and an unrecognised value is an
-    error rather than a silent false: "compile-on-install = yes" quietly meaning
-    "no" is the kind of thing that gets discovered in production.
+    An unrecognised value is an error, not a silent false.
     """
     value = str(options.get("compile-on-install", "false")).strip().lower()
     if value in ("true", "yes", "on", "1"):
@@ -225,13 +202,10 @@ def compile_on_install(options):
 
 
 def user_error(message):
-    """A configuration mistake, raised as the error buildout prints tracebackless.
+    """A configuration mistake, raised as the error buildout prints without a traceback.
 
-    ``zc.buildout`` is imported lazily so that this module -- which the three
-    generated scripts import on their way to their own entry points -- does not
-    drag buildout onto *their* import path. They run in the part's ``eggs``, not
-    in the buildout interpreter, and a build tool has no business needing the
-    build system.
+    ``zc.buildout`` is imported lazily, since the generated scripts import
+    this module too and must not need buildout on their path.
     """
     try:
         from zc.buildout import UserError

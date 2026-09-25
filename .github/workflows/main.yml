@@ -18,28 +18,8 @@ jobs:
     with:
       python-version: ${{ needs.config.outputs.python-version }}
       plone-version: ${{ needs.config.outputs.plone-version }}
-      # zpretty must never see the compiled .pt files under src/. They are Maizzle
-      # build output, and zpretty's formatting is not Maizzle's, so reformatting
-      # them would make `make check-emails` fail forever: the two gates would
-      # fight, and the staleness gate is the one that protects production.
-      #
-      # The upstream default path is `src`, which makes zpretty recurse into every
-      # .pt it finds, so the narrowing happens through zpretty's own --include
-      # instead of through a file list.
-      #
-      # This was a `$(find ...)` in zpretty-check-path, on the assumption that the
-      # reusable workflow interpolated the value unquoted into a bash line and the
-      # command substitution would run. It does interpolate it unquoted -- but out
-      # of an env var, and bash expands those without evaluating them, so zpretty
-      # received the literal string and exited 2 on every run since:
-      #
-      #     zpretty: error: unrecognized arguments: -name '*.zcml' -o -name '*.xml' | sort)
-      #
-      # An --include pattern needs no shell. Word-splitting still separates the two
-      # arguments, and nothing in the pattern is a glob character, so it arrives
-      # intact. Same value as ZPRETTY_INCLUDE in the Makefile, so the two cannot
-      # drift -- and `make lint` now reproduces this job rather than approximating
-      # it.
+      # Excludes the compiled .pt files, which are Maizzle build output.
+      # Same value as ZPRETTY_INCLUDE in the Makefile; keep both in step.
       zpretty-options: '--include \.(xml|zcml)$'
 
   test:
@@ -51,23 +31,14 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ['3.12', '3.13', '3.14']
-        # 6.0 dropped: it does not support Python 3.13, so a quarter of its rows
-        # can only ever fail on dependency resolution.
+        # 6.0 does not support Python 3.13.
         plone-version: ['6.2-latest', '6.1-latest']
     with:
       python-version: ${{ matrix.python-version }}
       plone-version: ${{ matrix.plone-version }}
 
-  # The staleness gate, in its Phase 1 Makefile form (see the sequencing note).
-  #
-  # This is the gate the whole two-stage architecture rests on: the compiled `.pt`
-  # is the production artifact, Node never runs in production, and nothing else
-  # notices when someone edits a `.vue` source and forgets to rebuild. Phase 0's
-  # standing lesson applies -- failures in this pipeline are silent, not loud, and
-  # the build's exit code carries almost no information about correctness.
-  #
-  # Node appears in this job and nowhere else. It is not a dependency of `test`,
-  # of `coverage`, or of any runtime path.
+  # The staleness check: checks the compiled `.pt` matches its sources. Node
+  # appears in this job and nowhere else.
   emails:
     name: "Emails: Build output is not stale"
     needs:
@@ -82,10 +53,7 @@ jobs:
         with:
           node-version: '22'
 
-      # The Makefile hard-errors at parse time when `uv` is absent, and the build
-      # step below goes through `make build-emails` so that CI and the developer
-      # build identically. `build-emails` itself needs only Node; uv is here to
-      # satisfy the guard, not because this job installs Python.
+      # The Makefile errors at parse time when `uv` is absent.
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
@@ -93,36 +61,15 @@ jobs:
         run: |
           set -euo pipefail
           cd emails
-          # Strict `npm ci`, with no `npm install` fallback. A fallback resolves a
-          # different toolchain than the lockfile pins, so the rebuild below emits
-          # different bytes and the staleness gate then reports the committed
-          # templates as stale when what actually drifted was Maizzle. A bad
-          # lockfile has to fail here, with npm's own message, rather than three
-          # steps later wearing someone else's name.
-          #
-          # If this ever fails with `Missing: ... from lock file`, the lockfile was
-          # regenerated on top of an existing node_modules, which makes npm record
-          # that tree instead of a full resolution and silently drop the optional
-          # platform packages. Regenerate with BOTH removed:
-          #   cd emails && rm -rf node_modules package-lock.json && npm install
+          # Strict `npm ci`, with no `npm install` fallback: a fallback could
+          # resolve a different toolchain than the lockfile pins.
           npm ci
 
       - name: Rebuild the templates
         run: |
           set -euo pipefail
-          # `make build-emails`, NOT a bare `npx maizzle build`.
-          #
-          # `maizzle build` empties its output directory, silently, so the
-          # hand-authored `.txt.pt` plaintext twins are kept in `emails/twins/` as
-          # source and copied into the package after the build. That copy lives in
-          # `make build-emails`; a bare `maizzle build` therefore leaves every twin
-          # deleted, and the staleness check below reports those deletions as stale
-          # templates -- which is a real diff, just not the one the message names.
-          # See `emails/twins/README.md`.
-          #
-          # Calling the same target the developer calls is also the only way this
-          # gate means anything: if CI builds differently from `make`, it is
-          # comparing against something nobody produces.
+          # `make build-emails`, not a bare `npx maizzle build`: it also
+          # copies the hand-authored twins back in. See emails/twins/README.md.
           make build-emails
 
       - name: Fail if the committed .pt files differ from a fresh build
@@ -138,8 +85,7 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
-          # An untracked .pt is just as stale: a new template that was built but
-          # never added is missing from the sdist and from every deployment.
+          # An untracked .pt is stale too.
           untracked="$(git ls-files --others --exclude-standard -- \
             src/imio/emailkit/templates src/imio/emailkit/browser/overrides)"
           if [ -n "$untracked" ]; then
@@ -149,22 +95,8 @@ jobs:
           fi
           echo "Email build output is up to date."
 
-  # Phase 4: `imio.recipe.emailkit`, the second distribution in this
-  # repository, and the acceptance criterion it exists to satisfy --
-  # `git clone && buildout && bin/compile-emails` from a clean checkout.
-  #
-  # Two things this job is here to keep true, both of them hard boundaries:
-  #
-  #  1. **buildout invokes no Node.** `make buildout-test` runs the whole buildout
-  #     with node, npm and npx removed from PATH. Compiling at buildout time is
-  #     explicitly rejected: it would make Node a production dependency across
-  #     ~350 applications.
-  #  2. **the generated scripts work**, which no unit test can establish -- a
-  #     buildout-generated script builds its own `sys.path` from lines inside
-  #     itself, so only a real buildout produces the thing under test.
-  #
-  # Node is installed here because `bin/compile-emails` needs it *after* buildout
-  # has finished, which is exactly the separation the whole architecture rests on.
+  # `imio.recipe.emailkit`: checks `git clone && buildout &&
+  # bin/compile-emails` with node/npm/npx removed from buildout's PATH.
   recipe:
     name: "Recipe: Tests and the buildout acceptance test"
     needs:
@@ -187,18 +119,13 @@ jobs:
         with:
           node-version: '22'
 
-      # `recipe/` has its own ruff config and is outside the house `make lint`'s
-      # RUFF_TARGETS (`src tests scripts`), so it is linted here or nowhere.
+      # `recipe/` has its own ruff config, outside `make lint`'s RUFF_TARGETS.
       - name: Lint imio.recipe.emailkit
         run: |
           set -euo pipefail
           uvx ruff@latest check --no-fix recipe
           uvx ruff@latest format --check recipe
 
-      # Runs in two environments on purpose: recipe/.venv has zc.buildout but no
-      # Plone, .venv has Plone but no buildout. Neither run alone covers the suite;
-      # the union does, and the skip counts in the log are the record of which half
-      # covered what.
       - name: imio.recipe.emailkit's own test suite
         run: make recipe-test
         env:
@@ -209,9 +136,6 @@ jobs:
         env:
           PLONE_VERSION: ${{ needs.config.outputs.plone-version }}
 
-      # The scripts must not have left the working tree holding a build nobody
-      # asked for. `check-emails` restores on a `finally`; this is the independent
-      # check that it really does.
       - name: The working tree is unchanged
         run: |
           set -euo pipefail

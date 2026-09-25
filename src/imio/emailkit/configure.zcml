@@ -15,19 +15,14 @@
 
   <include package=".browser" />
 
-  <!-- The content-rule action, and the discovery-backed vocabulary its
-       edit form offers. The vocabulary is included first because the action's
-       schema names it. -->
+  <!-- The vocabulary loads first: the content-rule action schema names it. -->
   <include package=".vocabularies" />
   <include package=".contentrules" />
 
-  <!-- imio.emailkit is its own first consumer: its templates register through
-       exactly the directive external addons use, and ALL of them do. The three
-       restyled Plone default mails are here alongside `notification` because
-       this package owns the view that renders each one (`browser/login_help.py`
-       for get_username, `browser/default_mails.py` for the other two), so every
-       one of them goes through render() and is discovered, previewable and
-       golden tested like any consumer template. -->
+  <!-- imio.emailkit registers its own templates through the same directive
+       external add-ons use. `get_username` and the two mails below it use
+       views this package owns (`browser/login_help.py`,
+       `browser/default_mails.py`). -->
   <emailkit:templates directory="templates">
     <emailkit:template
         name="notification"

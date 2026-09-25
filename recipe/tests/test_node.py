@@ -19,7 +19,7 @@ class TestResolvingTheToolchain:
         )
 
     def test_npm_and_npx_are_taken_beside_an_explicit_node_bin(self, node_on_path):
-        """Only ``node-bin`` is named; one option, three executables."""
+        """One option, ``node-bin``, resolves all three executables."""
         binary, _logs = node_on_path
         node, npm, npx = node_module.resolve(str(binary / "node"))
         assert node == str(binary / "node")
@@ -48,7 +48,7 @@ class TestResolvingTheToolchain:
 
 
 class TestTheNpmStalenessCheck:
-    """``npm ci`` runs "only if ``node_modules`` is stale vs. lockfile"."""
+    """``npm ci`` runs only if ``node_modules`` is stale against the lockfile."""
 
     def test_no_node_modules_means_install(self, project, node_on_path):
         binary, logs = node_on_path
@@ -77,11 +77,7 @@ class TestTheNpmStalenessCheck:
     def test_the_digest_answers_the_question_mtimes_only_approximate(
         self, project, node_on_path
     ):
-        """A touched-but-unchanged lockfile must not trigger a reinstall.
-
-        The Makefile precursor compares mtimes, which npm and git both perturb for
-        unrelated reasons. A digest of the lockfile is the actual question that matters.
-        """
+        """A touched-but-unchanged lockfile must not trigger a reinstall."""
         binary, logs = node_on_path
         lockfile = project.emails_dir / "package-lock.json"
         lockfile.write_text("{}", encoding="utf-8")
@@ -93,7 +89,7 @@ class TestTheNpmStalenessCheck:
         assert invocations(logs, NPM_LOG) == ["ci"]
 
     def test_no_lockfile_falls_back_to_npm_install(self, project, node_on_path):
-        """``npm ci`` needs a lockfile; the fallback is also what creates one."""
+        """``npm ci`` needs a lockfile. The fallback also creates one."""
         binary, logs = node_on_path
         assert node_module.ensure_dependencies(project.emails_dir, str(binary / "npm"))
         assert invocations(logs, NPM_LOG) == ["install"]
@@ -129,7 +125,6 @@ class TestRunningCommands:
             node_module.run(["/definitely/not/here"], cwd=project.emails_dir)
 
     def test_watch_delegates_to_maizzles_dev_server(self, project, node_on_path):
-        """``--watch`` delegates to Maizzle's dev server."""
         binary, logs = node_on_path
         node_module.build(project.emails_dir, str(binary / "npx"), watch=True)
         assert invocations(logs, "npx.log") == ["maizzle dev"]

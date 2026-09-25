@@ -19,10 +19,9 @@ domains = [path.name[:-4] for path in locale_path.glob("*.pot")]
 
 i18ndude = "uvx i18ndude"
 
-# The compiled `.pt` files under `templates/` and the jbot overrides under
-# `browser/overrides/` are Maizzle build output: their i18n msgids come from the
-# `.vue` sources, and i18ndude choking on 80 KB of inlined CSS buys nothing.
-# `emails/` is the Maizzle project and holds no Python or ZCML at all.
+# The compiled `.pt` files and the jbot overrides are Maizzle build output.
+# Their i18n msgids come from the `.vue` sources, so i18ndude does not need
+# to read them. `emails/` is the Maizzle project and holds no Python or ZCML.
 excludes = '"*.html *.vue emails node_modules *json-schema*.xml"'
 
 
@@ -63,12 +62,10 @@ def _sync(domain: str):
 def _compile(domain: str):
     """Compile every ``.po`` of ``domain`` into a ``.mo``.
 
-    The compiled catalogs are committed on purpose. ``zope.i18n`` does compile
-    a stale ``.po`` on start-up, but the freshly written ``.mo`` is not picked
-    up by the very run that produced it -- so a checkout without up to date
-    ``.mo`` files serves untranslated labels once, which in CI reads as a
-    missing translation. Compiling here keeps ``.po`` and ``.mo`` committed in
-    step.
+    The compiled catalogs are committed. ``zope.i18n`` compiles a stale
+    ``.po`` on start-up, but does not use the freshly written ``.mo`` in that
+    same run, so a checkout with outdated ``.mo`` files serves untranslated
+    labels once. Compiling here keeps ``.po`` and ``.mo`` in step.
     """
     from zope.i18n.compile import compile_mo_file
 

@@ -1,35 +1,21 @@
 """``@@emailkit-preview`` and the send-test button.
 
-> ``@@emailkit-preview`` (Manager-only): lists all registered templates, renders
-> each in an iframe using **committed fixture data**, with a language
-> switcher and a theme-token panel. A **Send test** button mails the currently
-> previewed template + fixture + language to the logged-in user's own address --
-> browser previews lie, Outlook doesn't; this closes the loop with real clients
-> for the cost of one form.
+Manager-only view. It lists every registered template, renders each in an
+iframe with committed fixture data, and offers a language switcher and a
+theme-token panel. A Send test button mails the previewed template,
+fixture, and language to the logged-in user's own address.
 
-Two things make this module different from the rest of Phase 2.
+Assertions here check behaviour, not markup: who may look, what is
+listed, what renders, that the switcher switches, and where the test mail
+goes. Each iframe's ``src`` is followed and its response is checked.
 
-**The markup is not the contract.** What's pinned here is *behaviour* -- who may
-look, what is listed, what is rendered, that the language switcher switches, where
-the test mail goes -- and the layout is left to whoever writes it. So the
-assertions here never look for a chosen class name or heading. Where the rendered
-previews live is discovered from the page itself: the ``src`` of each iframe is
-followed and what comes back is what gets asserted on. A preview page whose
-iframes 404, or which renders raw ``${}`` inside them, is broken however good the
-outer page looks.
+Two request keys are pinned in ``tests/support.py``:
+``PREVIEW_LANGUAGE_PARAM`` (``language``) and ``SEND_TEST_FORM`` /
+``SEND_TEST_METHOD`` (``form.button.send_test``, POST).
 
-**Two request keys had to be guessed.** The passage above mentions "a language
-switcher" and "a Send test button" without naming either control. Both live in
-``tests/support.py`` (``PREVIEW_LANGUAGE_PARAM``, ``SEND_TEST_FORM``,
-``SEND_TEST_METHOD``) and nowhere else, so reconciling them was one edit there.
-``language`` was right; the button is ``form.button.send_test`` and ``POST``-only.
-
-**One assertion is a recorded contradiction, not a bug.**
-``test_it_uses_the_previewed_language`` encodes the "+ language" requirement
-above and is marked ``xfail(strict=True)``, because the builder's frozen API
-takes no language argument and groups by the *recipient's* language. Its marker
-carries the full argument; the assertion still runs, and it flips the suite red
-if anybody makes it pass without settling the question.
+``test_it_uses_the_previewed_language`` is marked ``xfail(strict=True)``:
+the builder groups recipients by their own language and takes no
+language argument, so the send-test cannot yet honour the switcher.
 """
 
 from AccessControl import Unauthorized
@@ -48,18 +34,17 @@ PREVIEW = f"@@{support.PREVIEW_VIEW}"
 
 @pytest.fixture
 def as_manager(mail_portal, grant_roles):
-    """The preview is "Manager-only", which is also the role a developer previewing
-    templates actually has."""
+    """The preview is Manager-only, the role a developer previewing templates
+    has."""
     grant_roles(mail_portal, ["Manager"])
     return mail_portal
 
 
 @pytest.fixture
 def preview(mail_portal, mail_request, as_manager):
-    """``preview(language=None, method="GET", **form)`` -> the rendered page.
+    """``preview(language=None, method="GET", **form)`` returns the rendered page.
 
-    Traversed rather than adapted, so the security machinery is in the path: a
-    view registered with the wrong permission has to fail here.
+    Traverses the view so the security check runs.
     """
     support.require_preview(mail_portal, mail_request)
 
@@ -78,13 +63,11 @@ def preview(mail_portal, mail_request, as_manager):
 
 
 def parse_query(source):
-    """The query of an ``href``/``src`` as a form dict.
+    """Parses the query string of an ``href``/``src`` into a form dict.
 
-    Two decodings, both of which cost a debugging session if forgotten: the URL
-    lives in an HTML attribute, so ``&`` arrives as ``&amp;``, and the values are
-    percent-encoded -- a template name like ``imio.emailkit:notification`` has
-    its colon as ``%3A``, which is a perfectly good template name that resolves
-    to nothing at all.
+    Unescapes HTML entities first, then percent-decodes the values. Skip
+    either step and a colon in a template name stays as ``%3A``, which
+    resolves to nothing.
     """
     import html
     import urllib.parse
@@ -98,13 +81,10 @@ def parse_query(source):
 
 @pytest.fixture
 def previewed_bodies(mail_portal, mail_request, preview):
-    """``previewed_bodies(language=None)`` -> the rendered mail(s) on the page.
+    """``previewed_bodies(language=None)`` returns each rendered mail body.
 
-    Follows every iframe ``src`` and returns what each one renders. Falls back to
-    the page itself when there is no iframe, so a preview that renders inline is
-    still checked rather than skipped -- the preview asks for an iframe, but what the
-    assertions are about is the *rendered mail*, and a module that silently
-    stopped looking at it would be the worst outcome here.
+    Follows every iframe ``src``. Falls back to the page itself when there
+    is no iframe, so an inline preview is still checked.
     """
 
     def bodies(language=None, **form):
@@ -128,9 +108,8 @@ def previewed_bodies(mail_portal, mail_request, preview):
 
 
 class TestItIsManagerOnly:
-    """A preview page lists every template and renders
-    it with fixture data; it is not a secret, but it is a developer tool that
-    also mails on demand, and Manager is the role that was chosen."""
+    """The preview is a developer tool that also mails on demand. Manager is
+    the required role."""
 
     def test_anonymous_gets_unauthorized(self, mail_portal, mail_request):
         support.require_preview(mail_portal, mail_request)
@@ -143,9 +122,8 @@ class TestItIsManagerOnly:
             mail_portal.restrictedTraverse(PREVIEW)()
 
     def test_a_plain_member_gets_unauthorized(self, mail_portal, mail_request):
-        """ "Manager-only" is a stronger claim than "not anonymous", and it is the
-        one the preview makes. The test user is a Member by default in this fixture, so
-        this is the case a permission of ``zope2.View`` would let through."""
+        """Manager-only is stronger than "not anonymous". The test user is a
+        Member by default, so this checks that a Member is still refused."""
         support.require_preview(mail_portal, mail_request)
 
         with pytest.raises(Unauthorized):
@@ -159,9 +137,8 @@ class TestItIsManagerOnly:
 
 class TestItListsTheRegisteredTemplates:
     def test_every_registered_template_is_listed(self, preview):
-        """Driven off discovery, so a template added to the registration and
-        forgotten by the preview shows up here -- the same reasoning
-        ``test_golden.py`` uses for fixtures."""
+        """Driven by discovery, so a registered template the preview forgets
+        shows up here."""
         from imio.emailkit.discovery import available_templates
 
         page = preview()
@@ -170,14 +147,10 @@ class TestItListsTheRegisteredTemplates:
         assert missing == [], f"registered templates absent from the preview: {missing}"
 
     def test_the_default_mails_are_listed_too(self, preview):
-        """The preview shows every mail the package sends, the two Plone defaults included.
+        """The preview also lists the two Plone default mails.
 
-        They were absent for as long as they were jbot overrides: unregistered, so
-        the preview could not offer them, so the one mail a commune is most likely
-        to want in its own colours was the one nobody could look at. Owning their
-        views (``browser/default_mails.py``) is what fixed it. The reverse of
-        ``test_golden.py``'s
-        ``test_every_shipped_template_is_registered_for_discovery``.
+        Their own views (``browser/default_mails.py``) register them for
+        discovery, so the preview can offer them too.
         """
         page = preview()
         missing = [
@@ -193,19 +166,15 @@ class TestItListsTheRegisteredTemplates:
 
 
 class TestItRendersWithTheCommittedFixtures:
-    """The preview renders "using **committed fixture data**"."""
+    """The preview renders with the golden files' fixture data."""
 
     def test_the_fixture_values_reach_the_rendered_preview(self, previewed_bodies):
-        """The point of reusing the golden files' fixtures is that the preview shows what the
-        golden files pin. A preview built on lorem ipsum -- or on an empty
-        context, which renders without error -- would look fine and prove
-        nothing."""
+        """Checks the preview shows the fixture's data, not lorem ipsum or an
+        empty context that renders without error."""
         context = support.load_fixture(support.NOTIFICATION)
         expected = context["title"]
-        # The template is named explicitly. The preview defaults to the
-        # alphabetically first registered one, so relying on the default made this
-        # assertion depend on registration order -- it broke the moment a second
-        # template was registered whose name sorts earlier.
+        # Name the template explicitly. The preview otherwise defaults to
+        # the first registered template alphabetically.
         bodies = previewed_bodies(
             language="fr", template=support.qualified(support.NOTIFICATION)
         )
@@ -217,17 +186,14 @@ class TestItRendersWithTheCommittedFixtures:
         )
 
     def test_the_preview_has_no_unresolved_placeholder(self, previewed_bodies):
-        """The preview is the loop developers trust to tell them a template
-        works. Phase 0: on the fallback engine ``${...}`` passes through
-        verbatim and nothing raises -- so a preview that shows raw placeholders
-        while claiming success is exactly the failure mode this project keeps
-        finding."""
+        """The fallback engine lets ``${...}`` pass through unrendered without
+        raising. Checks no such placeholder reaches the preview."""
         for body in previewed_bodies(language="fr"):
             support.assert_render_is_clean(body, "previewed body")
 
 
 class TestTheLanguageSwitcher:
-    """The preview comes "with a language switcher"."""
+    """The preview offers a language switcher."""
 
     def test_switching_changes_the_rendered_language(self, previewed_bodies):
         fr_bodies = previewed_bodies(language="fr")
@@ -256,8 +222,8 @@ class TestTheLanguageSwitcher:
         )
 
     def test_the_two_languages_render_differently(self, previewed_bodies):
-        """The guard: a switcher that changes only the ``lang`` attribute and not
-        the translated content is a switcher that does not work."""
+        """A switcher that changes only the ``lang`` attribute, not the
+        translated content, does not work."""
         fr = "\n".join(previewed_bodies(language="fr"))
         nl = "\n".join(previewed_bodies(language="nl"))
 
@@ -265,20 +231,16 @@ class TestTheLanguageSwitcher:
 
 
 class TestSendTest:
-    """ "A **Send test** button mails the currently previewed template +
-    fixture + language to the logged-in user's own address"."""
+    """Send test mails the previewed template, fixture, and language to the
+    logged-in user's own address."""
 
     @pytest.fixture
     def me(self, mail_portal, as_manager, make_member):
-        """The logged-in user, with an address of their own.
+        """The logged-in user, with an address set.
 
-        The re-login is load-bearing, and it cost a debugging session:
-        ``plone.app.testing``'s pseudo-login puts a ``PropertiedUser`` in the
-        security manager at ``testSetUp`` time and that object caches its
-        property sheets. Setting ``email`` afterwards updates ``portal_memberdata``
-        but **not** the cached sheet, so ``api.user.get_current().getProperty(
-        "email")`` still returns ``""`` -- and the view then correctly refuses to
-        send, for a reason invented entirely by the test.
+        Logs in again after setting the email: the security manager caches
+        the user's property sheet at login, so an email change made after
+        login is invisible until the next login.
         """
         from plone.app.testing import login
         from plone.app.testing import TEST_USER_NAME
@@ -289,11 +251,10 @@ class TestSendTest:
 
     @pytest.fixture
     def send_test(self, preview):
-        """``send_test(language=...)`` -- press the button.
+        """``send_test(language=...)`` presses the Send test button.
 
-        ``POST``, because the view refuses the same request over ``GET`` on
-        purpose (``support.SEND_TEST_METHOD``), and rightly: a URL that sends
-        mail when merely fetched gets fetched.
+        Uses POST. The view refuses GET on purpose, since a URL that sends
+        mail when fetched will get fetched.
         """
 
         def press(language=None):
@@ -324,12 +285,10 @@ class TestSendTest:
     def test_it_delivers_nowhere_else(
         self, send_test, me, mailhost, site_sender, deliver
     ):
-        """ "to the logged-in user's own address" is a *closed* list.
+        """The test mail must go only to the logged-in user.
 
-        The fixture context contains no addresses, so there is nothing here to
-        leak by accident -- which is the point: the button must not acquire a
-        recipient from the template, from the site's contact address, or from a
-        hardcoded developer address that ships to production.
+        The fixture context has no other addresses, so the button must not
+        pick up the site's contact address or a hardcoded address instead.
         """
         send_test(language="fr")
         deliver()
@@ -364,14 +323,10 @@ class TestSendTest:
     def test_it_uses_the_previewed_language(
         self, send_test, me, mailhost, site_sender, deliver, set_default_language
     ):
-        """ "template + fixture + **language**". A test mail that always arrives
-        in one language cannot answer the question it exists for -- how the Dutch
-        version looks in Outlook.
+        """The test mail must show the previewed language, not a fixed one.
 
-        The site default is pinned to ``fr`` and the logged-in user is given no
-        preferred language, so ``nl`` can only come from the switcher. Without
-        that, a user who happened to prefer Dutch would make this pass for a
-        reason that has nothing to do with the switcher.
+        The site default is ``fr`` and the user has no preferred language,
+        so ``nl`` can only come from the switcher.
         """
         set_default_language("fr")
         me.setMemberProperties({"language": ""})
@@ -389,10 +344,8 @@ class TestSendTest:
     def test_it_sends_the_real_thing(
         self, send_test, me, mailhost, site_sender, deliver
     ):
-        """The whole justification for the send-test button is "browser previews lie, Outlook
-        doesn't", so the test mail has to be the *same* message the builder
-        would send -- both MIME parts, substituted, not a screenshot of the
-        iframe."""
+        """The test mail must be the same message the builder would send: both
+        MIME parts, substituted, not a screenshot of the preview."""
         send_test(language="fr")
         deliver()
 
@@ -404,9 +357,8 @@ class TestSendTest:
         support.assert_message_is_clean(message)
 
     def test_it_is_manager_only_too(self, mail_portal, mail_request, mailhost):
-        """The button is a mail-sending endpoint. A ``GET`` with the right
-        parameter from a non-Manager must not send anything -- and must not need
-        the outer page's permission check to have been passed first."""
+        """A GET with the send-test parameter, from a non-Manager, must not
+        send mail. It must not rely on the page's own check running first."""
         support.require_preview(mail_portal, mail_request)
         mail_request.form.clear()
         mail_request.form.update(support.SEND_TEST_FORM)
@@ -419,15 +371,11 @@ class TestSendTest:
     def test_a_manager_without_an_address_mails_nobody(
         self, mail_portal, as_manager, mailhost, site_sender, send_test, deliver
     ):
-        """The Manager previewing templates on a fresh site usually has no
-        address set, so this is the common case rather than the edge one.
+        """A Manager with no address set on a fresh site must trigger no mail.
 
-        What is asserted is the part that is unambiguous: **no mail leaves**. A
-        send-test with nowhere to send must not fall back to the site's contact
-        address, to the ``From`` address, or to a developer address someone left
-        in. Whether the refusal surfaces as an exception or as an on-page error is
-        W2's call and both honour the builder's "fail loud" contract -- which is why the call
-        below is allowed to raise or to return.
+        The send-test must not fall back to the site's contact address, the
+        ``From`` address, or a hardcoded address. Raising or returning are
+        both accepted outcomes.
         """
         from plone.app.testing import TEST_USER_ID
 
@@ -436,7 +384,7 @@ class TestSendTest:
         })
 
         with contextlib.suppress(Exception):
-            # A loud refusal is a valid answer -- see the docstring.
+            # Raising here is an accepted outcome.
             send_test(language="fr")
 
         deliver()

@@ -1,14 +1,9 @@
 """``render()``.
 
-**The rule this module exists to enforce:** assert on *substituted values*, never
-on marker strings. Phase 0 measured that without the ``IPageTemplateEngine``
-utility, ``zope.pagetemplate`` falls back to ``zope.tal``, where ``${...}``
-passes through **verbatim and raises nothing** while ``tal:repeat`` keeps
-working. A test that only checks "our marker is in the output" therefore passes
-while raw ``${member/fullname}`` ships to a citizen's inbox.
-
-So: every assertion here names a value that only appears *because* an expression
-was evaluated, and ``assert_render_is_clean`` closes the door on the rest.
+Every assertion here checks a substituted value, never a marker string.
+Without the ``IPageTemplateEngine`` utility, ``zope.pagetemplate`` falls
+back to ``zope.tal``, where ``${...}`` passes through unrendered and
+raises nothing. ``assert_render_is_clean`` catches any such leftover.
 """
 
 import pytest
@@ -42,7 +37,6 @@ def rendered(integration, template, fixture_data):
 
 class TestReturnValue:
     def test_returns_html_and_text(self, rendered):
-        """Returns ``html, text = render(...)``."""
         assert isinstance(rendered, tuple)
         assert len(rendered) == 2
 
@@ -72,15 +66,7 @@ class TestPlaceholdersAreSubstituted:
         support.assert_render_is_clean(text, "text")
 
     def test_every_fixture_value_reached_the_html(self, rendered, fixture_data):
-        """The positive half: values that exist only in the fixture.
-
-        *Every* string value, not a chosen few. One fixture is paired with one
-        template, so a key nothing renders is either dead data or -- far more
-        likely -- a placeholder that stopped resolving. Enumerating the whole
-        fixture means adding a placeholder without adding its data, or removing a
-        placeholder and leaving its data, both fail here rather than in six months
-        in an inbox.
-        """
+        """Every fixture string value must reach the html, not a chosen few."""
         html, _text = rendered
 
         missing = [
@@ -94,15 +80,7 @@ class TestPlaceholdersAreSubstituted:
         )
 
     def test_fixture_values_reached_the_plaintext_part(self, rendered, fixture_data):
-        """A text part whose placeholders quietly stopped resolving is exactly as
-        broken as an HTML one, and far less likely to be noticed by eye -- nobody
-        reads the ``text/plain`` alternative until a client renders only that.
-
-        Only the longest string value is required here: what a plaintext body
-        repeats is the author's call (and with no ``.txt.pt`` twin it is a naive
-        extraction), but a text part carrying *none* of the context means it was
-        never bound at all.
-        """
+        """The plaintext part must carry fixture data too, not just the html."""
         _html, text = rendered
 
         strings = [v for v in fixture_data.values() if isinstance(v, str)]
@@ -113,10 +91,8 @@ class TestPlaceholdersAreSubstituted:
         )
 
     def test_a_url_survived_into_an_attribute(self, rendered, fixture_data):
-        """``${...}`` inside a non-``class``/``style`` attribute -- the case
-        Phase 0 confirmed survives the build. A link that renders as literal
-        ``${cta_url}`` makes the mail useless while everything else looks
-        fine."""
+        """A URL in a non-``class``/``style`` attribute must render as a real
+        value, not literal ``${cta_url}``."""
         html, _text = rendered
 
         urls = [
@@ -132,8 +108,8 @@ class TestPlaceholdersAreSubstituted:
 
 class TestRenderLanguage:
     def test_lang_is_exposed_and_emitted_on_html(self, integration, template):
-        """The render language is also exposed as ``lang``, which the
-        layout emits on ``<html>``. Screen-reader pronunciation depends on it."""
+        """The render language must appear as ``lang`` on ``<html>``, for
+        screen-reader pronunciation."""
         html, _text = render(
             support.qualified(template),
             context=support.load_fixture(template),
@@ -146,8 +122,8 @@ class TestRenderLanguage:
         assert match.group(1).lower().startswith("fr")
 
     def test_the_language_argument_is_honoured(self, integration, template):
-        """Not merely "a lang attribute exists" -- it has to be *the* language
-        asked for, or ``language=`` is decoration."""
+        """The ``lang`` attribute must match the requested language, not just
+        be present."""
         html_nl, _ = render(
             support.qualified(template),
             context=support.load_fixture(template),
@@ -162,8 +138,8 @@ class TestRenderLanguage:
     def test_rendering_twice_in_two_languages_does_not_leak(
         self, integration, template
     ):
-        """Templates are cached; a language cached into the compiled program
-        would silently ship Dutch to French communes."""
+        """Templates are cached. A cached language must not leak into a later
+        render done in another language."""
         html_fr, _ = render(
             support.qualified(template),
             context=support.load_fixture(template),
@@ -186,10 +162,10 @@ class TestRenderLanguage:
 
 class TestPureFunction:
     def test_render_is_repeatable(self, integration, template, fixture_data):
-        """A pure function of (template, context, registry state).
+        """``render()`` is pure: same inputs, same output.
 
-        Previews and golden files both depend on this; a timestamp or a random
-        id in the output would make every golden file fail on the second run.
+        Previews and golden files depend on this. A timestamp or random id
+        in the output would make every golden file fail on the second run.
         """
         first = render(
             support.qualified(template), context=dict(fixture_data), language="fr"
@@ -203,9 +179,8 @@ class TestPureFunction:
     def test_render_does_not_mutate_the_context(
         self, integration, template, fixture_data
     ):
-        """Injecting ``theme``/``lang``/helpers must not write into the caller's
-        dict -- the preview view and the golden harness both reuse one fixture
-        across languages."""
+        """Injecting ``theme``, ``lang``, and helpers must not write into the
+        caller's context dict."""
         given = dict(fixture_data)
         before = dict(given)
 
@@ -218,19 +193,18 @@ class TestKitDefaults:
     """What the kit does so that no author has to remember it."""
 
     def test_layout_tables_are_marked_presentational(self, rendered):
-        """Accessibility defaults. RGAA applies to iMio's clients, and a
-        layout table without ``role="presentation"`` is read out cell by cell."""
+        """RGAA requires this. Without it, screen readers read a layout table
+        cell by cell."""
         html, _text = rendered
 
         assert support.A11Y_TABLE_MARKER in html
 
     def test_css_was_inlined(self, rendered):
-        """Phase 1's exit criterion, and Phase 0's caveat A1.
+        """CSS must be inlined by the build.
 
-        A single Chameleon placeholder in a literal ``style`` attribute stops
-        Juice inlining **document-wide** while the build still reports success.
-        Phase 0 measured 31 inline styles healthy vs 6 with inlining dead on a
-        comparable template, which is where the threshold comes from.
+        A Chameleon placeholder in a literal ``style`` attribute stops Juice
+        inlining for the whole document, while the build still reports
+        success.
         """
         html, _text = rendered
 
@@ -238,5 +212,5 @@ class TestKitDefaults:
 
         assert count >= support.MIN_INLINE_STYLES, (
             f"only {count} inline style attributes: CSS inlining is probably "
-            "dead (Phase 0 caveat A1 -- a ${...} in a literal style attribute)"
+            "dead (a ${...} in a literal style attribute stops it)"
         )

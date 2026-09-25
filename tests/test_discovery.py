@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 
 
-#: Nothing here is ever opened: the registry stores whatever the directive
-#: already resolved, so these tests only need paths that are distinguishable.
+#: Never opened. The registry stores resolved paths, so tests only need
+#: paths that are distinguishable from each other.
 FAKE_ROOT = Path("/nowhere")
 
 

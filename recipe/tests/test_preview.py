@@ -1,10 +1,4 @@
-"""``bin/preview-emails``: the parts that do not need a Plone runtime.
-
-Rendering itself is covered by the buildout acceptance harness, which has the real
-``imio.emailkit`` next door. What is worth unit-testing here is everything around
-it: where a fixture is looked for, what the page offers, and what the watcher
-watches -- the pieces where a mistake shows up as "the preview is silently empty".
-"""
+"""``bin/preview-emails``: the parts that do not need a Plone runtime."""
 
 from imio.recipe.emailkit import preview_emails
 
@@ -15,22 +9,14 @@ import time
 
 @pytest.fixture
 def configured():
-    """The minimal Zope configuration ``preview-emails`` loads before rendering.
-
-    Required by the theme tests and not merely convenient: ``plone.registry``'s ZCML
-    is what registers the *persistent field* adapters, without which
-    ``Registry.registerInterface`` raises "There is no persistent field equivalent
-    for the field ...". That coupling between :func:`configure` and
-    :func:`seed_theme` is easy to break silently, so it is exercised here rather
-    than worked around.
-    """
+    """The minimal Zope configuration ``preview-emails`` loads before rendering."""
     pytest.importorskip("plone.registry", reason="needs the Plone runtime")
     pytest.importorskip("imio.emailkit", reason="needs the Plone runtime")
     preview_emails.configure([])
 
 
 class TestFixtureLookup:
-    def test_it_finds_the_spec_7_location(self, project):
+    def test_it_finds_the_fixture_in_tests_fixtures(self, project):
         expected = project.tests_dir / "fixtures" / "hello.py"
         expected.write_text("CONTEXT = {}\n", encoding="utf-8")
         assert preview_emails.find_fixture(project, "hello") == expected
@@ -39,11 +25,7 @@ class TestFixtureLookup:
         assert preview_emails.find_fixture(project, "hello") is None
 
     def test_a_fixture_is_loaded_by_path_not_imported(self, project):
-        """Fixtures are a *directory of data files*, not an importable package.
-
-        Loading by path is also what keeps the preview and the golden test from ever
-        disagreeing about what a fixture says.
-        """
+        """Fixtures are a directory of data files, not an importable package."""
         path = project.tests_dir / "fixtures" / "hello.py"
         path.write_text("CONTEXT = {'title': 'Été'}\n", encoding="utf-8")
         assert preview_emails.load_fixture(path) == {"title": "Été"}
@@ -74,7 +56,7 @@ class TestThePage:
         assert "TemplateNotFound" in body
 
     def test_the_reload_script_lives_in_the_page_and_not_in_the_mails(self, tmp_path):
-        """A preview must not change the bytes you came to inspect."""
+        """A preview must not change the bytes it displays."""
         preview_emails.write_index([], tmp_path, ["fr"], generation=3, watch=True)
         body = (tmp_path / "index.html").read_text(encoding="utf-8")
         assert preview_emails.VERSION_PATH in body
@@ -96,18 +78,11 @@ class TestTheWatcher:
         (project.templates_dir / "hello.pt").write_text("x", encoding="utf-8")
         watched = {path.name for path in preview_emails.watched_paths([project])}
         assert watched == {"hello.vue", "hello.py", "hello.txt.pt"}
-        # The compiled output is what a pass *produces*; watching it would make
-        # every rebuild trigger another rebuild.
+        # Watching the output would make every rebuild trigger another rebuild.
         assert "hello.pt" not in watched
 
     def _run(self, project, pass_once):
-        """Start the loop, change a source, wait for one pass, stop.
-
-        The change has to happen *after* the loop has taken its first fingerprint,
-        which is why this drives a real thread instead of pre-editing the file: a
-        test that edited first would leave the loop with nothing to notice, and
-        would hang rather than fail.
-        """
+        """Start the loop, change a source, wait for one pass, stop."""
         stop = threading.Event()
         done = threading.Event()
 
@@ -139,7 +114,7 @@ class TestTheWatcher:
         assert passes
 
     def test_an_exception_in_a_pass_does_not_kill_the_watcher(self, project, capsys):
-        """A watcher that dies on a half-saved file is a watcher you restart all day."""
+        """A half-saved file must not kill the watcher."""
         calls = []
 
         def pass_once():
@@ -162,17 +137,12 @@ class TestTheThemePanelInItsCommandLineForm:
             preview_emails._theme_overrides(["primary_color"])
 
     def test_it_seeds_the_kits_own_defaults(self, configured):
-        """Without a registry every token collapses to the empty string.
-
-        The preview would then show an unbranded shell and an empty
-        ``primary_color`` where a colour belongs, which reads as a broken kit rather
-        than as a missing site.
-        """
+        """Without a registry every token collapses to the empty string."""
         registry = preview_emails.seed_theme({})
         assert registry["imio.emailkit.theme.primary_color"]
 
     def test_an_unknown_token_is_refused_rather_than_silently_ignored(self, configured):
-        """A typo'd token that did nothing would look like a broken kit."""
+        """A typo'd token that did nothing would look like a broken kit, silently."""
         with pytest.raises(ValueError, match="not a theme token"):
             preview_emails.seed_theme({"primaryColour": "#123456"})
 

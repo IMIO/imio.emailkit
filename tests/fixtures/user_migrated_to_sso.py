@@ -1,12 +1,8 @@
 """Context data for ``imio.emailkit:user_migrated_to_sso``.
 
-One key per placeholder and no more. The names ``render()`` injects (``lang``,
-``theme`` and its tokens, ``portal_url``, ``preheader``) are absent on purpose:
-pinning them here would hide a broken injection.
-
-The values expose bugs rather than look tidy: an accented institution name, an
-address long enough to make the card wrap, and a login url with a query string
-that has to survive escaping.
+Names ``render()`` injects (``lang``, ``theme`` and its tokens,
+``portal_url``, ``preheader``) are absent. Values are chosen to expose bugs:
+an accented name, a long address, and a login url query string.
 """
 
 CONTEXT = {

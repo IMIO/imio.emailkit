@@ -6,24 +6,17 @@
 
   <include package="imio.emailkit" file="meta.zcml" />
 
-  <!-- `directory` is also the default; stated so the reader of the registration
-       sees where the build output lands without opening the Maizzle config. -->
+  <!-- `directory` here equals the default; stated for a reader's convenience. -->
   <emailkit:templates directory="templates">
 
-    <!-- `subject="[msgid] Default text"` picks the msgid explicitly; the domain
-         comes from this file's `i18n_domain`, so no MessageFactory is needed.
-         The default is what reaches the inbox until a catalog translates the
-         msgid, and these dummies ship no catalogs on purpose. -->
     <emailkit:template
         name="convocation"
         subject="[email_subject_convocation] Convocation to the municipal council"
         preheader="[email_preheader_convocation] Agenda and documents for the session of 12 August."
         />
 
-    <!-- The hidden inbox-preview line next to the subject: the highest-visibility
-         email feature that everyone forgets. Left out, the client fills it with
-         whatever body copy comes first. Keep it short, clients cut around 100
-         characters. -->
+    <!-- `preheader`: the hidden inbox-preview line. Keep it short; clients
+         cut it around 100 characters. -->
     <emailkit:template
         name="notification"
         subject="[email_subject_notification] An update on your file"

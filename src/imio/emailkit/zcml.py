@@ -1,16 +1,11 @@
 """The ``<emailkit:templates>`` / ``<emailkit:template>`` directives.
 
-Registration is ZCML rather than Python so it inherits the machinery every
-other Zope registration has: duplicate names are a ``ConfigurationConflictError``
-at startup instead of a silent overwrite, ``overrides.zcml`` can replace a
-registration, ``zcml:condition`` gates one, and the msgid domain of ``subject``
-/ ``preheader`` comes from the enclosing ``i18n_domain`` instead of a hand-wired
-``MessageFactory``.
+Registration is ZCML, not Python: a duplicate name is a
+``ConfigurationConflictError``, and the ``subject``/``preheader`` msgid
+domain comes from the enclosing ``i18n_domain``.
 
-The handler only *emits actions*; the file checks live in
-``discovery.load_template`` and run when actions execute. That keeps the
-warnings at startup (action execution time) and lets conflict resolution see
-every registration before any of them takes effect.
+File checks live in ``discovery.load_template`` and run when actions
+execute.
 """
 
 from imio.emailkit import discovery
@@ -67,8 +62,7 @@ class ITemplateDirective(Interface):
 class TemplatesDirective:
     """Handler for one ``<emailkit:templates>`` block.
 
-    The namespace of every contained template is the package the ZCML file
-    belongs to -- never spelled out by the consumer, so it cannot lie.
+    The package is the namespace; the consumer never states it.
     """
 
     def __init__(self, context, directory=None):
@@ -88,11 +82,8 @@ class TemplatesDirective:
         self.package = package.__name__
         self.package_dir = Path(package.__file__).parent
         self.directory = directory or discovery.DEFAULT_DIRECTORY
-        # One directory record per package: any second <emailkit:templates>
-        # block in the same package conflicts here, regardless of what
-        # directory it names -- the discriminator carries no directory
-        # component. That is deliberate: the build tooling needs a single
-        # answer to "where does output land" for a given package.
+        # A second block in the same package always conflicts here: the
+        # discriminator carries no directory component.
         context.action(
             discriminator=("emailkit:templates", self.package),
             callable=discovery.register_directory,

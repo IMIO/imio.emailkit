@@ -6,18 +6,11 @@
 
   <include package="imio.emailkit" file="meta.zcml" />
 
-  <!-- No `directory` attribute on purpose: it defaults to `templates`, relative
-       to this package. State it only when you build somewhere else. -->
+  <!-- No `directory`: it defaults to `templates`, relative to this package. -->
   <emailkit:templates>
 
-    <!-- The subject lives in the registration as an i18n msgid, translated per
-         recipient language at send time: not in the template, not in a metadata
-         sidecar. Its domain is this file's `i18n_domain`, and the default text
-         after the msgid is not optional in practice, since an untranslated
-         subject otherwise reaches the inbox as the bare msgid.
-
-         No `preheader` either, also on purpose: it is optional, and the kit
-         layout collapses the hidden preview div to nothing when it is absent. -->
+    <!-- The subject msgid's domain is this file's `i18n_domain`. No
+         `preheader`: optional, and the kit collapses it when absent. -->
     <emailkit:template
         name="notification"
         subject="[email_subject_notification] A notification from your commune"

@@ -1,17 +1,9 @@
-"""Attachment sources -- polymorphic in, ``(bytes, filename, type)`` out.
+"""Attachment sources: resolve one of several input kinds to bytes.
 
-``.attach(source, filename=None, mimetype=None)`` takes "raw ``bytes``, a filesystem
-path (``str``/``Path``), an open binary file object, a ``NamedBlobFile``/``NamedFile``
-value, or a Plone File/Image content object". The builder stores those three values
-verbatim; this module turns them into something
-:meth:`email.message.EmailMessage.add_attachment` accepts, at ``.send()`` time.
-
-Like recipients, and for the same reason, failures are **collected** and raised
-once as :class:`~imio.emailkit.interfaces.AttachmentError`.
-
-Any Plone-version-specific branch is isolated here rather
-than in the builder. :func:`read_source` is that seam: it is the only function that
-knows what a source can be.
+``.attach()`` accepts raw bytes, a filesystem path, an open binary file, a
+``NamedFile``/``NamedBlobFile`` value, or a Plone File/Image content object.
+Failures are collected and raised once, as
+:class:`~imio.emailkit.interfaces.AttachmentError`.
 """
 
 from dataclasses import dataclass
@@ -35,14 +27,11 @@ class Attachment:
 
 
 def resolve(specs):
-    """Resolve every ``(source, filename, mimetype)`` spec the builder collected.
+    """Resolve every ``(source, filename, mimetype)`` spec into an :class:`Attachment`.
 
-    :param specs: iterable of the 3-tuples ``.attach()`` recorded, in order
-    :returns: list of :class:`Attachment`, same order
-    :raises AttachmentError: listing every spec that could not be resolved
-
-    Order is preserved because it is the order the parts appear in the message, and
-    that is the order a mail client lists them in.
+    :param specs: the 3-tuples ``.attach()`` recorded, in order
+    :returns: list of :class:`Attachment`, in the same order
+    :raises AttachmentError: lists every spec that could not be resolved
     """
     attachments = []
     problems = []
@@ -59,12 +48,8 @@ def resolve(specs):
 def resolve_one(source, filename=None, mimetype=None):
     """Resolve one attachment spec, raising :class:`AttachmentError` on failure.
 
-    Precedence for both metadata values: what the caller passed wins, then what
-    the source carries, then -- for the mimetype only -- what
-    :func:`mimetypes.guess_type` makes of the filename. Both are
-    inferred "where the source carries them" and both are required for ``bytes``;
-    an explicit argument overriding a blob's own ``contentType`` is the point of
-    having the arguments at all.
+    Precedence for ``filename``/``mimetype``: the caller's argument, then
+    the source, then a guessed mimetype. Both are required for raw ``bytes``.
     """
     data, source_filename, source_mimetype = read_source(source)
     filename = (filename or source_filename or "").strip()
@@ -85,27 +70,17 @@ def resolve_one(source, filename=None, mimetype=None):
 def read_source(source):
     """Return ``(data, filename, mimetype)`` for one ``.attach()`` source.
 
-    ``filename`` and ``mimetype`` are ``None`` when the source does not carry them,
-    which is the caller's cue that the corresponding argument was mandatory.
+    ``filename``/``mimetype`` are ``None`` when the source lacks them.
 
-    The order of the tests is load-bearing:
-
-    * ``bytes`` first, because it is the one source that carries nothing at all;
-    * ``INamed`` before the path test, because a blob value is not a path but the
-      *content object* tests below would happily try to adapt one;
-    * the path test before the file-object test, because ``str``/``Path`` have no
-      ``read`` but the reverse order would make the ``read`` duck-type the
-      catch-all it must not be;
-    * ``IPrimaryFieldInfo`` last of the real branches, because it is a component
-      lookup and everything above it is a cheap type check.
+    Check order: ``bytes`` first (carries neither); ``INamed`` before path
+    (a blob is not a path); path before file-object (``str``/``Path`` have
+    no ``read``); ``IPrimaryFieldInfo`` last (a slower component lookup).
     """
     if isinstance(source, (bytes, bytearray, memoryview)):
         return bytes(source), None, None
 
     if INamed.providedBy(source):
-        # NamedFile / NamedImage / NamedBlobFile / NamedBlobImage all expose these
-        # three; `contentType` may legitimately be empty, in which case the
-        # filename's extension gets a turn.
+        # All Named* types expose these three; `contentType` may be empty.
         return (
             bytes(source.data or b""),
             getattr(source, "filename", None),
@@ -134,16 +109,12 @@ def read_source(source):
                 f"{describe(source)} is not open in binary mode; it read "
                 f"{type(data).__name__}, not bytes"
             ])
-        # An open file's `name` is the path it was opened with -- but it is an int
-        # for a file opened from a descriptor, and absent for BytesIO.
+        # `name` is a path, an int (file descriptor), or absent (BytesIO).
         name = getattr(source, "name", None)
         filename = Path(name).name if isinstance(name, (str, os.PathLike)) else None
         return data, filename, None
 
-    # A Plone File or Image content object. `IPrimaryFieldInfo` is the boring Plone
-    # way to ask "which field is the payload" -- it answers `file` for File and
-    # `image` for Image without this module knowing either name, and it answers for
-    # any consumer's own content type that marks a primary field.
+    # A Plone File/Image object; IPrimaryFieldInfo finds the payload field.
     info = IPrimaryFieldInfo(source, None)
     if info is not None and info.value is not None:
         return read_source(info.value)
@@ -163,13 +134,11 @@ def guess_mimetype(filename):
 def split_mimetype(mimetype, source, filename):
     """Split ``"application/pdf"`` into ``("application", "pdf")``.
 
-    A mimetype without a slash cannot be split, and guessing which half was meant
-    would put the wrong ``Content-Type`` on a real mail, so it is an error like any
-    other missing metadata.
+    Raises when there is no slash: guessing the missing half risks the
+    wrong ``Content-Type``.
     """
     maintype, _, subtype = mimetype.partition("/")
-    # A stray charset or boundary parameter is the caller's, not ours to keep: it
-    # would end up duplicated once `add_attachment` writes its own.
+    # Drop a charset or boundary parameter: add_attachment writes its own.
     subtype = subtype.split(";")[0].strip()
     if not maintype or not subtype:
         raise AttachmentError([

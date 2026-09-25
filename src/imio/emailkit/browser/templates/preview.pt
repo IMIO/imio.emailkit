@@ -4,10 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>imio.emailkit preview</title>
-    <!-- Deliberately standalone: no main_template, no Plone CSS, no theme.
-         This is a developer tool, and it has to work on a
-         site whose front end is Volto as readily as on Classic UI. The mail
-         itself is in an iframe, so nothing below can reach it. -->
+    <!-- Standalone: no main_template, no Plone CSS, no theme. Works the same
+         on a Volto site and on Classic UI. -->
     <style>
       * { box-sizing: border-box; }
       body { margin: 0; font: 14px/1.5 system-ui, sans-serif; color: #1c1c1c; background: #f8f8f8; }

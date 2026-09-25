@@ -1,26 +1,13 @@
-# A minimal *external* consumer addon, used by the buildout acceptance harness.
-#
-# Its whole job is to be a second, independent distribution that registers
-# `<emailkit:templates>` in its own ZCML, so the recipe is exercised against
-# something it does not own. Two things it proves that `imio.emailkit` cannot:
-#
-#  1. The **in-package** layout -- `emails/` and `templates/` as siblings
-#     inside the package directory. `imio.emailkit` keeps its Maizzle project at
-#     the repository root instead, so without this addon the other branch of
-#     `find_emails_dir` would be untested.
-#  2. The `emails/.kit/` wiring contract. This addon's `maizzle.config.js` imports
-#     `./.kit/maizzle.config.base.js` and nothing else, which is the only thing a
-#     real consumer can do -- the kit lives in site-packages -- and it is what makes
-#     `kit-mode = path` and `kit-mode = copy` observably different.
+# A minimal external consumer addon, used by the buildout acceptance harness.
+# Proves the in-package `emails/`+`templates/` layout and the
+# `emails/.kit/` wiring contract, which `imio.emailkit` alone cannot.
 
 [project]
 name = "emailkitdemo"
 version = "0.1.0"
 description = "Throwaway consumer addon for imio.recipe.emailkit's acceptance test"
 requires-python = ">=3.10"
-# No dependency on imio.emailkit: the recipe resolves the kit from the *part's*
-# eggs, and keeping this addon dependency-free means the acceptance harness never
-# has to resolve anything extra to install it.
+# No dependency on imio.emailkit: the recipe resolves the kit from the part's eggs.
 dependencies = []
 
 [build-system]

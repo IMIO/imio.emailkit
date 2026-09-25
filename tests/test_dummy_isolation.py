@@ -1,27 +1,8 @@
 """The dummy add-ons must be invisible outside the fixture that installs them.
 
-This module has **no autouse installation fixture**, on purpose: it is the one
-place that observes the registry from the outside, so it can assert the invariant
-the rest of the suite depends on.
-
-It exists because that invariant was broken once, and the way it broke is worth
-recording. ``tests/dummies/conftest.py`` installs the add-ons per test and removes
-them again -- but with pytest's default ``--import-mode=prepend``, importing that
-conftest *also* puts ``tests/dummies/`` on ``sys.path``, permanently. A teardown
-that only undid its own insertion therefore undid nothing: the dummy templates
-stayed registered for the rest of the session, and
-``tests/test_golden.py::test_every_registered_template_has_a_fixture`` and
-``tests/test_preview.py`` failed on ``convocation`` -- a template that belongs to
-``dummy.complete`` and has no fixture in *this* package -- while both passed in
-isolation.
-
-Those two tests assert on the **exact** registered set rather than on a subset.
-That is what caught this, and it is the reason the assertions here are equalities
-too.
-
-Two properties are checked separately, because they break separately: the registry
-(what ``installed()`` adds, and gives back afterwards) and ``sys.path`` (what makes
-the packages importable at all).
+This module has no autouse install fixture: it observes the registry and
+``sys.path`` from outside, checked separately since either can leak on its
+own.
 """
 
 import dummyaddons
@@ -37,8 +18,7 @@ def registered():
     return set(available_templates())
 
 
-#: What the registry must hold in this package's own test session: its own
-#: templates, and nothing else.
+#: This package's own templates, and nothing else.
 OWN = {support.qualified(name) for name in support.RENDERABLE_TEMPLATES}
 
 DUMMY = set(dummyaddons.all_qualified_names())
@@ -63,8 +43,7 @@ class TestTheDummiesAreScoped:
         )
 
     def test_installation_is_fully_reversible(self, integration):
-        """Enter, observe, leave, observe again -- in one test, so ordering cannot
-        make it pass by accident."""
+        """Enter, observe, leave, observe again, in one test."""
         with dummyaddons.installed():
             inside = registered()
 
@@ -81,14 +60,8 @@ class TestTheDummiesAreScoped:
         )
 
     def test_the_host_registrations_survive_the_snapshot(self, integration):
-        """``installed()`` snapshots the registry, so it also *restores* it.
-
-        Asserted from the host's side rather than the dummies', because that is the
-        expensive way for this to go wrong: a snapshot put back wrongly takes
-        ``imio.emailkit``'s own registrations with it, and the symptom is every
-        later module failing with ``TemplateNotFound`` for a template nobody
-        touched.
-        """
+        """A wrong restore removes our own registrations, and later
+        modules fail with ``TemplateNotFound``."""
         with dummyaddons.installed():
             assert registered() >= OWN, (
                 "the host's own templates went missing *inside* installed(): "
@@ -100,14 +73,8 @@ class TestTheDummiesAreScoped:
         )
 
     def test_the_sys_path_entry_does_not_survive(self, integration):
-        """The other half of the mechanism, and the half the registry cannot show.
-
-        The packages have to be importable while they are installed -- the scan
-        resolves them by dotted name and their fixtures are loaded from beside them
-        -- so ``installed()`` manages ``sys.path`` as well as the registry. A stale
-        entry left behind is invisible until something imports from it, which is the
-        worst possible moment to find out.
-        """
+        """A leftover entry stays hidden until something later imports
+        from it."""
         import sys
 
         with dummyaddons.installed():
@@ -116,12 +83,7 @@ class TestTheDummiesAreScoped:
         assert str(dummyaddons.DUMMIES_DIR) not in sys.path
 
     def test_nested_installation_still_leaves_nothing(self, integration):
-        """``installed()`` is absolute, not a counter, and that is deliberate.
-
-        The gate modules install per test *and* call ``installed()`` directly. An
-        incremental implementation would then depend on which one exits first;
-        this one cannot.
-        """
+        """``installed()`` restores an absolute state, not a counter."""
         with dummyaddons.installed(), dummyaddons.installed():
             assert registered() >= DUMMY
 

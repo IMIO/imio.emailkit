@@ -2,39 +2,24 @@
 
     bin/preview-emails [--package NAME] [--watch]
 
-The flagship DX feature. Maizzle's own ``--watch`` shows *build-time* output: raw
-``${item/title}`` placeholders and unexpanded ``tal:repeat`` -- a miserable
-authoring loop. This script watches the ``.vue`` sources, compiles, pipes the
-result through Chameleon (``render()``) **with the committed fixtures**, and
-serves the result with live reload and a language switcher.
+Maizzle's own ``--watch`` shows build-time output: raw ``${item/title}``
+placeholders and unexpanded ``tal:repeat``. This script instead watches
+the ``.vue`` sources, compiles them, renders the result through Chameleon
+(``render()``) with the committed fixtures, and serves it with live
+reload and a language switcher.
 
-This is ``scripts/preview_emails.py`` generalised: same steps, no hardcoded
-paths, and one thing the precursor could not do.
+No ZODB connection is needed: ``render()`` is a pure function of
+template, context, and registry state, so a minimal ZCML load (just
+``Products.PageTemplates`` and each package's translation catalogs) is
+enough for real placeholder substitution and real translations.
 
-**The precursor needed a ZODB connection, and this does not.** That was recorded as
-the reason live reload was deferred ("wiring a watcher to a process that has to
-hold a ZODB connection open is the part with real design in it"). Measured while
-building this: ``render()`` is a pure function of (template, context, registry
-state), so a minimal ZCML load -- ``Products.PageTemplates``
-for the ``IPageTemplateEngine`` utility, plus each package's translation catalogs
--- is enough to render with real placeholder substitution and real FR/NL/DE
-translations. No ``zope.conf``, no database, no site. The watcher is therefore an
-ordinary polling loop, and live reload is ~30 lines.
+Without a site, theme tokens come from :class:`IEmailkitTheme`'s own
+defaults, seeded into an in-memory registry. ``--theme token=value``
+overrides them. For real branding, use ``@@emailkit-preview`` instead.
 
-What is *not* real without a site, stated plainly rather than left to be
-discovered: the theme tokens come from :class:`IEmailkitTheme`'s own defaults
-(seeded into an in-memory registry) rather than from a site's
-``plone.app.registry``. ``--theme token=value`` overrides them, which is the
-token panel in its command-line form. For a preview against a *real* site's
-branding, use ``@@emailkit-preview`` -- that is what it is for.
-
-``portal_url`` **is** real, and has to be. It is what the kit shell builds
-``asset_base`` from, and every image in the design is gated on that being
-non-empty -- the header logo, the status pill's icon, the footer mark, and the
-Quicksand stylesheet. Left to its site-less default the preview rendered all four
-as *nothing at all*: not broken images, no markup, no warning, just a design
-missing the parts that make it recognisable. So this server points ``portal_url``
-at itself (:func:`seed_portal_url`) and answers ``++resource++`` urls out of each
+``portal_url`` is real, because every image depends on it being
+non-empty. This server points ``portal_url`` at itself
+(:func:`seed_portal_url`) and answers ``++resource++`` urls out of each
 package's ``browser/static`` (:func:`read_resource`).
 """
 
@@ -66,17 +51,17 @@ DEFAULT_LANGUAGES = ("fr", "nl", "en")
 DEFAULT_PORT = 8090
 DEFAULT_HOST = "127.0.0.1"
 
-#: Where the rendered previews are written when ``--output`` is not given. Under
-#: the checkout's ``var/`` because that is already gitignored everywhere in this
-#: ecosystem, and because a preview is a throwaway artifact.
+#: Where the rendered previews are written when ``--output`` is not
+#: given. Under ``var/``, since that is already gitignored and a preview
+#: is a throwaway artifact.
 DEFAULT_OUTPUT = Path("var") / "preview"
 
 #: Polled by the browser; bumped by every re-render.
 VERSION_PATH = "/__emailkit/version"
 
 #: Where the preview server answers the urls the kit shell builds from
-#: ``asset_base``. Matches Zope's own traversal spelling, so the rendered html is
-#: byte-identical to what a site would produce apart from the host.
+#: ``asset_base``. Matches Zope's own traversal spelling, so the
+#: rendered html matches what a real site would produce.
 RESOURCE_PREFIX = "/++resource++"
 
 WATCH_INTERVAL = 0.6
@@ -85,20 +70,12 @@ WATCH_INTERVAL = 0.6
 class NotShipped(str):
     """A row note that is a plain fact rather than a failure.
 
-    An installed egg prunes both ``emails/`` and ``tests/`` (per
-    ``MANIFEST.in``), so the expected fixture cannot be there and no consumer
-    buildout could put it there: it lives in that package's own checkout.
-    ``@@emailkit-preview`` already reports that absence as a fact rather than an
-    error; this is the same judgement in the command line's vocabulary.
-
-    A ``str`` subclass so every consumer of a row keeps working unchanged, and
-    distinguished by *type* rather than by matching the message, so
-    :func:`report` can never mistake one for the other.
+    An installed egg prunes ``emails/`` and ``tests/``, so no fixture can
+    be there. A ``str`` subclass, distinguished by type so :func:`report`
+    never mistakes it for a failure.
     """
 
-    #: The same fact in the few words a sidebar entry has room for. The full
-    #: string is the terminal line, where there is room to say where the fixture
-    #: does live and why it is not here.
+    #: The same fact, short enough for a sidebar entry.
     short = "no fixture (installed egg) -- the .pt part still opens"
 
 
@@ -206,29 +183,16 @@ def main(config=None, argv=None):
 def seed_portal_url(base_url):
     """Make ``render()`` build ``asset_base`` against this server.
 
-    ``render()`` injects ``portal_url`` itself, from ``getSite()`` and a REQUEST,
-    and an injected name beats anything the caller puts in the context -- so a
-    preview cannot supply one by passing it in. It stands in for the site here the
-    same way :func:`seed_theme` stands in for ``plone.app.registry``: by replacing
-    the function the render reads.
+    ``render()`` injects ``portal_url`` from ``getSite()``, so a preview
+    cannot pass one in through the context. This replaces
+    ``render_module.portal_url`` instead.
 
-    Without this every image in the mail is *absent*, not broken. The kit gates
-    each one on ``tal:condition="asset_base"`` precisely so a render with no
-    request degrades to no image rather than to a broken-image icon -- correct for
-    a golden file, and the wrong thing entirely for the tool whose whole job is
-    showing you what the mail looks like. The header logo, the status pill's icon,
-    the footer mark and the Quicksand stylesheet all hang off it, which is most of
-    what makes the design recognisable.
+    Without this, every image in the mail is absent, not broken: the kit
+    gates each one on ``tal:condition="asset_base"``.
 
-    Paired with :func:`resource_dirs` and the handler's ``++resource++`` route,
-    which is what actually serves the bytes.
-
-    ``import_module`` and not ``from imio.emailkit import render``: the public API
-    is spelled as the latter, so ``imio/emailkit/__init__.py`` rebinds the name to
-    the ``render`` FUNCTION and shadows the submodule of the same name. Written the
-    obvious way this assigns an unused attribute to a function object, patches
-    nothing, and the preview goes on silently dropping every image -- which is how
-    it was found.
+    Uses ``import_module``, not ``from imio.emailkit import render``:
+    ``imio/emailkit/__init__.py`` rebinds ``render`` to the render
+    function, shadowing the submodule of the same name.
     """
     try:
         render_module = importlib.import_module("imio.emailkit.render")
@@ -246,12 +210,8 @@ def seed_portal_url(base_url):
 def resource_dirs(projects):
     """``{resource_name: directory}`` for every project shipping ``browser/static``.
 
-    The convention, and it is a convention rather than a lookup: a package's
-    ``browser:resourceDirectory`` is registered under the package's own dotted
-    name, so ``imio.emailkit`` serves at ``++resource++imio.emailkit``. Reading the
-    real name would mean parsing each package's ZCML for a directive this tool has
-    no other reason to care about; a consumer that names its directory something
-    else gets no images in the *preview* and is otherwise unaffected.
+    A convention, not a lookup: a package's resource directory is
+    registered under its own dotted name.
     """
     found = {}
     for project in projects:
@@ -262,13 +222,7 @@ def resource_dirs(projects):
 
 
 def _default_output():
-    """``./var/preview``.
-
-    The working directory, not any package's own tree: a preview belongs to the
-    person running the script, not to whichever addon happened to sort first. Run
-    from a buildout root -- which is where ``bin/preview-emails`` lives -- that is
-    the ``var/`` every iMio checkout already gitignores.
-    """
+    """``./var/preview``, relative to the working directory."""
     return Path.cwd() / DEFAULT_OUTPUT
 
 
@@ -282,12 +236,9 @@ _configured = False
 def configure(projects):
     """Load the minimum ZCML ``render()`` needs, once per process.
 
-    ``Products.PageTemplates`` is not optional and not a detail. It registers the
-    ``IPageTemplateEngine`` utility; without it ``zope.pagetemplate`` falls back to
-    ``zope.tal``, where ``${...}`` passes through **verbatim and with no error**.
-    A preview built on that fallback would render raw
-    placeholders and look like a template bug. :func:`render_all` asserts on the
-    output for the same reason.
+    Without ``Products.PageTemplates``, ``zope.pagetemplate`` falls back
+    to ``zope.tal``, where ``${...}`` passes through verbatim with no
+    error.
     """
     global _configured
     if _configured:
@@ -309,10 +260,8 @@ def configure(projects):
         '           xmlns:i18n="http://namespaces.zope.org/i18n">\n'
         '  <include package="Products.PageTemplates" />\n'
         '  <include package="zope.i18n" file="meta.zcml" />\n'
-        # `plone.registry` is included for its *field* adapters: without them
-        # `Registry.registerInterface` raises "There is no persistent field
-        # equivalent for the field ...", so the theme tokens could not be seeded
-        # and the preview would render an unbranded shell.
+        # `plone.registry` is included for its field adapters, needed to
+        # seed the theme tokens.
         f"{registry}"
         f"{catalogs}\n"
         "</configure>\n"
@@ -323,9 +272,8 @@ def configure(projects):
 def _packages_with_catalogs(projects):
     """Packages that ship a ``locales/`` directory, plus ``imio.emailkit`` itself.
 
-    ``imio.emailkit`` is always included because the kit layout's own strings --
-    the footer, the logo ``alt``, ``email_regards`` -- are in its domain and appear
-    in *every* consumer's mail.
+    ``imio.emailkit`` is always included: its strings appear in every
+    consumer's mail.
     """
     packages = {"imio.emailkit"}
     for project in projects:
@@ -344,12 +292,8 @@ def _importable(package):
 def seed_theme(overrides):
     """Register an in-memory ``plone.app.registry`` holding the theme tokens.
 
-    Without a registry, ``render()``'s ``get_theme()`` collapses every token to the
-    empty string, so a preview would show an unbranded shell and an empty
-    ``primary_color`` where a colour belongs. Seeding from
-    :class:`IEmailkitTheme`'s own field defaults is exactly what
-    ``profiles/base/registry/main.xml`` does at install time, so the preview shows
-    the same thing a freshly installed site would.
+    Without it, ``render()``'s ``get_theme()`` collapses every token to
+    an empty string, showing an unbranded shell.
     """
     try:
         from imio.emailkit.interfaces import IEmailkitTheme
@@ -419,29 +363,20 @@ def compile_all(projects, kit_dir, merged):
 def render_all(projects, languages, output):
     """Render every registered template of ``projects`` in every language.
 
-    Returns a list of ``(name, language, error)`` rows, ``error`` being ``None`` on
-    success. Discovery is rescanned and the compiled-template cache invalidated
-    first, so a template added or rebuilt since the last pass is picked up.
+    Returns ``(name, language, error)`` rows, ``error`` being ``None`` on
+    success. Rescans discovery and the compile cache first, so a rebuilt
+    template is picked up.
     """
     from imio.emailkit import discovery
     from imio.emailkit import scan
 
-    # `imio.emailkit.__init__` rebinds the name `render` on the package to the
-    # *function*, so `import imio.emailkit.render` yields the function too. The
-    # module is only reachable through a `from ... import <name>`.
+    # `imio.emailkit.__init__` rebinds `render` to the render function,
+    # so it is reachable only through this import form.
     from imio.emailkit.render import invalidate_cache as forget_templates
 
-    # Rescan rather than trust an earlier pass: a template added or rebuilt
-    # since then must show up, and the scan is cheap. `forget_templates()` is
-    # render()'s own Chameleon compile cache -- unrelated to discovery, and
-    # still needed so a rebuilt .pt is recompiled rather than served stale.
-    #
-    # The global `discovery.reset()` followed by a rescan scoped to `projects`
-    # is only safe because templates are self-contained: nothing a template
-    # renders ever looks up another package's registration mid-render. If a
-    # future feature needs cross-package template lookups, this reset has to
-    # be revisited -- it would blow away another package's registrations for
-    # the duration of this pass.
+    # Rescan rather than trust an earlier pass, so a rebuilt template
+    # shows up. Safe because templates are self-contained: nothing a
+    # template renders looks up another package's registration mid-render.
     discovery.reset()
     for project in projects:
         try:
@@ -456,9 +391,7 @@ def render_all(projects, languages, output):
         project = wanted.get(template.package)
         if project is None:
             continue
-        # Before the fixture check, deliberately: this is the one artifact that
-        # cannot fail for lack of one, and a template whose fixture is missing is
-        # exactly the template you want it for.
+        # Written before the fixture check: it needs no fixture.
         _write_source(name, template, output)
         fixture = find_fixture(project, template.basename)
         if fixture is None:
@@ -477,23 +410,9 @@ def render_all(projects, languages, output):
 def _write_source(name, template, output):
     """Copy the compiled ``.pt`` in beside the rendered mails, as ``<stem>.pt.html``.
 
-    The third part the page offers, and the only one that needs no fixture,
-    because it is the file itself. Nothing is substituted: ``${item/title}``
-    stands where its value would be and every ``tal:condition`` branch shows at
-    once.
-
-    **This is the build-time output the two-stage loop exists to get away from,
-    and showing it here is deliberate.** The objection to ``maizzle --watch`` is
-    to an authoring loop whose *only* output is unsubstituted markup -- one you
-    can work in all day without ever learning that ``${item/created}`` renders
-    nothing. Here it is one labelled part of three, next to the two that do
-    render, and it is never substituted for them: a template with no fixture
-    still reports FAILED and still exits non-zero. It answers "what does this
-    layout look like"; the parts beside it answer "does this template render",
-    which is the question this whole tool is protecting.
-
-    One file per template rather than one per language: there is no render, so
-    there is nothing for a language to change.
+    The one part that needs no fixture: unsubstituted, with every
+    ``tal:condition`` branch shown at once. One file per template, not
+    per language.
     """
     from imio.emailkit.render import resolved_path
 
@@ -515,9 +434,7 @@ def _render_one(name, context, language, output):
     except Exception as exc:
         return (name, language, f"{type(exc).__name__}: {exc}")
     if "${" in html:
-        # The zope.tal fallback engine passes ${...} through verbatim and raises
-        # nothing, so a preview that did not check this would quietly show a
-        # template bug that is really a configuration bug.
+        # The zope.tal fallback passes ${...} through with no error.
         return (
             name,
             language,
@@ -532,14 +449,9 @@ def _render_one(name, context, language, output):
 def _no_fixture(project, basename):
     """Why there is no fixture for ``basename``, as a failure or as a fact.
 
-    A package that ships neither ``emails/`` nor ``tests/`` is an installed egg
-    whose sdist pruned both. Its fixtures are in its own checkout and
-    nothing here can conjure them, so reporting FAILED would be telling the
-    person running the preview to fix something that is not theirs -- and would
-    exit non-zero on a buildout that is working exactly as intended.
-
-    Anywhere else -- any checkout, which is where this script is meant to run --
-    a missing fixture is a real omission that should be caught, and still fails.
+    A package shipping neither ``emails/`` nor ``tests/`` is an installed
+    egg; that is a fact, not a failure. In a checkout, it is a real
+    omission and still fails.
     """
     wanted = project.tests_dir / "fixtures" / f"{basename}.py"
     if project.emails_dir is None and not project.tests_dir.is_dir():
@@ -564,12 +476,7 @@ def find_fixture(project, basename):
 
 
 def load_fixture(path):
-    """The ``CONTEXT`` dict of a fixture module, loaded **by path**.
-
-    By path rather than by import, so ``tests/fixtures/`` stays a directory of data
-    files and so the preview and the golden test can never disagree about what the
-    fixture says.
-    """
+    """The ``CONTEXT`` dict of a fixture module, loaded by path."""
     spec = importlib.util.spec_from_file_location(
         f"_emailkit_fixture_{path.stem}", path
     )
@@ -586,14 +493,11 @@ def report(rows, output):
     failures = [row for row in rows if row[2] and not isinstance(row[2], NotShipped)]
     rendered = len(rows) - len(failures) - len(notes)
     print(f"\nrendered {rendered} preview(s) into {output}")
-    # Reported on stdout and never silently: a template the preview could not
-    # render is worth a line even when nobody is at fault for it.
     for name, _language, note in notes:
         print(f"  skip   {name}: {note}")
     for name, language, error in failures:
         print(f"  FAILED {name} [{language or '-'}]: {error}", file=sys.stderr)
-    # Non-zero on any failure: a preview that reports success while a template
-    # cannot render is the silent-failure pattern this project keeps tripping over.
+    # Non-zero on any failure, so it is never reported as a success.
     return 1 if failures else 0
 
 
@@ -668,16 +572,13 @@ if (WATCHING) {
 def write_index(rows, output, languages, generation, watch=False):
     """One page: a template list, a language switcher, an iframe.
 
-    The reload script lives here and nowhere else. Injecting it into the rendered
-    mails would change the bytes you came to inspect, which is the one thing a
-    preview must not do.
+    The reload script lives only here, not in the rendered mails.
     """
     templates = {}
     for name, language, error in rows:
         stem = name.replace(":", ".")
         entry = templates.setdefault(stem, {"name": name, "errors": [], "notes": []})
-        # A note is not an error and must not be painted as one: the template is
-        # still listed, and its .pt part -- which needs no fixture -- still opens.
+        # A note is not an error: the template is still listed.
         if isinstance(error, NotShipped):
             entry["notes"].append(error.short)
         elif error:
@@ -770,9 +671,8 @@ def _fingerprint(projects):
 def watch_loop(projects, pass_once, stop, interval=WATCH_INTERVAL):
     """Poll mtimes; re-run a pass when anything changed.
 
-    Polling rather than inotify: no dependency, works on every platform, and the
-    file count here is tens, not thousands. A loop is what is needed here, not a
-    filesystem-event framework.
+    Polling, not inotify: no extra dependency, and the file count is
+    tens, not thousands.
     """
     previous = _fingerprint(projects)
     while not stop.wait(interval):
@@ -811,10 +711,7 @@ def _handler_class(directory, state):
                 self.serve_resource(path)
                 return
             if path == "/favicon.ico":
-                # Every browser asks for it on every page load and the preview
-                # directory holds rendered mails, nothing else. Answering 204
-                # rather than letting it 404 keeps a dev tool's console free of
-                # an error that means nothing.
+                # Answer 204 instead of a meaningless 404.
                 self.send_response(204)
                 self.send_header("Content-Length", "0")
                 self.end_headers()
@@ -839,12 +736,9 @@ def _handler_class(directory, state):
         def log_message(self, format, *args):  # noqa: A002 - stdlib signature
             """Quieten the live-reload poll, and nothing else.
 
-            ``args[0]`` is the request line for an access log, but ``log_error``
-            routes through here too and passes an ``HTTPStatus`` -- so the
-            membership test has to check the type first. Without the guard a
-            plain 404 raises ``TypeError: argument of type 'HTTPStatus' is not
-            iterable`` inside the handler thread and prints a traceback far more
-            alarming than the missing file that caused it.
+            ``log_error`` also routes through here and passes an
+            ``HTTPStatus`` instead of a string, so the type is checked
+            first.
             """
             first = args[0] if args else ""
             if isinstance(first, str) and VERSION_PATH in first:
@@ -857,18 +751,10 @@ def _handler_class(directory, state):
 def read_resource(resources, path):
     """``(bytes, content_type)`` for a ``++resource++`` url, or ``None``.
 
-    The shell writes image and stylesheet urls as ``${asset_base}/<file>``, where
-    ``asset_base`` is ``<portal_url>/++resource++<package>``.
-    :func:`seed_portal_url` points that at this server; this is the other half,
-    and it is what makes the preview show the header logo, the pill icon, the
-    footer mark and Quicksand instead of silently dropping all four.
-
-    The url is split on the FIRST slash after the prefix, so the segment before it
-    is the resource name and the rest is the file. The result is resolved and then
-    checked to be inside the directory: a resource url is attacker-controlled in no
-    meaningful sense here, since this binds to 127.0.0.1 and serves a developer's
-    own checkout, but `..` reaching an ``open()`` is the kind of thing that gets
-    copied somewhere it does matter.
+    Split on the first slash after the prefix: the segment before it is
+    the resource name, the rest is the file. The resolved path is then
+    checked to stay inside the directory, so a `..` segment cannot
+    escape it.
     """
     import mimetypes
 

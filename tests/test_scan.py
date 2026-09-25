@@ -17,9 +17,8 @@ import subprocess
 import sys
 
 
-#: ``tests/scanfixtures`` is a ``sys.path`` root, not a package -- the same
-#: pattern ``tests/test_zcml_directive.py`` uses, so the fixture addons are
-#: importable by the dotted names their ZCML namespaces itself with.
+#: ``tests/scanfixtures`` is a ``sys.path`` root, not a package, so the
+#: fixture addons import by the dotted names their ZCML uses.
 SCANFIXTURES = Path(__file__).parent / "scanfixtures"
 if str(SCANFIXTURES) not in sys.path:
     sys.path.insert(0, str(SCANFIXTURES))
@@ -38,11 +37,9 @@ ZCML_TEMPLATE = """\
 
 
 def execute_permissively(body):
-    """Run ``body`` through the scan's machine as a file of ``fixture.basic``.
+    """Runs ``body`` through the scan machine as a file of ``fixture.basic``.
 
-    The same setup ``scan_package`` builds, minus the file on disk: ``package``
-    is what an ``<include package=...>`` would have set, and the directive reads
-    it to derive the template namespace.
+    Builds the same setup as ``scan_package``, minus the file on disk.
     """
     machine = scan.PermissiveConfigurationMachine()
     xmlconfig.registerCommonDirectives(machine)

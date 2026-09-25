@@ -1,20 +1,7 @@
 """Fixtures for `imio.recipe.emailkit`'s own suite.
 
-Two design choices worth stating, because they are what keeps this suite fast and
-honest at the same time:
-
-**Node is faked, once, here.** ``fake_node`` writes three shell scripts that
-record their invocation and, for ``npx maizzle build``, write a predictable file
-into the output directory. Every test about *wiring, staleness, restoration and
-exit codes* then runs in milliseconds and without a network. The real toolchain is
-exercised by the buildout acceptance harness (``make buildout-test``), which is
-where "does Maizzle actually produce a `.pt`" belongs -- a unit test that shells
-out to npm is a unit test people skip.
-
-**Buildout is not faked.** ``zc.buildout`` and ``zc.recipe.egg`` are hard
-dependencies of this distribution and are installed in its test environment, so
-the recipe class is exercised against the real ``pkg_resources`` types. Only the
-``buildout`` *mapping* is a stub, because it is a mapping.
+Node is faked (``fake_node``), so tests run fast and without a network.
+Buildout is not faked; only the ``buildout`` mapping is a stub.
 """
 
 from pathlib import Path
@@ -58,12 +45,8 @@ def kit(tmp_path):
 
 @pytest.fixture
 def consumer(tmp_path):
-    """A consumer addon in the **in-package** layout, with one built ``.pt``.
-
-    ``emails/`` and ``templates/`` are siblings inside the package directory. The
-    other layout -- ``emails/`` at the checkout root, which ``imio.emailkit``
-    itself uses -- is covered by ``root_layout_consumer``.
-    """
+    """A consumer addon in the in-package layout: ``emails/`` and
+    ``templates/`` as siblings inside the package directory."""
     package_dir = tmp_path / "site-packages" / "acme" / "notifications"
     emails = package_dir / "emails"
     (emails / "src" / "templates").mkdir(parents=True)
@@ -81,11 +64,7 @@ def consumer(tmp_path):
 
 @pytest.fixture
 def root_layout_consumer(tmp_path):
-    """A checkout whose Maizzle project sits at the *root*, four levels above.
-
-    This is ``imio.emailkit``'s own shape (``emails/`` beside ``src/``), and it is
-    the reason ``find_emails_dir`` ascends instead of only looking in the package.
-    """
+    """A checkout whose Maizzle project sits at the root, four levels above."""
     root = tmp_path / "checkout"
     package_dir = root / "src" / "acme" / "roots"
     package_dir.mkdir(parents=True)
@@ -109,13 +88,7 @@ def project(consumer):
 
 @pytest.fixture
 def fake_node(tmp_path):
-    """Three executables standing in for ``node``, ``npm`` and ``npx``.
-
-    ``npx maizzle build`` writes ``<output>/hello.pt`` with deterministic content,
-    which is exactly the property the staleness gate depends on. Where the output
-    goes is read from ``EMAILKIT_FAKE_OUTPUT``, so a test can point it at the
-    project's ``templates/`` directory the way a real ``maizzle.config.js`` would.
-    """
+    """Three executables standing in for ``node``, ``npm`` and ``npx``."""
     binary = tmp_path / "fakebin"
     binary.mkdir()
 
@@ -137,7 +110,7 @@ def fake_node(tmp_path):
               mkdir -p "$EMAILKIT_FAKE_OUTPUT"
               # `maizzle build` EMPTIES its output directory. Faithfully faked,
               # because that behaviour is why the twins are copied afterwards and
-              # why the staleness gate snapshots first.
+              # why the staleness check snapshots first.
               rm -f "$EMAILKIT_FAKE_OUTPUT"/*.pt
               printf '<html>built ${{title}}</html>\\n' > "$EMAILKIT_FAKE_OUTPUT/hello.pt"
             fi
@@ -157,12 +130,7 @@ def fake_node(tmp_path):
 
 @pytest.fixture
 def node_on_path(fake_node, monkeypatch):
-    """``fake_node`` made discoverable through ``PATH``, as ``node-bin`` expects.
-
-    Prepended rather than substituted: the fakes are shell scripts and need
-    ``mkdir``, ``rm`` and ``printf`` to exist. ``shutil.which`` takes the first
-    match, so the fakes still win over a real Node.
-    """
+    """``fake_node`` prepended to ``PATH``, so it wins over a real Node."""
     binary, logs = fake_node
     monkeypatch.setenv("PATH", os.pathsep.join([str(binary), os.environ["PATH"]]))
     return binary, logs

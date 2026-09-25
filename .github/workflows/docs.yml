@@ -1,8 +1,6 @@
 name: "Docs"
 
-# Deliberately separate from main.yml. The Python suite must not gate a typo fix in
-# the documentation, and a broken MDX page must not gate a release — they are
-# different artifacts with different reviewers and very different run times.
+# Separate from main.yml so a docs issue never blocks the Python suite.
 on:
   push:
     paths:
@@ -14,13 +12,10 @@ on:
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
-# GitHub Pages needs these on the deploy job. `contents: read` is the default for
-# the rest; nothing here writes to the repository.
 permissions:
   contents: read
 
-# One deploy at a time, and never cancel one in flight: a cancelled deploy-pages run
-# can leave the Pages site pointing at a half-uploaded artifact.
+# Never cancel a deploy in progress: it can leave Pages half-uploaded.
 concurrency:
   group: "pages"
   cancel-in-progress: false
@@ -52,9 +47,7 @@ jobs:
         run: npm run lint
 
       - name: Build the static site
-        # The site is served from https://<owner>.github.io/<repo>/, so every asset
-        # and link needs a /<repo> prefix. Reading it from the repository name rather
-        # than hardcoding it means a fork builds correctly with no edit.
+        # Read from the repository name, so a fork builds with no edit.
         env:
           NEXT_BASE_PATH: /${{ github.event.repository.name }}
         run: npm run build
@@ -66,8 +59,7 @@ jobs:
 
   deploy:
     name: "Docs: Deploy to GitHub Pages"
-    # Only the default branch publishes. Every other push and every pull request
-    # still runs `build` above, so a page that fails to render is caught before merge.
+    # Only the default branch publishes.
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest

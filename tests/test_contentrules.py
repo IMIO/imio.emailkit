@@ -1,35 +1,10 @@
-"""The *"Send styled email"* content-rule action.
+"""The "Send styled email" content-rule action.
 
-> **Content rules:** a new action type *"Send styled email"* -- edit form offers
-> the registered template names (vocabulary from discovery) + recipient sources;
-> executor delegates to ``Email(...)``. The stock mail action is left untouched.
-
-Nine gates, one class each, in order.
-
-Three things shape every assertion here.
-
-**A content rule that quietly does not send is indistinguishable from no rule at
-all.** So the error gates are not "an exception is raised somewhere": each one
-also asserts that *nothing was delivered*, and the happy-path gates assert that
-something *was* -- otherwise "no mail arrived" would pass every test in the
-module for the wrong reason.
-
-**Never assert on a marker string.** Without the ``IPageTemplateEngine`` utility
-zope.pagetemplate falls back to zope.tal, where ``${...}`` reaches the inbox
-verbatim and nothing raises. Gate 5 therefore asserts on
-*substituted values* -- the triggering object's real title, its real URL, and a
-CTA label whose FR and NL translations differ -- and runs
-``support.assert_message_is_clean`` over both MIME parts.
-
-**The registration is checked in both registries.** Everything here -- element,
-executor, forms -- is plain global ZCML, exactly like every other Plone
-content-rule action, and gate 1 asserts that in the global registry *and* that the
-site adds no registration of its own. A per-site local utility installed by the
-``:default`` profile was built and then deliberately reverted: it looks identical
-from inside the site, and it stores a copy of the element that drifts from the ZCML
-with no symptom. The last class in this module states the consequence -- a
-``:base`` site has the action type too -- and why that is correct rather than a
-leak.
+Adds a content-rule action type: its edit form offers registered template
+names and recipient sources, and its executor sends through ``Email(...)``.
+The stock mail action stays unchanged. Assertions check substituted values,
+not marker strings, since an unresolved ``${...}`` would still pass a
+marker check under the zope.tal fallback engine.
 """
 
 from plone.app.contentrules import api as contentrules_api
@@ -79,17 +54,13 @@ Email = support.require_builder()
 #: The one template this package registers, which is what a rule points at.
 TEMPLATE = support.qualified(support.NOTIFICATION)
 
-#: A name nothing is registered under. Gate 7: a rule may hold a template name
-#: whose add-on has since been uninstalled, and that must not be a silent skip.
+#: A name nothing is registered under; must raise, not skip silently.
 STALE_TEMPLATE = "imio.emailkit:template_that_was_removed"
 
-#: The rule's id in ``IRuleStorage``, and the folder the rule is assigned to.
 RULE_ID = "styled-mail-rule"
 FOLDER_ID = "dossiers"
 
-#: The triggering content. Title and description are what gate 5 looks for in the
-#: rendered mail, so they are distinctive and accented: a charset regression
-#: anywhere between ``Title()`` and the MIME part shows up here.
+#: Accented, so a charset bug becomes visible.
 ITEM_ID = "urb-2026-0417"
 ITEM_TITLE = "Permis d'urbanisme URB-2026-0417"
 ITEM_DESCRIPTION = "L'enquête publique est clôturée; le dossier passe au collège."
@@ -97,12 +68,7 @@ ITEM_DESCRIPTION = "L'enquête publique est clôturée; le dossier passe au coll
 
 @implementer(IObjectEvent)
 class Triggered:
-    """The minimal object event a rule executor reads.
-
-    ``plone.app.contentrules``' own tests use exactly this: the executor only
-    ever looks at ``event.object``, and building a real event would mean picking
-    one of the fifteen the panel offers for no gain.
-    """
+    """The minimal object event a rule executor reads."""
 
     def __init__(self, obj):
         self.object = obj
@@ -122,11 +88,8 @@ def as_manager(mail_portal, grant_roles):
 
 @pytest.fixture
 def folder(mail_portal, as_manager):
-    """The folder a rule gets assigned to.
-
-    Created *before* any rule exists, so its own ``IObjectAddedEvent`` cannot
-    trigger the rule under test and inflate the message count.
-    """
+    """Created before any rule exists, so its own add event cannot trigger
+    the rule under test."""
     from plone import api
 
     return api.content.create(
@@ -156,17 +119,8 @@ def make_action():
 
 @pytest.fixture
 def make_rule(mail_portal, folder, storage):
-    """``make_rule(action)`` -> a rule holding ``action``, assigned to ``folder``.
-
-    The whole chain a manager builds through the panel: a rule in the storage, an
-    action in the rule, an assignment on a folder. Nothing here is a shortcut
-    past the machinery -- gate 4 needs the real dispatch, not a direct call.
-
-    Returned **traversed** rather than straight out of the storage, because the
-    panel views walk up from the rule to build URLs and the storage is not a
-    ``getPhysicalPath``-able container. The ``++rule++`` namespace is how Plone's
-    own UI reaches a rule, so this is the object the panel actually has.
-    """
+    """-> a rule holding ``action``, assigned to ``folder``, traversed
+    through ``++rule++`` since storage itself is not traversable."""
 
     def make(action, event=IObjectAddedEvent):
         rule = Rule()
@@ -200,11 +154,8 @@ def fire(folder):
 
 @pytest.fixture
 def item(folder, as_manager):
-    """The triggering object, created with *no* rule assigned.
-
-    For the gates that call the executor directly: they are about what the
-    executor does with an object, not about the dispatch that found it.
-    """
+    """The triggering object, with no rule assigned: for tests that call
+    the executor directly."""
     from plone import api
 
     return api.content.create(
@@ -229,22 +180,12 @@ def execute(folder):
 
 @pytest.fixture
 def rule_view(mail_request):
-    """``rule_view(rule)`` -> the ``@@manage-elements`` view of a rule.
-
-    The panel page that lists a rule's actions and offers the addable ones. Used
-    rather than a raw utility lookup for gate 1, because "appears in the content
-    rules control panel" is a statement about that list.
-    """
+    """``rule_view(rule)`` -> the ``@@manage-elements`` view of a rule."""
 
     def make(rule):
         return ManageElements(rule, mail_request)
 
     return make
-
-
-# ---------------------------------------------------------------------------
-# Gate 1 -- the action type is registered and appears in the panel
-# ---------------------------------------------------------------------------
 
 
 class TestTheActionTypeIsRegistered:
@@ -261,23 +202,16 @@ class TestTheActionTypeIsRegistered:
         assert element.editview == EDIT_VIEW_NAME
 
     def test_it_is_titled_send_styled_email(self, mail_portal):
-        """The action type's title is fixed verbatim: *"Send styled email"*. That
-        string is what a Manager picks out of the panel's list, so it is
-        deliberately fixed text rather than a label somebody chose."""
+        """The title is the exact text a Manager sees in the panel list.
+        It is fixed, not a free label."""
         element = getUtility(IRuleAction, name=ELEMENT_NAME)
 
         assert element.title == "Send styled email"
         assert element.description
 
     def test_it_is_registered_in_zcml_like_every_other_plone_action(self, mail_portal):
-        """A plain global ``plone:ruleAction``, and no GenericSetup step.
-
-        Asserted rather than assumed, in both registries, because the alternative
-        that was tried and rejected -- a local utility installed by the
-        ``:default`` profile -- looks identical from inside the site and stores a
-        copy that drifts from the ZCML with no symptom. If this ever becomes a
-        local registration again, this is the test that says so.
-        """
+        """Checked in both the global and the site registry, since a
+        per-site copy could drift from ZCML unnoticed."""
         globally = getGlobalSiteManager().queryUtility(IRuleAction, name=ELEMENT_NAME)
         locally = getSiteManager(mail_portal).queryUtility(
             IRuleAction, name=ELEMENT_NAME
@@ -300,13 +234,8 @@ class TestTheActionTypeIsRegistered:
         "event", [IObjectEvent, IObjectAddedEvent], ids=["any", "added"]
     )
     def test_it_is_offered_for_any_event(self, mail_portal, event):
-        """The directive's ``event="*"``: a styled mail is worth sending on any
-        trigger, so the action must not disappear depending on the rule's event.
-
-        Matched on ``addview``, because the element objects
-        ``allAvailableActions`` returns are all plain ``RuleAction`` instances
-        built by the directive and carry no name.
-        """
+        """Matched on ``addview``: ``allAvailableActions`` returns plain
+        instances that carry no name."""
         with current_site(mail_portal):
             offered = {element.addview for element in allAvailableActions(event)}
 
@@ -328,10 +257,8 @@ class TestTheActionTypeIsRegistered:
     def test_the_configured_action_is_listed_on_its_rule(
         self, mail_portal, make_action, make_rule, rule_view
     ):
-        """The other half of the panel: a *configured* action has to render its
-        own summary. ``ManageElements`` looks the element up by name to do it, so
-        this fails outright if the element and the stored ``element`` attribute
-        ever disagree."""
+        """``ManageElements`` looks up the element by name, so this fails
+        if the stored ``element`` attribute disagrees."""
         rule = make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         with current_site(mail_portal):
@@ -346,10 +273,7 @@ class TestTheActionTypeIsRegistered:
     def test_the_summary_says_which_recipient_sources_are_configured(
         self, make_action, language
     ):
-        """Three configurations, three whole sentences, all four languages. A
-        summary that under-reported the owner would let a manager believe the
-        content's owner is not mailed when they are, which is the one thing this
-        line exists to prevent."""
+        """The summary must always say when the owner is mailed."""
         addresses = support.translated(
             make_action(recipients=[support.PLAIN_ADDRESS]).summary, language
         )
@@ -376,9 +300,8 @@ class TestTheActionTypeIsRegistered:
     def test_the_add_and_edit_views_are_registered(
         self, mail_portal, mail_request, make_action, make_rule
     ):
-        """Registered *globally*, unlike the element: a rule stored on a site
-        that later opted out of ``:default`` still has to be editable and
-        deletable."""
+        """Registered globally, so a rule stays editable even on a site
+        that opts out of ``:default``."""
         make_rule(make_action())
         rule = mail_portal.restrictedTraverse(f"++rule++{RULE_ID}")
 
@@ -388,11 +311,6 @@ class TestTheActionTypeIsRegistered:
 
         assert isinstance(addview, StyledMailAddFormView)
         assert isinstance(editview, StyledMailEditFormView)
-
-
-# ---------------------------------------------------------------------------
-# Gate 2 -- the vocabulary lists every discovered template
-# ---------------------------------------------------------------------------
 
 
 class TestTheVocabularyComesFromDiscovery:
@@ -424,9 +342,8 @@ class TestTheVocabularyComesFromDiscovery:
     def test_a_template_from_another_addon_appears_without_touching_this_package(
         self, vocabulary
     ):
-        """The whole point, and the reason the vocabulary reads discovery rather than
-        a list: two unrelated add-ons' templates have to show up in the form of a
-        package that has never heard of them."""
+        """The vocabulary reads discovery, not a fixed list, so a template
+        from another add-on appears here too."""
         outside = set(vocabulary().by_token)
         assert not (set(dummyaddons.all_qualified_names()) & outside), (
             "the dummy add-ons are discoverable outside their fixture, so this "
@@ -443,9 +360,8 @@ class TestTheVocabularyComesFromDiscovery:
         )
 
     def test_it_is_not_cached_behind_discovery(self, vocabulary):
-        """A cache here would outlive the registration it copied and make this the
-        one place in the package that still believes in a template nobody registers
-        any more -- an add-on uninstalled, or a template dropped from its ZCML."""
+        """The vocabulary must not cache. A cache could keep listing a
+        template after its add-on is uninstalled."""
         with dummyaddons.installed():
             assert (
                 dummyaddons.COMPLETE.qualified("convocation") in vocabulary().by_token
@@ -456,26 +372,13 @@ class TestTheVocabularyComesFromDiscovery:
         )
 
 
-# ---------------------------------------------------------------------------
-# Gate 3 -- adding the action through the form stores template + recipients
-# ---------------------------------------------------------------------------
-
-
 class TestTheAddAndEditForms:
-    """Reached by **traversal**, not by ``getMultiAdapter``.
-
-    Both forms are ``plone.z3cform`` wrappers, and a wrapper renders its form
-    against its own ``context`` -- the ``+action`` adding view for the add form,
-    the stored element for the edit form. Adapted by hand those are unwrapped, so
-    ``absolute_url()`` and ``restrictedTraverse('portal_membership')`` inside the
-    page chrome fail on the acquisition chain and the render blows up for a reason
-    that has nothing to do with this action. ``portal.restrictedTraverse(...)`` is
-    the path Plone's own UI takes and gives properly wrapped views.
-    """
+    """Reached by traversal, not ``getMultiAdapter``: these ``plone.z3cform``
+    wrappers need the acquisition-wrapped context only traversal gives."""
 
     @pytest.fixture
     def empty_rule(self, mail_portal, storage, as_manager):
-        """A rule with no elements yet, i.e. what the add form is reached from."""
+        """A rule with no elements yet, what the add form is reached from."""
         storage[RULE_ID] = Rule()
         return mail_portal.restrictedTraverse(f"++rule++{RULE_ID}")
 
@@ -499,11 +402,8 @@ class TestTheAddAndEditForms:
         )
 
     def test_the_add_form_renders_its_three_widgets(self, addview):
-        """Rendered, not merely constructed. A ``Choice`` over a named vocabulary
-        and a ``List`` of ``TextLine`` are both widgets that fail at *render*
-        time -- an unregistered vocabulary name, a missing multi-widget template
-        -- and a form that only ever has ``create()`` called on it in tests would
-        ship broken."""
+        """Rendered, not just constructed: a ``Choice`` or ``List`` widget
+        can fail only at render time."""
         addview.update()
         rendered = addview.contents
 
@@ -557,10 +457,7 @@ class TestTheAddAndEditForms:
     def test_an_empty_recipients_field_stores_the_missing_value(
         self, addview, empty_rule
     ):
-        """``recipients`` is optional, so leaving it blank stores the field's
-        ``missing_value`` -- ``None``, not ``[]``. Worth an assertion because the
-        executor and the summary both have to survive it, and "mail the owner and
-        nobody else" is a perfectly ordinary rule."""
+        """Leaving ``recipients`` blank stores ``None``, not ``[]``."""
         form = addview.form_instance
         addview.update()
 
@@ -576,17 +473,10 @@ class TestTheAddAndEditForms:
         assert support.translated(stored.summary, "fr")
 
     def test_the_schema_has_no_body_and_no_subject_field(self):
-        """TTW template markup editing is ruled out, and the subject lives in
-        the registration so it is translated per recipient language. Both would
-        be tempting fields on this form, and both are the wrong answer."""
+        """The subject comes from the template registration instead."""
         names = set(IStyledMailAction.names())
 
         assert names == {"template", "recipients", "send_to_owner"}, sorted(names)
-
-
-# ---------------------------------------------------------------------------
-# Gate 4 -- firing the rule sends one mail per language group, through Email
-# ---------------------------------------------------------------------------
 
 
 class TestFiringTheRuleSends:
@@ -604,8 +494,7 @@ class TestFiringTheRuleSends:
     def test_nothing_is_sent_until_the_rule_fires(
         self, make_action, make_rule, mailhost, site_sender, deliver
     ):
-        """The non-vacuity control for the whole class: assigning a rule must not
-        mail anybody, or every count below would be meaningless."""
+        """Assigning a rule must not send mail by itself."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         deliver()
@@ -623,12 +512,8 @@ class TestFiringTheRuleSends:
         fr_member,
         nl_member,
     ):
-        """The builder's per-language sending, reached from a rule.
-
-        The recipients are **userids**, which is why the action takes them: a
-        bare address resolves with no language and lands in the site-default
-        group, while a userid carries the member's own preference.
-        """
+        """Recipients are userids, not bare addresses, so each carries a
+        preferred language for grouping."""
         make_rule(
             make_action(
                 recipients=[
@@ -645,9 +530,9 @@ class TestFiringTheRuleSends:
             f"{len(mailhost.sent)} message(s) for two recipients in two "
             "languages; the builder emits one message per language group"
         )
-        # Keyed by language rather than by position: several queued deliveries
-        # are separate transaction data managers and the order `tpc_finish`
-        # visits them in is not the order they were queued.
+        # Keyed by language, not position: queued deliveries are separate
+        # transaction data managers, and tpc_finish does not visit them in
+        # queue order.
         by_language = {
             support.lang_of(record.message): support.envelope(record)
             for record in mailhost.sent
@@ -668,9 +553,7 @@ class TestFiringTheRuleSends:
         fr_member,
         nl_member,
     ):
-        """Proof that the mail went through the builder and not through some second
-        assembly path: the subject is the *registration's* msgid, translated
-        per group. Nothing but the builder does that."""
+        """The subject is the registered msgid, translated per language."""
         make_rule(
             make_action(
                 recipients=[
@@ -696,9 +579,8 @@ class TestFiringTheRuleSends:
     def test_the_message_has_the_shape_the_builder_builds(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """``set_content(text)`` + ``add_alternative(html)``, i.e. plaintext then
-        HTML inside a ``multipart/alternative``. The stock mail action sends a
-        bare ``text/plain``, so this also distinguishes the two."""
+        """The builder's ``multipart/alternative`` shape, unlike the stock
+        action's plain ``text/plain``."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         fire()
@@ -716,8 +598,8 @@ class TestFiringTheRuleSends:
     def test_the_sender_is_the_site_sender(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """ "``From`` defaults to the site's configured sender". The action
-        offers no source field, so this is the only ``From`` it can have."""
+        """No source field: ``From`` is always the site's configured
+        sender."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         fire()
@@ -730,7 +612,7 @@ class TestFiringTheRuleSends:
 
 
 class TestTheOwnerRecipientSource:
-    """The second recipient source, and the only one that is computed."""
+    """The only recipient source that is computed, not stored."""
 
     def test_the_owner_receives_the_mail(
         self,
@@ -763,9 +645,8 @@ class TestTheOwnerRecipientSource:
         make_member,
         mail_portal,
     ):
-        """The reason the executor passes a **userid**: the member adapter then
-        supplies the display name and the preferred language, which is what makes
-        the builder's per-language sending work from a rule at all."""
+        """A userid, not an address, so the member adapter can supply the
+        display name and preferred language."""
         make_member(mail_portal)
 
         make_rule(make_action(send_to_owner=True))
@@ -820,11 +701,6 @@ class TestTheOwnerRecipientSource:
         assert support.envelope(record) == [support.PLAIN_ADDRESS]
 
 
-# ---------------------------------------------------------------------------
-# Gate 5 -- the styled template, with substituted values
-# ---------------------------------------------------------------------------
-
-
 class TestTheMailIsTheStyledTemplate:
     @pytest.fixture
     def sent_html(
@@ -838,9 +714,8 @@ class TestTheMailIsTheStyledTemplate:
     def test_no_placeholder_survives_into_either_part(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """The single most important assertion in this module. Under the zope.tal
-        fallback engine ``${...}`` reaches the inbox verbatim and nothing raises,
-        so "our marker is in the output" is a test that ships raw placeholders."""
+        """Under the zope.tal fallback engine, ``${...}`` reaches the inbox
+        unresolved and nothing raises."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         fire()
@@ -860,10 +735,8 @@ class TestTheMailIsTheStyledTemplate:
         assert f'href="{expected}"' in sent_html, sent_html[:2000]
 
     def test_it_is_the_kit_template_and_not_a_bare_body(self, sent_html):
-        """Styled means the compiled kit output: a real document with inlined
-        styles, not the text somebody typed. Counted rather than pattern-matched
-        on a class name, because the CSS is fixed at build time and the class
-        names are not the contract."""
+        """Counted by inline styles, not a CSS class name, since class
+        names can change."""
         assert sent_html.lstrip().lower().startswith("<!doctype html")
         assert support.count_inline_styles(sent_html) >= support.MIN_INLINE_STYLES
 
@@ -878,14 +751,9 @@ class TestTheMailIsTheStyledTemplate:
         fr_member,
         nl_member,
     ):
-        """The one context value the action supplies as a **msgid** rather than a
-        string, and the reason it has to be one: ``.with_context()`` runs once,
-        before the builder groups by language, so a value translated in the executor
-        would reach a Dutch recipient in French.
-
-        Non-vacuous because the two translations are asserted to differ first --
-        otherwise both groups would "match" the untranslated default and the test
-        would pass with the translation machinery switched off.
+        """The label is a msgid, not translated text, since
+        ``.with_context()`` runs before recipients are grouped by language.
+        Checks first that FR and NL differ, so this cannot pass untranslated.
         """
         french = support.translated(CTA_LABEL, "fr")
         dutch = support.translated(CTA_LABEL, "nl")
@@ -916,10 +784,7 @@ class TestTheMailIsTheStyledTemplate:
     def test_the_plaintext_part_carries_the_same_values(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """Half the message, and the half nobody looks at. The hand-authored
-        ``.txt.pt`` twin is the primary plaintext path, and it reads
-        the same names -- so a context key the HTML happens to tolerate shows up
-        here."""
+        """The plaintext ``.txt.pt`` twin uses the same context values."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         fire()
@@ -928,11 +793,6 @@ class TestTheMailIsTheStyledTemplate:
         text, _html = support.bodies(support.sole(mailhost.sent).message)
         assert ITEM_TITLE in text
         assert ITEM_DESCRIPTION in text
-
-
-# ---------------------------------------------------------------------------
-# Gate 6 -- an unresolvable recipient raises, and nothing is sent
-# ---------------------------------------------------------------------------
 
 
 class TestAnUnresolvableRecipientRaises:
@@ -947,8 +807,7 @@ class TestAnUnresolvableRecipientRaises:
     def test_nothing_is_delivered(
         self, make_action, execute, item, mailhost, site_sender, deliver
     ):
-        """ "Fail loud, not silent drop" is only half the guarantee; the other half
-        is that the mail did not go out to the recipients that *did* resolve."""
+        """No mail goes to recipients that did resolve, when another fails."""
         action = make_action(recipients=[support.PLAIN_ADDRESS, support.UNRESOLVABLE])
 
         with pytest.raises(RecipientError):
@@ -973,13 +832,8 @@ class TestAnUnresolvableRecipientRaises:
     def test_no_recipients_at_all_raises_rather_than_doing_nothing(
         self, make_action, execute, item, mailhost, site_sender, recipients
     ):
-        """A rule saved with an empty recipient list and the owner box unticked
-        would otherwise be a rule that fires and mails nobody, forever, quietly.
-        The builder already treats "no recipients" as a ``RecipientError``.
-
-        Both shapes the field can store: ``[]`` from an emptied multi-widget and
-        ``None``, the field's ``missing_value``, from one never filled in.
-        """
+        """Must raise, not fire silently. Checks both stored shapes: ``[]``
+        and ``None``."""
         action = make_action()
         action.recipients = recipients
 
@@ -989,10 +843,7 @@ class TestAnUnresolvableRecipientRaises:
     def test_an_unresolvable_owner_raises_rather_than_sending_to_the_rest(
         self, make_action, execute, item, mailhost, site_sender, deliver
     ):
-        """The owner is the one recipient the *action* computes, so it is the one
-        place a silent drop could be introduced here rather than inherited from
-        the builder. The test user has no email address unless a fixture gives them
-        one."""
+        """The owner is computed by the action itself, not the builder."""
         action = make_action(recipients=[support.PLAIN_ADDRESS], send_to_owner=True)
 
         with pytest.raises(RecipientError):
@@ -1004,9 +855,8 @@ class TestAnUnresolvableRecipientRaises:
     def test_the_failure_reaches_the_operation_that_triggered_the_rule(
         self, make_action, make_rule, fire, mailhost, site_sender, deliver
     ):
-        """Dispatched for real, not called directly. ``plone.contentrules``
-        catches nothing, so a broken rule has to surface on the very operation
-        that fired it -- which is what makes it noticeable at all."""
+        """Dispatched through the real rule: ``plone.contentrules`` catches
+        nothing, so the error reaches the caller."""
         make_rule(make_action(recipients=[support.UNRESOLVABLE]))
 
         with pytest.raises(RecipientError):
@@ -1025,26 +875,19 @@ class TestAnUnresolvableRecipientRaises:
         make_member,
         mail_portal,
     ):
-        """``plone.contentrules`` stops a rule when an element returns ``False``,
-        which makes ``False`` the quiet way to fail. A problem is an exception
-        here; a success is ``True``."""
+        """A ``False`` return silently stops a rule, so this executor must
+        raise on failure and always return ``True`` on success."""
         make_member(mail_portal)
 
         assert execute(make_action(send_to_owner=True), item) is True
-
-
-# ---------------------------------------------------------------------------
-# Gate 7 -- a stale template name fails loudly
-# ---------------------------------------------------------------------------
 
 
 class TestAStaleTemplateNameFailsLoudly:
     def test_the_executor_raises_template_not_found(
         self, make_action, execute, item, mailhost, site_sender
     ):
-        """The realistic case: the add-on that shipped the template was
-        uninstalled and the rule still names it. Skipping would leave a rule
-        that looks configured and mails nobody."""
+        """The template's add-on was uninstalled; this must raise, not
+        skip silently."""
         action = make_action(
             template=STALE_TEMPLATE, recipients=[support.PLAIN_ADDRESS]
         )
@@ -1075,8 +918,7 @@ class TestAStaleTemplateNameFailsLoudly:
     def test_a_template_that_disappears_after_the_rule_was_saved(
         self, make_action, execute, item, mailhost, site_sender, deliver
     ):
-        """The same failure, arrived at the way it happens in production: the rule
-        names a template that *was* registered when it was saved."""
+        """Registered when the rule was saved, but not registered now."""
         with dummyaddons.installed():
             name = dummyaddons.COMPLETE.qualified("convocation")
             action = make_action(template=name, recipients=[support.PLAIN_ADDRESS])
@@ -1101,19 +943,9 @@ class TestAStaleTemplateNameFailsLoudly:
         assert mailhost.sent == []
 
 
-# ---------------------------------------------------------------------------
-# Gate 8 -- the stock mail action is left untouched
-# ---------------------------------------------------------------------------
-
-
 class TestTheStockMailActionIsUntouched:
-    """ "The stock mail action is left untouched"."""
-
     def test_it_is_still_registered_globally(self, mail_portal):
-        # ``mail_portal`` is not used, but it is what sets the layer up: without
-        # a layer fixture the ZCML has not been loaded for this test and the
-        # global registry is the bare, cleaned-up one, so the assertion below
-        # would fail for a reason that has nothing to do with the stock mail action.
+        # mail_portal loads the ZCML layer; without it the registry is empty.
         element = getGlobalSiteManager().queryUtility(
             IRuleAction, name="plone.actions.Mail"
         )
@@ -1147,10 +979,7 @@ class TestTheStockMailActionIsUntouched:
         assert {"plone.actions.Mail", ELEMENT_NAME} <= offered, sorted(offered)
 
     def test_it_still_sends(self, folder, item, mailhost, site_sender):
-        """Executed for real. "Untouched" does not just mean "the utility is still
-        registered" -- it also means "it still puts mail on the wire", and
-        this package installs a MailHost double and a browser layer, either of
-        which could have broken it."""
+        """Executed for real: the stock action must still send mail."""
         action = MailAction()
         action.subject = "Rapport"
         action.source = support.OVERRIDE_SENDER
@@ -1173,21 +1002,8 @@ class TestTheStockMailActionIsUntouched:
         assert MailAction.element == "plone.actions.Mail"
 
 
-# ---------------------------------------------------------------------------
-# Gate 9 -- transaction abort sends nothing
-# ---------------------------------------------------------------------------
-
-
 class TestTransactionAbortSendsNothing:
-    """The builder's guarantee, checked *through* the executor.
-
-    The builder's own abort test (``tests/test_send_transaction.py``) proves the
-    guarantee for a direct caller. It would still be possible for a rule action
-    to lose it -- by passing ``immediate=True``, say, to "make sure the mail goes
-    out" -- and the failure mode is a mail sent for an operation that was rolled
-    back. So the whole triangle is asserted again here: pending, cancelled,
-    delivered.
-    """
+    """Nothing is sent before commit; an abort cancels everything queued."""
 
     def test_nothing_is_delivered_before_the_transaction_ends(
         self, make_action, make_rule, fire, mailhost, site_sender
@@ -1214,8 +1030,8 @@ class TestTransactionAbortSendsNothing:
     def test_a_delivery_really_was_joined_to_the_transaction(
         self, make_action, make_rule, fire, mailhost, site_sender
     ):
-        """The positive half: an empty inbox proves nothing on its own, because a
-        rule that never queued anything also has an empty inbox."""
+        """An empty inbox alone proves nothing; checks the abort really
+        cancelled a queued delivery."""
         make_rule(make_action(recipients=[support.PLAIN_ADDRESS]))
 
         fire()
@@ -1252,16 +1068,10 @@ class TestTransactionAbortSendsNothing:
         assert mailhost.aborted == 2
 
 
-# ---------------------------------------------------------------------------
-# The executor stays a caller of the builder
-# ---------------------------------------------------------------------------
-
-
 class TestTheExecutorOnlyDelegates:
     def test_it_adds_no_builder_method(self):
-        """The ``Email`` API is frozen and adding no new builder methods is a
-        non-goal here. ``tests/test_builder.py`` keeps the set closed; this
-        asserts that importing the content-rule module did not widen it."""
+        """Importing the content-rule module adds no public method to
+        ``Email``."""
         public = {
             name
             for name in dir(Email)
@@ -1273,9 +1083,8 @@ class TestTheExecutorOnlyDelegates:
     def test_it_does_not_send_immediately(
         self, make_action, execute, item, mailhost, site_sender, deliver
     ):
-        """``.send()`` with no argument, i.e. the builder's default. Restated as an
-        assertion because ``immediate=True`` is exactly the shortcut somebody
-        reaches for when a rule "does not seem to send"."""
+        """The executor uses the builder's default queued send, not
+        ``immediate=True``."""
         action = make_action(recipients=[support.PLAIN_ADDRESS])
 
         execute(action, item)
@@ -1295,10 +1104,8 @@ class TestTheExecutorOnlyDelegates:
         assert isinstance(executor, StyledMailActionExecutor)
 
     def test_the_render_context_is_the_documented_set(self, item):
-        """There is no fixed rule for what a rule-triggered mail renders against, so
-        the action fixes a small set and documents it. Pinned here because
-        widening it silently is how a documented contract stops being one, and
-        because a template author has nothing else to write against."""
+        """A template author writes against this fixed set of context
+        names, so it must not change silently."""
         assert set(render_context(item)) == set(RENDER_CONTEXT_NAMES)
         assert render_context(item)["title"] == ITEM_TITLE
         assert render_context(item)["intro"] == ITEM_DESCRIPTION
@@ -1307,12 +1114,8 @@ class TestTheExecutorOnlyDelegates:
 
 
 class TestTheExecutorLogsEnoughToDiagnose:
-    """A rule that fails has to leave a log line naming what it was trying to do.
-
-    The exception reaches the browser of whoever triggered the operation, but the
-    person who has to fix a nightly workflow reads a log file -- and "RecipientError"
-    on its own says nothing about which rule, which template or which recipients.
-    """
+    """A failed rule must log its template and recipients: the exception
+    message alone is not enough to diagnose it."""
 
     def test_a_successful_send_is_logged_with_template_and_recipients(
         self, make_action, execute, item, mailhost, site_sender, caplog
@@ -1352,35 +1155,16 @@ class TestTheExecutorLogsEnoughToDiagnose:
         )
 
 
-# ---------------------------------------------------------------------------
-# Level 3 -- a ``:base`` site keeps the action type, deliberately
-# ---------------------------------------------------------------------------
-#
-# Its own class, at the end of the module. `zope.pytestlayer` keeps a layer up for
-# the whole *class* and tears it down at the class boundary, and `plone.testing`
-# stacks every layer's DemoStorage onto ONE shared stack -- so a layer set up while
-# another is still up sees the other's database writes. Mixing `base_portal` and
-# `mail_portal` in one class therefore reads a `:base` site with `:default` already
-# applied to it (measured, not theorised), and the profile-version control below
-# would silently be checking the wrong site. `tests/test_optout.py` gets the same
-# isolation by being its own module.
+# This class stays separate: mixing `base_portal` and `mail_portal` in one
+# class would stack a `:default` site on top of a `:base` one.
 
 
 class TestABaseOnlySiteStillHasTheActionType:
-    """The registration is plain global ZCML, so ``:base`` has it too.
-
-    This is the intended behaviour and not a leak. Level 3's opt-out is about
-    Plone's **stock transactional mails**: ``:base`` ships "the runtime (API,
-    discovery, kit) without the Plone-default overrides". An action type is not an
-    override of anything -- it is inert until a Manager creates a rule that uses
-    it, and the templates it can send come from discovery either way. Gating it
-    would mean a per-site local utility whose stored copy drifts from the ZCML with
-    no symptom, which is the silent-failure class this project exists to avoid.
-    """
+    """A ``:base`` site keeps the action type too: it is plain global ZCML,
+    and the ``:base`` profile only opts out of Plone's mail overrides."""
 
     def test_the_base_profile_is_what_this_site_has(self, base_portal):
-        """The control for the whole class: without it, every assertion below
-        could be true because the fixture handed back the ``:default`` site."""
+        """Checks the fixture gave a ``:base`` site, not a ``:default`` one."""
         setup_tool = base_portal.portal_setup
 
         assert setup_tool.getLastVersionForProfile("imio.emailkit:base") not in (
@@ -1396,8 +1180,7 @@ class TestABaseOnlySiteStillHasTheActionType:
         )
 
     def test_the_browser_layer_is_still_absent(self, base_portal, layers_of):
-        """What ``:base`` *does* opt out of, restated here so the next assertion
-        cannot be mistaken for "the opt-out is broken"."""
+        """Confirms what ``:base`` does opt out of."""
         from imio.emailkit.interfaces import IEmailkitLayer
 
         assert IEmailkitLayer not in layers_of(base_portal)
@@ -1420,8 +1203,8 @@ class TestABaseOnlySiteStillHasTheActionType:
         )
 
     def test_the_vocabulary_still_works(self, base_portal):
-        """A ``:base`` site still renders its own templates, so the form's template
-        list has to resolve there too."""
+        """A ``:base`` site still renders templates, so the vocabulary
+        must resolve there too."""
         factory = getUtility(IVocabularyFactory, name=TEMPLATES_VOCABULARY)
 
         assert TEMPLATE in factory(base_portal).by_token

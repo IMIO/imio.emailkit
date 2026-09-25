@@ -1,28 +1,9 @@
 """The authoring lint.
 
-"Authoring lint: one fixture per rule, each caught;
-and a clean file passing." That is the shape of this module, and the *clean* half
-is the half that matters most. The risk register says it outright: "The lint
-produces false positives and gets disabled -- prefer a missed case to a false
-alarm; every rule needs a passing-clean fixture too." A lint that cries wolf is
-switched off, and then ``style-placeholder`` and ``comment-double-dash`` ship to
-production, which is exactly what this gate exists to stop.
-
-So each rule has a pair of fixtures:
-
-* ``tests/fixtures/lint/violating/<rule>.vue`` -- the mistake, and only that
-  mistake, so the assertion can be "exactly this rule id and nothing else";
-* ``tests/fixtures/lint/clean/<rule>.vue`` -- the same intent expressed correctly,
-  including the constructs the rule is most likely to confuse itself with
-  (``tal:attributes="style ..."``, ``bgcolor``, ``:class`` on a whole literal name,
-  Outlook conditional comments, ``${python: ...}``).
-
-Plus ``clean/kitchen_sink.vue``, which holds every one of those at once, and
-``ignored/opt_out.vue`` for the escape hatch.
-
-No Plone, no Node, no fixtures from the rest of the suite: the lint is pure text
-processing, and keeping these tests dependency-free is what lets the gate run in
-a buildout-generated script that has nothing else available.
+Each rule has a fixture that violates it and one that expresses the same
+intent correctly (``fixtures/lint/violating|clean/<rule>.vue``): a rule
+that fires on correct markup gets disabled. The lint is pure text
+processing, with no Plone or Node dependency.
 """
 
 from imio.emailkit import lint
@@ -39,16 +20,15 @@ FIXTURES = HERE / "fixtures" / "lint"
 VIOLATING = FIXTURES / "violating"
 CLEAN = FIXTURES / "clean"
 
-# The `.vue` sources this repository actually ships: its own four templates plus
-# the built-in kit. `bin/check-emails` runs the lint over exactly these.
+# The `.vue` sources this repository ships: its own templates and the kit.
+# `bin/check-emails` lints exactly these.
 OWN_SOURCES = (
     REPO / "emails" / "src" / "templates",
     REPO / "src" / "imio" / "emailkit" / "kit",
 )
 
-# Every rule id, paired with the fixture basename that exercises it. Written out
-# rather than derived from `lint.RULES`, so adding a rule without a fixture pair
-# fails here instead of shipping untested.
+# Every rule id, paired with its fixture basename. Listed here, not derived
+# from `lint.RULES`, so a rule added without a fixture fails immediately.
 RULE_FIXTURES = {
     "tal-on-component": "tal_on_component",
     "runtime-class": "runtime_class",
@@ -60,26 +40,10 @@ RULE_FIXTURES = {
     "path-call": "path_call",
 }
 
-# A known, deliberately un-silenced violation in this repository's own sources.
-#
-# `emails/src/templates/mail_password.vue` has an authoring comment containing
-# `--`. It is currently harmless *in the compiled artifact*, because the kit's
-# `stripAuthorComments` hook removes non-conditional comments before the `.pt` is
-# written -- verified: the comment does not appear in
-# `browser/overrides/Products.CMFPlone.browser.login.templates.mail_password_template.pt`.
-# It is still a violation of the project's own recorded decision ("No `--` in any
-# comment, anywhere in the repo"), and the fix is one character.
-#
-# It is listed here rather than suppressed with an `emailkit-lint: ignore=`
-# marker, because a marker would make it permanent and invisible. The hard
-# assertion below is "no violation outside this list", so the ledger stops
-# regressions without pretending the file is clean; the xfail after it is what
-# goes green the moment the comment is fixed.
-# Empty, and it should stay that way. It held one entry -- a `--` in an authoring
-# comment in mail_password.vue -- which was fixed rather than suppressed, at which
-# point `check-emails` gained the lint as a prerequisite. An entry here is a
-# deliberate, visible exception; a growing ledger means the gate is being worked
-# around instead of the sources being fixed.
+# Violations allowed in this repository's own sources, by (path, line, rule
+# id). Keep this empty: an entry here is a visible, deliberate exception. A
+# growing set means the lint is being worked around instead of the source
+# being fixed.
 KNOWN = set()
 
 
@@ -106,11 +70,7 @@ def ids_in(path):
 
 @pytest.mark.parametrize(("rule_id", "basename"), sorted(RULE_FIXTURES.items()))
 def test_the_violating_fixture_trips_its_rule(rule_id, basename):
-    """The fixture reports its own rule, at least once, and reports nothing else.
-
-    "Nothing else" is the load-bearing half: it is what proves the *other* seven
-    rules are not quietly firing on ordinary markup.
-    """
+    """The fixture must trip its own rule, and only that rule."""
     found = ids_in(VIOLATING / f"{basename}.vue")
     assert found, f"{basename}.vue tripped nothing"
     assert set(found) == {rule_id}, (
@@ -126,7 +86,7 @@ def test_the_clean_fixture_stays_silent(rule_id, basename):
 
 
 def test_every_rule_has_a_fixture_pair():
-    """A rule with no fixtures is a rule nobody has ever seen fire."""
+    """Every rule must have both a violating and a clean fixture."""
     assert set(lint.RULES) == set(RULE_FIXTURES)
     for basename in RULE_FIXTURES.values():
         assert (VIOLATING / f"{basename}.vue").is_file()
@@ -134,7 +94,7 @@ def test_every_rule_has_a_fixture_pair():
 
 
 def test_violations_carry_a_file_and_a_line():
-    """`path:line:` is the whole point; a rule name with no location is useless."""
+    """A violation must report a file and a line, not just a rule name."""
     violations = lint.check_file(VIOLATING / "style_placeholder.vue")
     assert len(violations) == 1
     (violation,) = violations
@@ -147,12 +107,8 @@ def test_violations_carry_a_file_and_a_line():
 
 
 def test_the_report_explains_the_consequence_and_the_escape_hatch():
-    """These failures are invisible at build time, so the rule name teaches nobody.
-
-    The rules are documented as a table of *evidence*; the report has to carry
-    enough of it that an author who has never read that table understands why a
-    green build is not proof of anything.
-    """
+    """The report must explain the consequence and the fix, not just the
+    rule id, since the failure is invisible at build time."""
     (violation,) = lint.check_file(VIOLATING / "style_placeholder.vue")
     text = str(violation)
     assert "style-placeholder" in text
@@ -167,31 +123,22 @@ def test_the_report_explains_the_consequence_and_the_escape_hatch():
 
 
 def test_conditional_comments_are_not_double_dash_violations():
-    """Outlook conditionals are load-bearing markup made of hyphen runs.
-
-    The one carve-out `comment-double-dash` has to get right. If it fired here,
-    the rule would be unusable in any template with an MSO fallback -- which is
-    all of them.
-    """
+    """Outlook conditional comments use hyphen runs and must not trip
+    `comment-double-dash`."""
     source = (CLEAN / "comment_double_dash.vue").read_text(encoding="utf-8")
     assert "<!--[if mso]>" in source and "<!--[if !mso]><!-->" in source
     assert lint.check_source(source) == []
 
 
 def test_a_double_dash_in_a_script_comment_is_not_reported():
-    """`<script>` never reaches the email, and its banner comments are full of --."""
+    """`<script>` content never reaches the email, so `--` in it is safe."""
     source = "<script setup>\n/** a -- b */\n</script>\n<template><p>x</p></template>\n"
     assert lint.check_source(source) == []
 
 
 def test_a_build_time_class_binding_is_not_a_runtime_class():
-    """`:class="toneClass"` is correct kit code and must never be reported.
-
-    The kit's own `Panel.vue` resolves a tone this way: Vue evaluates the binding
-    at build time and every complete utility name is literal in the source, so
-    Tailwind's scanner finds them. What `runtime-class` is actually after is a
-    name *assembled* from fragments, which no scanner can see.
-    """
+    """`runtime-class` must only catch a name assembled at runtime, not a
+    build-time literal Tailwind's scanner already sees."""
     picks = '<template><table :class="toneClass"><tr><td>x</td></tr></table></template>'
     builds = "<template><table :class=\"'bg-' + tone\"><tr><td>x</td></tr></table></template>"
     assert lint.check_source(picks) == []
@@ -199,7 +146,8 @@ def test_a_build_time_class_binding_is_not_a_runtime_class():
 
 
 def test_the_sanctioned_theme_token_form_is_not_a_style_placeholder():
-    """`tal:attributes="style string:..."` is the amended, correct form, not a bug."""
+    """`tal:attributes="style string:..."` is the correct form for a theme
+    token, not a violation."""
     good = (
         '<template><td tal:attributes="style string:background-color: '
         '${theme/primary_color}">x</td></template>'
@@ -210,7 +158,7 @@ def test_the_sanctioned_theme_token_form_is_not_a_style_placeholder():
 
 
 def test_bgcolor_may_carry_a_placeholder():
-    """`bgcolor` is never parsed as CSS, which is why the kit colours cells with it."""
+    """`bgcolor` is never parsed as CSS, so a placeholder in it is safe."""
     assert (
         lint.check_source('<template><td bgcolor="${primary_color}">x</td></template>')
         == []
@@ -218,7 +166,8 @@ def test_bgcolor_may_carry_a_placeholder():
 
 
 def test_a_javascript_template_literal_is_not_a_tal_path_call():
-    """`${config.x}` in `<script>` is Node's interpolation, not Chameleon's."""
+    """`${config.x}` in `<script>` is a JavaScript template literal, not a
+    Chameleon path call."""
     source = (
         "<script setup>\nconst css = `@import \"${resolve('kit.css')}\";`\n</script>\n"
         "<template><p>x</p></template>\n"
@@ -310,11 +259,7 @@ def test_an_unrelated_marker_does_not_suppress():
 
 
 def test_no_unknown_violations_in_the_repos_own_sources():
-    """The repo's own `.vue` files report nothing outside the `KNOWN` ledger.
-
-    This is the regression gate: a new violation in a real template, or a new
-    false positive from a rule change, both fail here with the location.
-    """
+    """The repo's own `.vue` files must report nothing outside `KNOWN`."""
     unexpected = own_violations() - KNOWN
     assert unexpected == set(), (
         "unexpected violations in this repository's own email sources: "
@@ -323,17 +268,12 @@ def test_no_unknown_violations_in_the_repos_own_sources():
 
 
 def test_the_repos_own_sources_are_fully_clean():
-    """No xfail: the one violation this ever found has been fixed.
-
-    `check-emails` now runs the lint as a prerequisite, so this is the assertion
-    that keeps that gate honest -- if it ever fails, the repo's own sources broke
-    a rule the package asks every consumer to follow.
-    """
+    """The repo's own sources must have no violations at all."""
     assert own_violations() == set()
 
 
 def test_the_known_ledger_is_not_stale():
-    """Every entry in `KNOWN` is still a real finding, or it should be deleted."""
+    """Every entry in `KNOWN` must still be a real finding."""
     found = own_violations()
     assert found >= KNOWN or not KNOWN, (
         f"KNOWN lists violations that no longer occur: {sorted(KNOWN - found)}"
@@ -389,8 +329,8 @@ def test_node_modules_is_not_walked():
 
 
 def test_the_module_entry_point_runs():
-    """`python -m imio.emailkit.lint` is the contract the Makefile and the recipe
-    both call; a working `main()` with a broken `__main__` guard is a broken gate."""
+    """`python -m imio.emailkit.lint` is what the Makefile and the recipe
+    call, so the `__main__` guard must work."""
     result = subprocess.run(  # noqa: S603
         [sys.executable, "-m", "imio.emailkit.lint", str(VIOLATING / "path_call.vue")],
         capture_output=True,

@@ -2,9 +2,8 @@
 <metadata>
   <version>1000</version>
   <dependencies>
-    <!-- ":default extends :base". Everything the runtime needs is
-         in :base; :default adds only the browser layer that activates the
-         restyled Plone default mails. -->
+    <!-- `:default` extends `:base` and adds only the browser layer that
+         activates the restyled Plone default mails. -->
     <dependency>profile-imio.emailkit:base</dependency>
   </dependencies>
 </metadata>

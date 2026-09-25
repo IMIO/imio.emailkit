@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Installing this layer is the single act that switches the restyled
-     Plone default mails on: the jbot directory is bound to it in
-     browser/configure.zcml and is inert without it. This file is why
-     `:default` and `:base` differ. -->
+<!-- Installing this layer switches on the restyled Plone default mails. The
+     jbot directory in browser/configure.zcml is bound to it and is inert
+     without it. This is the difference between `:default` and `:base`. -->
 <layers>
   <layer interface="imio.emailkit.interfaces.IEmailkitLayer"
          name="imio.emailkit"

@@ -5,27 +5,14 @@
     i18n_domain="imio.emailkit"
     >
 
-  <!-- Two includes, one reason each. Both are idempotent (zope.configuration
-       skips a file it has already processed), so they only ever move a
-       declaration earlier.
+  <!-- `plone.app.contentrules` declares the `ManageContentRules` permission
+       and ships no `permissions.zcml`, so the whole package must be
+       included. The permission must be registered before the
+       `browser:page` actions below run, or they fail at start-up with a
+       `ComponentLookupError`.
 
-       `plone.app.contentrules` declares the
-       `plone.app.contentrules.ManageContentRules` permission in its own
-       `configure.zcml` and ships no `permissions.zcml`, so the whole package is
-       what has to be included. The permission has to be a REGISTERED utility by
-       the time the `browser:page` actions below execute, and ZCML executes
-       actions in the order they were collected; cookiecutter-zope-instance
-       writes a site.zcml that includes this package before Plone's own, so
-       without this the registrations die at start-up with a
-       `ComponentLookupError` naming the permission, which says nothing about
-       include ordering and reads as a misspelled permission name. Same reasoning
-       and the same placement as the `Products.CMFCore` permissions include in
-       `browser/configure.zcml`.
-
-       `plone.contentrules`' `meta.zcml` defines the `plone:ruleAction` directive
-       used at the bottom of this file. It arrives with the include above as well;
-       stating it puts the dependency next to the directive that needs it instead
-       of leaving it to a transitive include. -->
+       `plone.contentrules`' `meta.zcml` defines the `plone:ruleAction`
+       directive used at the bottom of this file. -->
   <include package="plone.app.contentrules" />
   <include
       package="plone.contentrules"
@@ -49,30 +36,18 @@
       permission="plone.app.contentrules.ManageContentRules"
       />
 
-  <!-- The action type, registered exactly the way every other
-       `plone.contentrules` action in the Plone ecosystem is. There is no
-       GenericSetup step and none is wanted.
+  <!-- The action type, registered like every other `plone.contentrules`
+       action. Not conditional on the `:default` profile: an action type is
+       inert until a Manager creates a rule that uses it.
 
-       Why this is NOT conditional on the `:default` profile, since the question
-       will come up: `plone:ruleAction` is unconditionally global, and that is
-       right here. The opt-out (installing `:base` instead of `:default`) is
-       about not restyling Plone's stock transactional mails; it is not a request
-       to hide an action type. An action type is inert until a Manager creates a
-       rule that uses it, and its template list comes from discovery, so a
-       `:base` site gains nothing it opted out of by having the entry available.
-       Gating it would mean registering a local utility per site, whose stored
-       copy then drifts from this file with no symptom; that is a worse failure
-       than the one it would prevent.
+       `event="*"` and `for="*"`: a styled mail is worth sending on any
+       trigger, and the action reads only what any content object has.
 
-       `event="*"` because a styled mail is worth sending on any trigger, and
-       `for="*"` because the action reads only what any content object has.
-
-       `title` and `description` are plain strings, not msgids: the directive's
-       fields are `schema.TextLine`/`schema.Text` rather than
-       `zope.configuration.fields.MessageID`, so there is no way to hand it a
-       message object. That is what Plone's own "Send email" does too. Everything
-       the action shows inside its own forms (labels, help text, the summary line)
-       does go through `_()` and ships FR/NL/DE. -->
+       `title` and `description` are plain strings, not msgids: the
+       directive's fields are `schema.TextLine`/`schema.Text`, with no way to
+       hand them a message object, like Plone's own "Send email" action.
+       Everything the action shows inside its own forms goes through `_()`
+       and ships FR/NL/DE. -->
   <plone:ruleAction
       name="imio.emailkit.actions.StyledMail"
       title="Send styled email"

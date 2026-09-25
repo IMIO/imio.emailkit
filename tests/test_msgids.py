@@ -11,8 +11,8 @@ EMAILKIT_NS = "{http://namespaces.imio.be/emailkit}"
 
 
 def zcml_msgids():
-    # The parsed file is this repository's own configure.zcml, not input from
-    # anywhere, so defusedxml would be a dependency for nothing.
+    # This file comes from the package itself, not from external input.
+    # defusedxml is not needed here.
     tree = ElementTree.parse(PACKAGE / "configure.zcml")  # noqa: S314
     msgids = set()
     for element in tree.iter(f"{EMAILKIT_NS}template"):

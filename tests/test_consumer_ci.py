@@ -1,28 +1,11 @@
-"""The CI contract, run against the two dummy consumer add-ons (Phase 4 gate 10).
+"""The CI contract, run against the two dummy consumer add-ons.
 
-> **CI contract for every consumer addon**
-> 1. ``bin/check-emails --package <self>`` -- build output is not stale.
-> 2. Golden-file tests -- runtime rendering is intact.
-
-Both gates, for both dummies, **and both of them shown going red**. A gate that has
-only ever been seen green is not known to be a gate: every finding in this project
-is a failure that produced a successful build, and a staleness check that silently
-compares nothing would look exactly like a passing one.
-
-Layout of this module:
-
-* ``TestTheContractIsWiredUp`` -- each dummy add-on actually has the four artifacts
-  the contract needs. Catches a dummy that quietly stops participating.
-* ``TestStalenessGate`` -- gate 1, green (a real Maizzle build) and red.
-* ``TestGoldenGate`` -- gate 2, red. The green half is the dummies' own suites under
-  ``tests/dummies/``, which run in the same pytest session; re-running them here
-  would be a copy of them rather than a check on them.
-* ``TestTheBaseClassIsShipped`` -- a provided test base class means the
-  thing a consumer imports has to come out of the *egg*.
-
-The Node-dependent tests skip loudly when the toolchain is absent (installing and
-running this add-on never needs Node -- only building templates does), and each
-red-side test has a Node-free twin so the red is demonstrable either way.
+Every consumer add-on's CI must run ``bin/check-emails`` (build output is
+not stale, sources pass the authoring lint) and its golden-file tests
+(runtime rendering is intact). Each check is shown both passing and
+failing here, so a check that silently compares nothing cannot look like a
+passing one. Node-dependent tests skip when the toolchain is absent; each
+failing case also has a Node-free twin.
 """
 
 from pathlib import Path
@@ -38,10 +21,10 @@ support.require_runtime()
 
 
 NODE_MISSING = (
-    "Node is not available (npx and/or emails/node_modules). Gate 1 of the CI "
-    "contract compiles the add-on and diffs against the committed output, so it "
-    "cannot run without the Maizzle toolchain. The red-side assertions below do "
-    "not need Node and still run."
+    "Node is not available (npx and/or emails/node_modules). The staleness "
+    "check compiles the add-on and diffs against the committed output, so it "
+    "cannot run without the Maizzle toolchain. The failing-side assertions "
+    "below do not need Node and still run."
 )
 
 
@@ -62,14 +45,7 @@ def require_node():
 
 
 class TestTheContractIsWiredUp:
-    """Every artifact the two gates consume, present for every registered template.
-
-    Driven off the templates the add-on declares, so one added without its fixture,
-    its snapshot or its `.vue` source fails here -- rather than being quietly absent
-    from both gates, which is how a template stops being tested without anybody
-    noticing. ``tests/test_discovery_dummies.py`` pins that declared list to what
-    each add-on's `configure.zcml` actually registers, so the two cannot drift.
-    """
+    """Every artifact both checks need, for every registered template."""
 
     def test_the_addon_ships_maizzle_sources(self, addon):
         sources = sorted(
@@ -108,21 +84,8 @@ class TestTheContractIsWiredUp:
         assert missing == [], f"{addon.package}: no fixture for {missing}"
 
     def test_every_snapshotted_template_has_a_complete_set(self, addon):
-        """Whatever is snapshotted is snapshotted completely.
-
-        Not "every registered template has a snapshot", which is what this used
-        to assert. A snapshot set is a *choice* now -- this package snapshots one
-        of its four templates and ``dummy.complete`` one of its two, because a
-        byte comparison per template per language stopped paying for the diffs it
-        produced (see ``tests/test_golden.py``). Requiring full coverage here
-        would make that choice unavailable to a consumer while the base class
-        happily supports it.
-
-        What still has to hold is that a set is not half-generated: a template
-        with a French snapshot and no English one, or an html with no txt, means
-        an interrupted ``EMAILKIT_UPDATE_GOLDEN=1`` run and a gate that silently
-        checks less than it looks like it does.
-        """
+        """Whatever is snapshotted is snapshotted completely: a French
+        snapshot with no English one means an interrupted golden-update run."""
         snapshotted = {
             path.name.split(".")[0] for path in addon.golden_dir.glob("*.*.*")
         }
@@ -140,12 +103,8 @@ class TestTheContractIsWiredUp:
         )
 
     def test_no_snapshot_outlives_its_template(self, addon):
-        """The other half: a snapshot for a template that is no longer registered.
-
-        Dead weight that no test reads and no target regenerates, which is what
-        the old full-coverage assertion made impossible by construction and what
-        replaces it now that coverage is a choice.
-        """
+        """A snapshot for a template that is no longer registered is dead
+        weight: no test reads it and no target regenerates it."""
         snapshotted = {
             path.name.split(".")[0] for path in addon.golden_dir.glob("*.*.*")
         }
@@ -156,12 +115,7 @@ class TestTheContractIsWiredUp:
         )
 
     def test_the_addon_has_its_own_test_suite_using_the_shipped_base_class(self, addon):
-        """Gate 9's artifact, asserted as part of the contract.
-
-        The suite is what makes gate 2 run at all, and it has to reach the base
-        class the *egg* provides -- a consumer that copied the harness into their
-        own tree would pass their own tests while missing every improvement to it.
-        """
+        """Must import the base class from the egg, not a copy."""
         modules = sorted(addon.suite_dir.glob("test_*.py"))
 
         assert modules, f"{addon.package} ships no test module in {addon.suite_dir}"
@@ -171,12 +125,8 @@ class TestTheContractIsWiredUp:
         )
 
     def test_only_declared_twins_are_committed(self, addon):
-        """A ``.txt.pt`` in ``templates/`` that is not in ``emails/twins/``.
-
-        This is data loss waiting to happen: ``maizzle build`` empties its output
-        directory, so a twin whose only copy lives in ``templates/`` disappears on
-        the next build, silently. It has already happened once in this repository.
-        """
+        """``maizzle build`` empties its output directory, so a twin that
+        only exists in ``templates/`` silently disappears on the next build."""
         committed = sorted(p.name for p in addon.templates_dir.glob("*.txt.pt"))
         sourced = sorted(f"{name}.txt.pt" for name in addon.twins)
 
@@ -188,10 +138,10 @@ class TestTheContractIsWiredUp:
 
 
 class TestStalenessGate:
-    """Gate 1: the committed ``.pt`` files match what a fresh build produces."""
+    """The committed ``.pt`` files must match what a fresh build produces."""
 
     def test_committed_output_is_not_stale(self, addon):
-        """The green run. Compiles the add-on for real and diffs, byte for byte."""
+        """The passing case: compiles the add-on for real."""
         require_node()
 
         committed, fresh = dummyaddons.rebuild(addon)
@@ -204,12 +154,7 @@ class TestStalenessGate:
         )
 
     def test_the_gate_goes_red_when_a_committed_template_is_edited(self, addon):
-        """The red run, through the real build.
-
-        Somebody hand-edits a compiled `.pt` (or forgets to rebuild after touching
-        the `.vue`), and this is what CI must say. The file is restored whatever
-        happens.
-        """
+        """Simulates a hand-edited compiled ``.pt`` file. Restored after."""
         require_node()
 
         target = addon.templates_dir / f"{addon.templates[0]}.pt"
@@ -231,11 +176,11 @@ class TestStalenessGate:
         )
         assert target.read_bytes() == original, "the tampered file was not restored"
 
-    # -- the same three failures, without Node in the loop ------------------
+    # The same three failures, without Node.
 
     @pytest.fixture
     def two_trees(self, tmp_path, addon):
-        """A committed tree and a fresh tree, both starting out identical."""
+        """Two identical trees."""
         committed, fresh = tmp_path / "committed", tmp_path / "fresh"
         shutil.copytree(addon.templates_dir, committed)
         shutil.copytree(addon.templates_dir, fresh)
@@ -262,7 +207,7 @@ class TestStalenessGate:
         assert dummyaddons.is_stale(report)
 
     def test_a_built_but_uncommitted_template_is_MISSING(self, two_trees):
-        """A template that would never ship. The build has it, git does not."""
+        """Built but not committed: it would never ship."""
         committed, fresh = two_trees
         (fresh / "brand_new.pt").write_text("<html></html>\n", encoding="utf-8")
 
@@ -272,7 +217,7 @@ class TestStalenessGate:
         assert dummyaddons.is_stale(report)
 
     def test_a_committed_but_no_longer_built_template_is_ORPHAN(self, two_trees):
-        """Dead weight the golden gate would keep confirming for ever."""
+        """Dead weight nothing regenerates."""
         committed, fresh = two_trees
         target = sorted(fresh.glob("*.pt"))[0]
         target.unlink()
@@ -284,14 +229,8 @@ class TestStalenessGate:
 
 
 class TestAuthoringLintGate:
-    """Gate 2 of ``bin/check-emails``, run over the dummies' sources.
-
-    Not part of the two-gate contract, but it is the other half of what CI runs on
-    a consumer add-on, and pointing it at the dummies is what proves the documented
-    ``.vue`` sources actually obey the rules they document. Driven through the CLI
-    rather than the Python API: the exit code is the stable contract, and it is what
-    a pipeline reads.
-    """
+    """The authoring lint half of ``bin/check-emails``, over the dummies'
+    sources. Run through the CLI, since the exit code is what CI reads."""
 
     @staticmethod
     def lint(*paths):
@@ -300,8 +239,8 @@ class TestAuthoringLintGate:
 
         if importlib.util.find_spec("imio.emailkit.lint") is None:
             pytest.skip("imio.emailkit.lint is not available in this checkout")
-        # S603: the argument list is this module's own literals plus paths built
-        # from `tests/dummyaddons.py`'s constants. Nothing here comes from input.
+        # S603: the argument list is this module's own literals plus paths
+        # from tests/dummyaddons.py's constants. Nothing here is user input.
         return subprocess.run(  # noqa: S603
             [sys.executable, "-m", "imio.emailkit.lint", *[str(p) for p in paths]],
             capture_output=True,
@@ -322,13 +261,8 @@ class TestAuthoringLintGate:
     def test_the_lint_gate_goes_red_on_a_placeholder_in_a_style_attribute(
         self, tmp_path
     ):
-        """The catalogue's worst entry, as a consumer would write it by accident.
-
-        A ``${...}`` in a literal ``style`` attribute eats the closing brace and
-        kills CSS inlining for the whole document, with a successful build. If this
-        ever stops being caught, the dummies' clean bill of health above stops
-        meaning anything.
-        """
+        """A ``${...}`` in a literal ``style`` attribute kills CSS inlining
+        for the whole document, with a successful build."""
         source = tmp_path / "broken.vue"
         source.write_text(
             "<template>\n"
@@ -348,16 +282,9 @@ class TestAuthoringLintGate:
 
 
 class TestGoldenGate:
-    """Gate 2, shown going red. The green half is ``tests/dummies/`` itself.
-
-    Each test builds a throwaway subclass of the **shipped** base class pointed at a
-    tampered copy of a dummy add-on's snapshots, then calls the very test method CI
-    calls. Nothing is simulated: the assertion that fires is the one in
-    ``imio.emailkit.golden``.
-
-    ``layer_fixture = None`` on those subclasses because the Plone site is already
-    up -- this module's own ``integration`` fixture holds it -- and the harness's
-    autouse fixture does not run when a test method is called directly.
+    """The golden-file check, shown failing, on a throwaway subclass of the
+    shipped base class pointed at a tampered snapshot. ``layer_fixture =
+    None``: the Plone site is already up through this module's own fixture.
     """
 
     ADDON = dummyaddons.COMPLETE
@@ -367,7 +294,7 @@ class TestGoldenGate:
 
     @pytest.fixture
     def harness(self, tmp_path):
-        """``harness(mutate)`` -> a base-class subclass on a tampered snapshot dir."""
+        """-> a base-class subclass on a tampered snapshot dir."""
         from imio.emailkit.golden import GoldenTemplateTests
 
         golden = tmp_path / "golden"
@@ -416,13 +343,8 @@ class TestGoldenGate:
     def test_the_gate_goes_red_when_a_placeholder_stops_resolving(
         self, integration, harness
     ):
-        """The other named regression: a ``${}`` that stopped resolving.
-
-        Simulated the way it really arrives -- in the *rendered* output, which no
-        longer matches the snapshot. The snapshot is edited to hold the substituted
-        value's placeholder instead, because a render cannot be broken from a test
-        without breaking the engine for everything else.
-        """
+        """A ``${}`` that stopped resolving, simulated on the snapshot since
+        a real render cannot be broken from a test."""
         instance, _snapshot = harness(
             lambda path: path.write_text(
                 path.read_text(encoding="utf-8").replace(
@@ -440,12 +362,8 @@ class TestGoldenGate:
     def test_a_snapshot_taken_while_the_engine_was_broken_is_rejected(
         self, integration, harness
     ):
-        """The audit that keeps a bad regeneration from being confirmed for ever.
-
-        ``EMAILKIT_UPDATE_GOLDEN=1`` on a broken engine writes raw
-        ``${member/fullname}`` into the committed file, and a plain comparison then
-        passes on every later run. This is the test that does not.
-        """
+        """A broken engine writes a raw placeholder into the snapshot; a
+        plain comparison would then pass forever."""
         instance, snapshot = harness(
             lambda path: path.write_text(
                 path.read_text(encoding="utf-8").replace(
@@ -481,12 +399,8 @@ class TestGoldenGate:
         assert "no fixture at" in str(exc_info.value)
 
     def test_a_missing_snapshot_skips_rather_than_fails(self, integration, tmp_path):
-        """The one failure mode that is deliberately *not* red.
-
-        A template with no snapshot yet has nothing to compare against, and
-        reporting that as a golden failure would point at the wrong defect. It
-        skips, with a message that says how to create one.
-        """
+        """No snapshot means nothing to compare against, so this skips
+        instead of failing."""
         from imio.emailkit.golden import GoldenTemplateTests
 
         class NoSnapshot(GoldenTemplateTests):
@@ -496,9 +410,7 @@ class TestGoldenGate:
             golden_dir = tmp_path / "empty"
             layer_fixture = None
 
-        # `pytest.skip.Exception` is the public name of the `Skipped` outcome, and
-        # it derives from `BaseException` -- so a plain `except Exception` here
-        # would not catch it and the test would report as an error.
+        # pytest.skip.Exception derives from BaseException, not Exception.
         with pytest.raises(pytest.skip.Exception) as exc_info:
             NoSnapshot().test_matches_golden("convocation", "fr", self.HTML)
 
@@ -510,12 +422,8 @@ class TestGoldenGate:
 
 
 class TestTheBaseClassIsShipped:
-    """A provided test base class -- provided means importable.
-
-    Phases 1-3 kept the harness in ``tests/golden_harness.py``, which does not ship
-    in the egg; Phase 4 moved it to ``imio.emailkit.golden``. These assertions are
-    what stops it drifting back.
-    """
+    """The shared test base class must be importable from the egg, from
+    ``imio.emailkit.golden``."""
 
     def test_it_imports_from_the_distribution(self):
         from imio.emailkit.golden import GoldenTemplateTests
@@ -528,13 +436,8 @@ class TestTheBaseClassIsShipped:
         )
 
     def test_the_packaging_ships_it(self):
-        """A ``.py`` module in a found package needs no ``package-data`` entry.
-
-        Asserted rather than assumed, because the harness only *became* shippable
-        by being a module: had it been kept as data (a ``.pt``, a template, a
-        directory) it would have needed a ``pyproject.toml`` line, and the failure
-        would only show up in an sdist nobody builds locally.
-        """
+        """A ``.py`` module in a found package needs no ``package-data``
+        entry, unlike a template or a data directory."""
         import imio.emailkit.golden
 
         module = Path(imio.emailkit.golden.__file__)
@@ -543,12 +446,8 @@ class TestTheBaseClassIsShipped:
         assert module.parent.name == "emailkit"
 
     def test_this_packages_own_harness_is_a_subclass_and_not_a_copy(self):
-        """``tests/golden_harness.py`` must stay a binding, not a fork.
-
-        If the two ever diverge, ``imio.emailkit``'s own suite stops dogfooding the
-        thing consumers get -- which is the only reason to believe the shipped
-        version works.
-        """
+        """``tests/golden_harness.py`` must stay a binding, not a fork, or
+        this package stops exercising the code consumers get."""
         from imio.emailkit.golden import GoldenTemplateTests as Shipped
 
         import golden_harness
@@ -563,13 +462,8 @@ class TestTheBaseClassIsShipped:
             ), f"tests/golden_harness.py overrides {name}; that is a fork"
 
     def test_the_shipped_layers_do_not_need_pytest(self):
-        """Why the harness is its own module rather than part of ``testing.py``.
-
-        ``imio.emailkit.testing`` holds the Plone test layers and plenty of iMio
-        add-ons still run their tests under ``zope.testrunner``. Folding a
-        pytest-importing base class into that module would make the layers
-        unimportable for them.
-        """
+        """A pytest import here would make ``imio.emailkit.testing``
+        unimportable for consumers still on ``zope.testrunner``."""
         import ast
         import imio.emailkit.testing
 

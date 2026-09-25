@@ -7,7 +7,7 @@ import pytest
 
 
 class TestTheFourFiles:
-    def test_it_writes_exactly_the_four_spec_5_names(self, project):
+    def test_it_writes_exactly_four_files(self, project):
         paths = scaffold.new_template(project, "convocation")
         names = sorted(path.name for path in paths)
         assert names == [
@@ -24,7 +24,7 @@ class TestTheFourFiles:
         assert (project.tests_dir / "golden" / "convocation.fr.html").is_file()
 
     def test_the_fixture_defines_a_context_dict(self, project):
-        """The fixture's contract, and what ``bin/preview-emails`` loads by path."""
+        """What ``bin/preview-emails`` loads by path."""
         scaffold.new_template(project, "convocation")
         body = (project.tests_dir / "fixtures" / "convocation.py").read_text(
             encoding="utf-8"
@@ -37,7 +37,7 @@ class TestTheFourFiles:
     def test_the_golden_file_is_a_visible_placeholder_not_a_plausible_snapshot(
         self, project
     ):
-        """A golden that silently agreed with the first render would catch nothing."""
+        """A golden that agreed with the first render would catch nothing."""
         scaffold.new_template(project, "convocation")
         body = (project.tests_dir / "golden" / "convocation.fr.html").read_text(
             encoding="utf-8"
@@ -52,14 +52,11 @@ class TestTheFourFiles:
         assert project.package in stub
 
     def test_the_registration_stub_is_zcml_not_the_old_dict_form(self, project):
-        """Registration moved from a Python dict to a ZCML directive; the
-        scaffold must teach the current form, not the old one."""
+        """The scaffold must teach registration as a ZCML directive."""
         stub = scaffold.registration_stub(project, "convocation")
         assert "<emailkit:template" in stub
         assert 'name="convocation"' in stub
         assert "email_preheader_convocation" in stub
-        # The old form this replaces, so a regression is caught rather than
-        # merely un-asserted.
         assert "emailkit` dict" not in stub
         assert "MessageFactory" not in stub
 
@@ -70,7 +67,7 @@ class TestTheSkeletonEncodesTheAuthoringRules:
     def test_no_chameleon_placeholder_in_a_literal_style_or_class_attribute(
         self, project
     ):
-        """The amended rule: it kills CSS inlining document-wide, silently."""
+        """A placeholder here silently kills CSS inlining document-wide."""
         scaffold.new_template(project, "convocation")
         body = (project.sources_dir / "convocation.vue").read_text(encoding="utf-8")
         import re
@@ -80,14 +77,7 @@ class TestTheSkeletonEncodesTheAuthoringRules:
                 assert "${" not in match.group(1)
 
     def test_no_double_dash_anywhere_in_the_vue_source(self, project):
-        """Chameleon refuses to parse it, at runtime, on a green build.
-
-        Asserted over the whole file rather than only inside its comments, which is
-        both simpler and stricter, and which is exactly how the repo-wide rule is
-        written: "No ``--`` in any comment, anywhere".
-        A ``.vue`` source's comments are the ones that become HTML comments in the
-        compiled output, so this is the file where the rule bites.
-        """
+        """Chameleon refuses to parse a `--` in an HTML comment, at runtime."""
         scaffold.new_template(project, "convocation")
         body = (project.sources_dir / "convocation.vue").read_text(encoding="utf-8")
         assert "--" not in body
@@ -125,7 +115,7 @@ class TestFailingLoud:
 
     @pytest.mark.parametrize("name", ["", "with space", "../escape", "a/b", "dot.name"])
     def test_a_name_that_is_not_a_usable_stem_is_refused(self, project, name):
-        """The name becomes a filename, a module name *and* a lookup key."""
+        """The name becomes a filename, a module name, and a lookup key."""
         with pytest.raises(scaffold.ScaffoldError):
             scaffold.new_template(project, name)
 
@@ -148,10 +138,7 @@ class TestTheNextStepsMessage:
         assert "`emailkit` dict" not in message
 
     def test_the_registration_stub_names_the_namespace_declaration(self, project):
-        # Without `xmlns:emailkit=<the URI>` on the consumer's <configure>
-        # root, the pasted block does not parse -- and the marker grep the
-        # recipe discovers packages with matches exactly that URI, so the
-        # package would not even be found. The stub must say so.
+        # Without it, the pasted block does not parse.
         stub = scaffold.registration_stub(project, "convocation")
         assert "xmlns:emailkit" in stub
         assert projects.MARKER in stub

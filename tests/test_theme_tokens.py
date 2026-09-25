@@ -1,17 +1,11 @@
-"""Theme tokens are the *only* runtime-variable branding.
+"""Theme tokens are the only runtime-variable branding.
 
-These three registry records are the answer to "the majority of
-per-commune needs without touching markup". So the one thing that must be true is
-that changing a record changes the rendered mail. If it does not, every commune
-gets iMio blue and the documented override story quietly has two levels, not
-three.
+Each of these three registry records must change the rendered mail when
+changed, or a commune cannot brand its mails without touching markup.
 
-Phase 0's caveat A1 is the reason this is not obvious: the original form,
-``style="background-color: ${theme/primary_color}"``, produced a *broken literal*
-(``${theme/primary_color`` -- closing brace eaten by Juice) **and** killed CSS
-inlining document-wide, with the build reporting success. The token therefore has
-to arrive via ``tal:attributes``, and the only way to know it did is to read the
-rendered output.
+The token must arrive via ``tal:attributes``, not a literal style
+attribute: a literal ``${...}`` there can produce a broken attribute and
+stop CSS inlining for the whole document while the build still succeeds.
 """
 
 import pytest
@@ -64,8 +58,8 @@ def _render(template):
 class TestRecordsExist:
     @pytest.mark.parametrize("token", sorted(support.THEME_RECORDS))
     def test_record_is_installed(self, integration, token):
-        """Verbatim: the record names are part of the public API --
-        a site's ``registry.xml`` refers to them by string."""
+        """The record names are public API: a site's ``registry.xml`` refers
+        to them by string."""
         from plone.registry.interfaces import IRegistry
         from zope.component import getUtility
 
@@ -78,7 +72,6 @@ class TestPrimaryColor:
     def test_changing_the_record_changes_the_output(
         self, integration, set_record, template
     ):
-        """Phase 1 test-plan gate 9."""
         set_record("primary_color", PROBE_COLOR)
         first = _render(template)
 
@@ -86,9 +79,8 @@ class TestPrimaryColor:
         second = _render(template)
 
         assert PROBE_COLOR in first, (
-            f"{PROBE_COLOR} never reached the output: the theme token is not "
-            "rendered (Phase 0 caveat A1 -- it must arrive via tal:attributes, "
-            "not a literal style attribute)"
+            f"{PROBE_COLOR} never reached the output: the theme token is not rendered"
+            " (pass it through tal:attributes, not a literal style attribute)"
         )
         assert OTHER_COLOR in second
         assert PROBE_COLOR not in second, "the render cached the old token value"
@@ -97,18 +89,9 @@ class TestPrimaryColor:
     def test_the_token_lands_in_a_well_formed_attribute(
         self, integration, set_record, template
     ):
-        """Not merely present somewhere in the document.
-
-        Caveat A1's broken form put the token in the output too, as
-        ``style="background-color:${theme/primary_color"`` -- present, and useless.
-        So what is checked is that the value sits inside a *closed, quoted*
-        attribute, plus (below) that no ``${`` survived anywhere.
-
-        Deliberately not restricted to ``style``: ``bgcolor`` is the Outlook
-        fallback for a background and is exactly where a kit is right to put a
-        colour. Which attribute the kit chooses is its business; that the value
-        arrives intact is not.
-        """
+        """The token must sit inside a closed, quoted attribute, not just
+        appear somewhere in the document. Not restricted to ``style``:
+        ``bgcolor`` is a valid Outlook fallback for a colour."""
         import re
 
         set_record("primary_color", PROBE_COLOR)
@@ -128,9 +111,8 @@ class TestPrimaryColor:
     def test_inlining_still_works_with_a_token_present(
         self, integration, set_record, template
     ):
-        """Caveat A1's *other* half: the bad form did not only break the token,
-        it stopped Juice inlining for the whole document -- 31 inline styles down
-        to 6, build green."""
+        """A broken token form can also stop CSS inlining for the whole
+        document while the build still succeeds."""
         set_record("primary_color", PROBE_COLOR)
 
         html = _render(template)
@@ -149,12 +131,8 @@ class TestLogoUrl:
         assert PROBE_LOGO in html
 
     def test_the_logo_has_an_alt_attribute(self, integration, set_record, template):
-        """The logo/``Img`` component: "enforced ``alt``".
-
-        An image-only header with no ``alt`` is a mail that says nothing at all
-        to a screen reader or to a client that blocks remote images -- which
-        is most corporate clients by default.
-        """
+        """The logo image must carry an ``alt`` attribute, for screen
+        readers and clients that block remote images."""
         set_record("logo_url", PROBE_LOGO)
 
         html = _render(template)
@@ -173,12 +151,7 @@ class TestFooterHtml:
     def test_the_footer_is_injected_as_structure(
         self, integration, set_record, template
     ):
-        """The rule: "``structure`` is reserved for the shell's ``body_html``
-        slot and ``footer_html``, nothing else".
-
-        Escaped markup in the footer is the visible symptom of the wrong idiom,
-        and it reaches every mail the site sends.
-        """
+        """``footer_html`` uses ``structure``, so it must not be escaped."""
         set_record("footer_html", PROBE_FOOTER)
 
         html = _render(template)

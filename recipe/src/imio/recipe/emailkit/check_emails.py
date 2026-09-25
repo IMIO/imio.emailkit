@@ -1,29 +1,22 @@
-"""``bin/check-emails``. Two gates in one script. **This is the CI gate.**
+"""``bin/check-emails``. The CI gate for email templates.
 
     bin/check-emails [--package NAME]
 
-Gate 1 -- *staleness*: compile each package into a tmpdir and ``diff`` against the
-committed ``templates/``; exit 1 with a per-file diff summary if stale.
+Two checks run in one script:
 
-Gate 2 -- *the authoring lint*: the ``.vue`` sources are checked against the
-authoring rules. That lint lives in ``imio.emailkit`` as
-``python -m imio.emailkit.lint <paths>`` and **is called, not reimplemented** --
-the rules are about the templates, so they belong with the runtime that ships
-them, and a second copy here would be a second copy to keep correct.
+* the staleness check compiles each package into a tmpdir, diffs it
+  against the committed ``templates/``, and exits 1 if anything is stale.
+* the authoring lint checks the ``.vue`` sources with
+  ``python -m imio.emailkit.lint <paths>``, which lives next to the rules
+  it checks.
 
-Why the staleness gate matters more than it looks: the compiled ``.pt`` is the
-production artifact, Node never runs in production, and *nothing else in the
-system notices* when someone edits a ``.vue`` source and forgets to rebuild. The
-Maizzle exit code carries almost no information about correctness, which leaves
-this diff and the golden files as the only trustworthy gates.
+The staleness check matters because the compiled ``.pt`` file is the
+production artifact, and nothing else notices when a ``.vue`` source
+changes but its build is not committed.
 
-A note on "into a tmpdir": the build's destination is the consumer's own
-``output.path``, and Maizzle has no configurable alternate destination -- it writes
-into the package by design. So the direction is inverted, exactly as the Makefile
-precursor does it: the *committed* output is snapshotted to a tmpdir, the build
-runs in place, the two are compared, and the snapshot is restored on the way out,
-unconditionally. A check that leaves your working tree holding a build you did not
-ask for is a check people stop running.
+The build writes into the consumer's own ``output.path``, so the check
+snapshots the committed output first, builds in place, compares, and
+restores the snapshot afterwards.
 """
 
 from imio.recipe.emailkit import cli
@@ -45,13 +38,11 @@ DESCRIPTION = (
     "build, and the `.vue` sources must obey the authoring rules."
 )
 
-#: The lint's interface, as agreed with the workstream that owns it. Invoked as a
-#: subprocess with this interpreter, so it runs with exactly the script's own
-#: ``sys.path`` -- i.e. the part's eggs -- and its exit code is the gate.
+#: Run as a subprocess with this interpreter, so it uses this script's
+#: own ``sys.path`` (the part's eggs).
 LINT_MODULE = "imio.emailkit.lint"
 
-#: Lines of unified diff to show per stale file. Enough to see what changed,
-#: little enough that twenty stale files still fit on a screen.
+#: Lines of unified diff to show per stale file.
 DIFF_LINES = 20
 
 OK, STALE, MISSING, ORPHAN = "ok", "STALE", "MISSING", "ORPHAN"
@@ -63,14 +54,14 @@ def parser():
         "--no-lint",
         action="store_true",
         help=(
-            f"skip gate 2. Only for an environment where {LINT_MODULE} is not "
-            "installed; a skipped gate protects nothing."
+            f"skip the authoring lint. Only for an environment where "
+            f"{LINT_MODULE} is not installed."
         ),
     )
     parsed.add_argument(
         "--lint-only",
         action="store_true",
-        help="run gate 2 only. Needs no Node, so it is the cheap half.",
+        help="run the authoring lint only. Needs no Node.",
     )
     parsed.add_argument(
         "--diff-lines",
@@ -108,16 +99,16 @@ def main(config=None, argv=None):
     failed = []
 
     if not arguments.lint_only:
-        print("==> gate 1: the committed build output is not stale")
+        print("==> staleness check: the committed build output must not be stale")
         if staleness_gate(compilable, merged, kit_dir, arguments.diff_lines) != 0:
             failed.append("staleness")
 
     if not arguments.no_lint:
-        print("\n==> gate 2: the authoring lint")
+        print("\n==> authoring lint")
         if lint_gate(compilable) != 0:
             failed.append("lint")
     else:
-        print(f"\n==> gate 2: SKIPPED by --no-lint. {LINT_MODULE} was not run.")
+        print(f"\n==> authoring lint: SKIPPED by --no-lint. {LINT_MODULE} was not run.")
 
     if failed:
         sys.stdout.flush()
@@ -128,7 +119,7 @@ def main(config=None, argv=None):
 
 
 # ---------------------------------------------------------------------------
-# Gate 1 -- staleness
+# Staleness check
 # ---------------------------------------------------------------------------
 
 
@@ -154,9 +145,7 @@ def staleness_gate(projects, merged, kit_dir, diff_lines=DIFF_LINES):
             print(f"    FAILED {exc}", file=sys.stderr)
             stale += 1
     if stale:
-        # Flushed first: the per-file report went to stdout, which is buffered
-        # whenever it is a pipe, and the summary goes to stderr, which is not.
-        # Without this the summary jumps above the report it summarises.
+        # Flush stdout first: it is buffered when piped.
         sys.stdout.flush()
         print(
             "\n  Committed email templates are stale. Run `bin/compile-emails` "
@@ -183,12 +172,8 @@ def check_project(project, kit_dir, kit_mode, npm, npx, diff_lines=DIFF_LINES):
 def take_snapshot(package_dir, destination):
     """Copy every committed ``.pt`` under ``package_dir`` into ``destination``.
 
-    Every ``.pt``, not just ``templates/``: the build legitimately writes to more
-    than one place -- ``imio.emailkit``'s own project also emits jbot
-    overrides under ``browser/overrides/``, addressed by dotted filename rather
-    than by name -- and a gate that only watched one directory would have let the
-    other go stale silently. Hand-written templates are swept up too, which is
-    harmless: they are restored byte-identical, and :func:`report` only looks at
+    Copies every ``.pt``, not just ``templates/``: the build can also
+    write to ``browser/overrides/``. :func:`report` only looks at
     directories the build actually wrote into.
     """
     package_dir = Path(package_dir)
@@ -210,11 +195,10 @@ def _inside_emails(package_dir, path):
 
 
 def restore_snapshot(package_dir, snapshot):
-    """Put the committed tree back exactly, including deleting what the build added.
+    """Put the committed tree back exactly, including files the build added.
 
-    Anything matching ``*.pt`` that is present now and absent from the snapshot
-    did not exist before this run, so removing it is what "restore" means. Doing
-    it on a ``finally`` is deliberate.
+    Any ``*.pt`` file present now but absent from the snapshot did not
+    exist before this run, so it is deleted.
     """
     package_dir = Path(package_dir)
     for relative, copy in snapshot.items():
@@ -259,11 +243,8 @@ def report(project, snapshot, diff_lines=DIFF_LINES):
 def _built_dirs(package_dir, snapshot, fresh):
     """Directories the build actually wrote into.
 
-    Only these are subject to the ORPHAN check, and only files inside them are
-    reported at all. A directory of *hand-written* templates -- a browser view's
-    ``.pt``, say -- is nobody's build output, and reporting it as "committed, no
-    longer built" would be a false alarm on a file that is perfectly correct. The
-    same guidance applies to this gate too: prefer a missed case to a false alarm.
+    Only these are checked for ORPHAN files, so a hand-written template
+    is never reported as "committed, no longer built".
     """
     return {
         relative.parent
@@ -276,11 +257,8 @@ def _built_dirs(package_dir, snapshot, fresh):
 def _touched(current, copy):
     """Was ``current`` rewritten by the build? Compared by mtime, not content.
 
-    A byte-identical rebuild is the *normal* case -- Phase 0 verified the build is
-    deterministic -- so content cannot answer "did the build write this file".
-    The mtime can: Maizzle empties its output directory and writes every file
-    again, so anything it owns is newer than the snapshot copy taken moments
-    before.
+    A byte-identical rebuild is normal, so content cannot answer this.
+    Maizzle rewrites every file it owns, so it is newer than the snapshot.
     """
     try:
         return current.stat().st_mtime_ns > copy.stat().st_mtime_ns
@@ -322,18 +300,16 @@ def _diff(committed, current, diff_lines=DIFF_LINES):
 
 
 # ---------------------------------------------------------------------------
-# Gate 2 -- the authoring lint
+# Authoring lint
 # ---------------------------------------------------------------------------
 
 
 def lint_gate(projects, module=LINT_MODULE, executable=None):
     """Run ``python -m imio.emailkit.lint`` over every ``.vue`` source.
 
-    Delegated, not reimplemented. If the module is not importable the gate
-    **fails**: this is the CI gate, and a gate that quietly turns
-    itself off when its implementation is missing is worse than no gate, because
-    it reports success. ``--no-lint`` exists for the one case where that is a
-    deliberate, visible choice.
+    Delegates to the lint rather than reimplementing it. If the module is
+    not importable, this check fails rather than reporting success
+    silently.
     """
     executable = executable or sys.executable
     sources = []
@@ -356,15 +332,15 @@ def lint_gate(projects, module=LINT_MODULE, executable=None):
         return 1
     if completed.returncode == 0:
         return 0
-    # `python -m` exits 1 with "No module named ..." on stderr. Distinguishing it
-    # from a genuine lint failure matters, because the fixes are unrelated.
+    # `python -m` exits 1 with "No module named ..." for a missing module.
     if not _module_importable(module, executable, environment):
         print(
-            f"\n  {module} is not importable in this environment, so gate 2 could "
-            f"not run.\n"
+            f"\n  {module} is not importable in this environment, so the "
+            f"authoring lint could not run.\n"
             f"  It ships in `imio.emailkit`; make sure the part's `eggs` resolves a "
             f"version that has it.\n"
-            f"  Pass --no-lint to run gate 1 alone, deliberately and visibly.",
+            f"  Pass --no-lint to run the staleness check alone, deliberately and "
+            f"visibly.",
             file=sys.stderr,
         )
     return 1
@@ -373,11 +349,8 @@ def lint_gate(projects, module=LINT_MODULE, executable=None):
 def _child_environment():
     """This process's ``sys.path``, handed to the child through ``PYTHONPATH``.
 
-    Not optional, and the reason is worth stating: a buildout-generated script
-    gets its ``sys.path`` from lines *inside the script*, so ``sys.executable`` is
-    an interpreter that knows nothing about the part's eggs. Without this, gate 2
-    reported "No module named 'imio'" on a perfectly good installation --
-    a configuration failure wearing a missing-dependency costume.
+    A buildout-generated script sets ``sys.path`` from lines inside the
+    script, so ``sys.executable`` alone knows nothing about the part's eggs.
     """
     environment = dict(os.environ)
     inherited = environment.get("PYTHONPATH")

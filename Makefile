@@ -1,26 +1,19 @@
-### Defensive settings for make:
-#     https://tech.davis-hansson.com/p/make/
+### Defensive make settings: https://tech.davis-hansson.com/p/make/
 SHELL:=bash
 .ONESHELL:
-# No -x: the recipes below are long, and tracing every line buries the
-# actual diff output that check-emails exists to show.
 .SHELLFLAGS:=-eu -o pipefail -O inherit_errexit -c
 .SILENT:
 .DELETE_ON_ERROR:
 MAKEFLAGS+=--warn-undefined-variables
 MAKEFLAGS+=--no-builtin-rules
 
-# We like colors
-# From: https://coderwall.com/p/izxssa/colored-makefile-for-golang-projects
 RED=`tput setaf 1`
 GREEN=`tput setaf 2`
 RESET=`tput sgr0`
 YELLOW=`tput setaf 3`
 
-# Python checks
 UV?=uv
 
-# installed?
 ifeq (, $(shell which $(UV) ))
   $(error "UV=$(UV) not found in $(PATH)")
 endif
@@ -43,40 +36,20 @@ VENV_FOLDER=$(BACKEND_FOLDER)/.venv
 export VIRTUAL_ENV=$(VENV_FOLDER)
 BIN_FOLDER=$(VENV_FOLDER)/bin
 
-# Environment variables to be exported
 export PYTHONWARNINGS := ignore
 export DOCKER_BUILDKIT := 1
 
-# ---------------------------------------------------------------------------
-# Email build (in its Phase 1 Makefile form -- see the sequencing note:
-# `imio.emailkit` authors its own templates long before `imio.recipe.emailkit`
-# exists, and `bin/preview-emails` in Phase 4 is this generalised, not new
-# invention).
-#
-# NODE IS A DEVELOPER/CI TOOL ONLY. No target below is a dependency of
-# `install`, `sync`, `test`, `start` or `create-site`, and none of them may ever
-# become one: making Node reachable from a deployment path would put it in front
-# of ~350 production applications.
-# ---------------------------------------------------------------------------
+# NODE IS A DEVELOPER/CI TOOL ONLY. It must never become reachable from a
+# deployment path, in front of ~350 production applications.
 
 NPM?=npm
 NPX?=npx
 
 EMAILS_FOLDER=$(BACKEND_FOLDER)/emails
-# Hand-authored plaintext twins: source, copied into the package by build-emails
-# because `maizzle build` empties its own output directory.
+# Hand-authored plaintext twins, copied in by `build-emails`.
 TWINS_FOLDER=$(BACKEND_FOLDER)/emails/twins
 
-# Where the committed build output lives. Two destinations because the two kinds
-# of artifact are addressed differently at runtime: templates are looked up by
-# name through the <emailkit:templates> registry, overrides by the dotted
-# path of the file they shadow.
-#
-# `emails/maizzle.config.js` writes here directly -- `output.path` for templates,
-# `useOutputPath()` + `emailkit.overridesPath` for the two jbot overrides -- and
-# emits `.pt` straight away via `output.extension`, so
-# there is no intermediate `dist/` and no rename step. These paths are therefore
-# *duplicated* between the two files; keep them in step.
+# Duplicated in `emails/maizzle.config.js`; keep both in step.
 PACKAGE_FOLDER=$(BACKEND_FOLDER)/src/imio/emailkit
 TEMPLATES_FOLDER=$(PACKAGE_FOLDER)/templates
 OVERRIDES_FOLDER=$(PACKAGE_FOLDER)/browser/overrides
@@ -86,8 +59,6 @@ PREVIEW_PORT?=8090
 
 all: build
 
-# Add the following 'help' target to your Makefile
-# And add help text after each target name starting with '\#\#'
 .PHONY: help
 help: ## This help message
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -124,8 +95,6 @@ build: install ## Alias of install (Node is deliberately not part of this)
 clean: ## Clean installation and instance (data left intact)
 	@echo "$(RED)==> Cleaning environment and build$(RESET)"
 	@rm -rf $(VENV_FOLDER) pyvenv.cfg .installed.cfg instance/etc .venv .pytest_cache .ruff_cache constraints* requirements*
-	# setuptools artefacts: a stale build/ silently keeps shipping files that
-	# have since been deleted from the source tree.
 	@rm -rf build dist src/*.egg-info
 	@rm -rf $(PREVIEW_FOLDER)
 
@@ -146,49 +115,22 @@ console: $(VENV_FOLDER) instance/etc/zope.ini ## Start a console into a Plone in
 create-site: $(VENV_FOLDER) instance/etc/zope.ini ## Create a new site from scratch
 	@$(BIN_FOLDER)/zconsole run instance/etc/zope.conf ./scripts/create_site.py
 
-# Explicit paths: ruff invoked with no path walks the whole repo, which previously
-# reflowed a committed API example inside prose documentation.
+# Explicit paths: an unscoped ruff would reflow API examples in docs/.
 RUFF_TARGETS=src tests scripts
 
-# Hand-written markup and configuration only: the compiled .pt files under
-# templates/ and browser/overrides/ are generated artifacts (see lint target).
-#
-# Expressed as zpretty's own --include rather than a shell file list. The CI job
-# takes the same value through an input, and that input reaches the run line as
-# an env var, which bash EXPANDS but never EVALUATES -- so the `$(find ...)` this
-# used to be arrived at zpretty as a literal string and it exited 2 on every run:
-#
-#     zpretty: error: unrecognized arguments: -name '*.zcml' -o -name '*.xml' | sort)
-#
-# An --include pattern needs no shell at all, so the same characters mean the same
-# thing in both places. Quoted here and unquoted there, because a Makefile recipe
-# is parsed by a shell and `|` would be a pipe; an expanded env var is not
-# re-parsed, so the pattern survives either way.
+# --include, not a file list, so this same value also works as a CI env var.
 ZPRETTY_ROOT=src
 ZPRETTY_INCLUDE=--include '\.(xml|zcml)$$'
 
-# QA
 .PHONY: lint
 lint: ## Check code base according to Plone standards
 	@echo "$(GREEN)==> Lint codebase$(RESET)"
-	# No --fix here: a lint target that rewrites files exits non-zero *because*
-	# it fixed something, so a clean tree fails on the first run and passes on
-	# the second. Checking is `lint`, rewriting is `format`.
 	@uvx ruff@latest check --no-fix --config $(BACKEND_FOLDER)/pyproject.toml $(RUFF_TARGETS)
-	# Whole repo and no --config, because that is exactly what CI runs
-	# (`ruff format --diff`, no path). Scoped like `ruff check` above it, this
-	# target passed while CI failed on two files under tests/ -- a local lint that
-	# cannot reproduce the CI gate is not a lint. The scope difference is
-	# deliberate: `recipe/` is a second distribution with its own ruff config, and
-	# forcing this one's on it reports 215 violations its own does not.
 	@uvx ruff@latest format --check
 	@uvx pyroma@latest -d .
 	@uvx check-python-versions@latest .
-	# zpretty must never see the compiled .pt files. They are Maizzle build
-	# output, and zpretty's formatting is not Maizzle's, so reformatting them
-	# would make `check-emails` fail forever: the two gates would fight, and the
-	# staleness gate is the one that protects production. Only hand-written
-	# templates and ZCML/XML are linted.
+	# zpretty must never see the compiled .pt files: it would fight the
+	# staleness check in check-emails.
 	@uvx zpretty@latest --check $(ZPRETTY_ROOT) $(ZPRETTY_INCLUDE)
 
 .PHONY: format
@@ -201,34 +143,20 @@ format: ## Fix code base according to Plone standards
 .PHONY: check
 check: format lint ## Check and fix code base according to Plone standards
 
-# `bin/check-emails`, gate (2): the authoring lint.
-#
-# The `.vue` sources, not the compiled output -- these are the authoring rules,
-# and every one of them catches a mistake that produced a *successful* Maizzle
-# build. Two of them (`style-placeholder`, `comment-double-dash`) are invisible
-# until a mail client or Chameleon sees the result, which is why this is a gate
-# rather than a style preference. `--list-rules` explains all eight.
-#
-# Deliberately Node-free and dependency-free: it is plain-regex text processing in
-# the egg (`imio.emailkit.lint`), so `bin/check-emails` can call the very same
-# module and the two gates cannot drift. It runs through the venv only because
-# `python -m imio.emailkit.lint` imports the package; the module itself needs
-# nothing but the standard library, so `python src/imio/emailkit/lint.py <paths>`
-# works with a bare interpreter too.
+# The authoring lint checks the `.vue` sources, not the compiled output.
+# `--list-rules` explains all eight rules.
 LINT_EMAILS_TARGETS?=$(EMAILS_FOLDER)/src/templates $(PACKAGE_FOLDER)/kit
 
 .PHONY: lint-emails
-lint-emails: $(VENV_FOLDER) ## Authoring lint (gate 2) of the .vue sources
+lint-emails: $(VENV_FOLDER) ## Authoring lint of the .vue sources
 	@echo "$(GREEN)==> Linting email sources against the authoring rules$(RESET)"
 	@$(BIN_FOLDER)/python -m imio.emailkit.lint $(LINT_EMAILS_TARGETS)
 
-# i18n
 .PHONY: i18n
 i18n: $(VENV_FOLDER) ## Update locales
 	@echo "$(GREEN)==> Updating locales$(RESET)"
 	@$(BIN_FOLDER)/python -m imio.emailkit.locales
 
-# Tests
 .PHONY: test
 test: $(VENV_FOLDER) ## run tests
 	@$(BIN_FOLDER)/pytest
@@ -240,14 +168,8 @@ test-coverage: $(VENV_FOLDER) ## run tests with coverage
 .PHONY: update-golden
 update-golden: $(VENV_FOLDER) ## Regenerate the golden snapshots (deliberate, never automatic)
 	@echo "$(YELLOW)==> Regenerating golden files -- review the diff before committing$(RESET)"
-	# Both harnesses: this package's own templates and the two dummy consumer
-	# add-ons. Leaving the dummies out meant their snapshots silently went stale,
-	# which is precisely the failure golden files exist to catch.
+	# Covers this package's templates and the two dummy consumer add-ons.
 	@EMAILKIT_UPDATE_GOLDEN=1 $(BIN_FOLDER)/pytest tests/test_golden.py tests/dummies -q -rs
-
-# ---------------------------------------------------------------------------
-# Emails (Node)
-# ---------------------------------------------------------------------------
 
 .PHONY: node-check
 node-check:
@@ -259,22 +181,13 @@ node-check:
 
 .PHONY: emails-deps
 emails-deps: node-check ## Install the Maizzle toolchain (npm ci when a lockfile exists)
-	# `npm ci` "only if node_modules is stale vs. lockfile". `npm ci`
-	# needs a lockfile, so fall back to `npm install` while there is none -- which
-	# also creates it, after which every later run is the reproducible path.
 	@cd $(EMAILS_FOLDER)
 	@if [[ -e node_modules && -f package-lock.json && node_modules -nt package-lock.json ]]; then
 		echo "$(YELLOW)==> node_modules is up to date$(RESET)"
 	elif [[ -f package-lock.json ]]; then
-		# No `npm install` fallback on failure, deliberately: it would resolve a
-		# different toolchain than the lockfile pins, so the compiled output drifts
-		# and `check-emails` then reports the committed templates as stale --
-		# blaming the templates for a dependency problem.
-		#
-		# `Missing: ... from lock file` means the lockfile was regenerated on top of
-		# an existing node_modules, so npm recorded that tree instead of a full
-		# resolution and dropped the optional platform packages. Regenerate with
-		# both removed: `cd emails && rm -rf node_modules package-lock.json && npm install`.
+		# No `npm install` fallback: it would resolve a different toolchain
+		# than the lockfile pins. If this fails with `Missing: ... from lock
+		# file`, regenerate: `rm -rf node_modules package-lock.json && npm install`.
 		echo "$(GREEN)==> npm ci$(RESET)"
 		$(NPM) ci
 	else
@@ -284,16 +197,11 @@ emails-deps: node-check ## Install the Maizzle toolchain (npm ci when a lockfile
 
 .PHONY: build-emails
 build-emails: emails-deps ## Compile emails/ into the package (templates/ + browser/overrides/)
-	# The build writes straight into the package: `output.path` for the
-	# discovered templates, `useOutputPath()` for the two jbot overrides. The
-	# resulting `.pt` files are the runtime artifact and are committed.
 	@echo "$(GREEN)==> Compiling email templates$(RESET)"
 	@mkdir -p $(TEMPLATES_FOLDER) $(OVERRIDES_FOLDER)
 	@cd $(EMAILS_FOLDER) && $(NPX) maizzle build
-	# `maizzle build` EMPTIES its output directory, silently, and 6.0.7 has no
-	# option to stop it -- it deleted a committed hand-authored twin. So the
-	# twins live in emails/twins/ as source and are copied in afterwards. Templates
-	# resolve them as <directory>/<name>.txt.pt, which is what this produces.
+	# `maizzle build` empties its output directory, silently. Twins are
+	# copied back in from emails/twins/ afterwards.
 	@if compgen -G "$(TWINS_FOLDER)/*.txt.pt" > /dev/null; then \
 		cp -a $(TWINS_FOLDER)/*.txt.pt $(TEMPLATES_FOLDER)/; \
 		echo "$(GREEN)==> Copied hand-authored plaintext twins$(RESET)"; \
@@ -301,24 +209,9 @@ build-emails: emails-deps ## Compile emails/ into the package (templates/ + brow
 	@echo "$(GREEN)==> Done. Commit the .pt files -- they are what production renders.$(RESET)"
 
 .PHONY: check-emails
-check-emails: emails-deps lint-emails ## The two gates: authoring lint, then staleness
-	# `bin/check-emails`, both gates in one target.
-	#
-	# Gate (2), the authoring lint, runs FIRST -- as a prerequisite -- because it
-	# reads the sources and a source-level mistake explains a stale or broken
-	# build, not the other way round. Several of its rules describe failures that
-	# compile cleanly and only surface at runtime, so hearing about them before
-	# the diff is the useful order.
-	#
-	# Gate (1), staleness. Phase 0 verified the build is deterministic (two
-	# consecutive builds byte-identical) with `html.format: true`, which is what
-	# makes a byte diff meaningful and keeps the diff line-granular.
-	#
-	# The build has no configurable alternate destination -- it writes into the
-	# package by design -- so the committed output is snapshotted to a tmpdir,
-	# the build runs in place, the two are compared, and the snapshot is restored.
-	# The restore is on a trap: a `check` target that leaves your working tree
-	# holding a build you did not ask for is a target people stop running.
+check-emails: emails-deps lint-emails ## Authoring lint, then staleness check
+	# The build writes into the package with no alternate destination, so the
+	# committed output is snapshotted first and restored on a trap.
 	@echo "$(GREEN)==> Checking committed email templates against a fresh build$(RESET)"
 	@snapshot="$$(mktemp -d)"
 	@trap 'cp -a "$$snapshot/templates/." "$(TEMPLATES_FOLDER)/" 2>/dev/null || true; cp -a "$$snapshot/overrides/." "$(OVERRIDES_FOLDER)/" 2>/dev/null || true; rm -rf "$$snapshot"' EXIT
@@ -364,32 +257,14 @@ check-emails: emails-deps lint-emails ## The two gates: authoring lint, then sta
 
 .PHONY: preview-emails
 preview-emails: $(VENV_FOLDER) instance/etc/zope.ini ## Render the committed templates with the committed fixtures and serve them
-	# The two-stage dev loop, minus the file watcher.
-	#
-	# Maizzle's own --watch is explicitly rejected: it shows *build-time*
-	# output -- raw ${item/title}, unexpanded tal:repeat -- "a miserable
-	# authoring loop". So this renders through render() with the committed
-	# fixtures, which is what the mail will actually look like.
-	#
-	# DEFERRED, on purpose: watching sources + live reload. Re-run the target
-	# after `make build-emails`. Wiring a watcher to a process that has to hold a
-	# ZODB connection open is the part with real design in it, and it belongs with
-	# `bin/preview-emails` in Phase 4 rather than half-built here.
+	# Not `maizzle --watch`: that shows build-time output, with raw
+	# ${item/title} still in place. Re-run this target after `make build-emails`.
 	@echo "$(GREEN)==> Rendering previews into $(PREVIEW_FOLDER)$(RESET)"
 	@EMAILKIT_PREVIEW_DIR=$(PREVIEW_FOLDER) EMAILKIT_PREVIEW_PORT=$(PREVIEW_PORT) \
 		$(BIN_FOLDER)/zconsole run instance/etc/zope.conf ./scripts/preview_emails.py
 
-# ---------------------------------------------------------------------------
-# imio.recipe.emailkit -- the second distribution in this repository, and the
-# Phase 4 acceptance test that runs it through a real buildout.
-#
-# Nothing below is a prerequisite of install / sync / test / start / create-site,
-# and nothing below may become one. `buildout-test` deliberately runs buildout
-# with node, npm and npx removed from PATH, because compiling at buildout time
-# is explicitly rejected as a hard boundary: it would make Node a production
-# dependency across ~350 applications.
-# ---------------------------------------------------------------------------
-
+# imio.recipe.emailkit, the second distribution in this repository. Nothing
+# below may become a prerequisite of install/sync/test/start/create-site.
 RECIPE_FOLDER=$(BACKEND_FOLDER)/recipe
 RECIPE_VENV=$(RECIPE_FOLDER)/.venv
 BUILDOUT_VENV=$(BACKEND_FOLDER)/var/buildout-venv
@@ -402,18 +277,8 @@ $(RECIPE_VENV): $(RECIPE_FOLDER)/pyproject.toml ## Environment for the recipe's 
 
 .PHONY: recipe-test
 recipe-test: $(RECIPE_VENV) $(VENV_FOLDER) ## Run imio.recipe.emailkit's own test suite
-	# Run twice, in two environments, because no single one has everything and a
-	# skipped test proves nothing:
-	#
-	#  1. recipe/.venv has zc.buildout and zc.recipe.egg, so the recipe class is
-	#     exercised against the real pkg_resources types. It has no Plone, so the
-	#     two tests that need the runtime skip there.
-	#  2. .venv has the runtime, so those two run: the MARKER-string drift
-	#     check (the one string this distribution duplicates on purpose) and the
-	#     theme-token check. test_recipe.py skips there for lack of buildout.
-	#
-	# The union covers every test. Neither run alone does, so both run in full and
-	# the skip counts are the record of which half covered what.
+	# Runs twice: recipe/.venv has buildout but no Plone; .venv has Plone but
+	# no buildout. The union covers the whole suite.
 	@echo "$(GREEN)==> imio.recipe.emailkit tests (buildout environment)$(RESET)"
 	@$(RECIPE_VENV)/bin/python -m pytest $(RECIPE_FOLDER)/tests -q -rs
 	@echo "$(GREEN)==> imio.recipe.emailkit tests (Plone runtime environment)$(RESET)"
@@ -421,11 +286,8 @@ recipe-test: $(RECIPE_VENV) $(VENV_FOLDER) ## Run imio.recipe.emailkit's own tes
 		-q -rs -p no:cacheprovider -c $(RECIPE_FOLDER)/pyproject.toml
 
 $(BUILDOUT_VENV): $(VENV_FOLDER) ## Bootstrap zc.buildout for the acceptance test
-	# Built from the SAME interpreter as .venv, deliberately. The harness resolves
-	# eggs out of .venv's site-packages, and buildout's own generated scripts run
-	# under this interpreter -- so a version mismatch puts 3.12 C extensions on a
-	# 3.10 path and the scripts die with `No module named '_cffi_backend'`, which
-	# names nothing recognisable. Measured, not hypothetical.
+	# Built from the same interpreter as .venv, so buildout's generated
+	# scripts do not run C extensions built for a different Python version.
 	@echo "$(GREEN)==> Bootstrap zc.buildout$(RESET)"
 	@mkdir -p $(BACKEND_FOLDER)/var
 	@if [[ ! -d "$(BUILDOUT_VENV)" ]]; then uv venv --python $(BIN_FOLDER)/python $(BUILDOUT_VENV); fi
@@ -433,19 +295,12 @@ $(BUILDOUT_VENV): $(VENV_FOLDER) ## Bootstrap zc.buildout for the acceptance tes
 		"zc.buildout" "zc.recipe.egg" "setuptools"
 
 .PHONY: buildout-test
-buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## Phase 4 acceptance: buildout, then bin/compile-emails
-	# `git clone && buildout && bin/compile-emails`, which is what this phase asks for.
-	#
-	# Eggs are resolved offline from the development virtualenv's site-packages
-	# rather than downloaded: same recipe, same working set, same generated
-	# scripts, no network. `test-buildout-pypi.cfg` is the from-PyPI variant for
-	# anyone who wants to check the download path too.
+buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## Acceptance test: buildout, then bin/compile-emails
+	# Eggs are resolved offline from the development virtualenv's
+	# site-packages. `test-buildout-pypi.cfg` is the from-PyPI variant.
 	@set -euo pipefail
 	@site_packages="$$($(BIN_FOLDER)/python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])')"
 	@echo "$(GREEN)==> buildout, with node/npm/npx REMOVED from PATH$(RESET)"
-	# The hard boundary tested rather than asserted: with
-	# `compile-on-install` at its default the whole run must succeed on a machine
-	# that has no Node at all.
 	@nonode="$$($(BIN_FOLDER)/python -c 'import os; print(os.pathsep.join(p for p in os.environ["PATH"].split(os.pathsep) if p and not any(os.path.exists(os.path.join(p, n)) for n in ("node", "npm", "npx"))))')"
 	@env -u VIRTUAL_ENV PATH="$$nonode" PYTHONWARNINGS=ignore \
 		$(BUILDOUT_VENV)/bin/buildout -c $(BUILDOUT_CFG) \
@@ -458,13 +313,10 @@ buildout-test: $(VENV_FOLDER) $(BUILDOUT_VENV) node-check ## Phase 4 acceptance:
 	@$(BACKEND_FOLDER)/bin/compile-emails
 	@echo "$(GREEN)==> bin/compile-emails --kit-mode copy (the other mode)$(RESET)"
 	@$(BACKEND_FOLDER)/bin/compile-emails --kit-mode copy
-	# Both packages, both gates. The external consumer addon is what proves the
-	# wiring end to end; imio.emailkit is its own first consumer, so it
-	# goes through the identical generated script rather than being trusted
-	# because `make lint-emails` covers it separately.
-	@echo "$(GREEN)==> bin/check-emails --package emailkitdemo (both gates)$(RESET)"
+	# Checks both packages: the external consumer addon, and imio.emailkit itself.
+	@echo "$(GREEN)==> bin/check-emails --package emailkitdemo (lint + staleness)$(RESET)"
 	@$(BACKEND_FOLDER)/bin/check-emails --package emailkitdemo
-	@echo "$(GREEN)==> bin/check-emails --package imio.emailkit (both gates)$(RESET)"
+	@echo "$(GREEN)==> bin/check-emails --package imio.emailkit (lint + staleness)$(RESET)"
 	@$(BACKEND_FOLDER)/bin/check-emails --package imio.emailkit
 	@echo "$(GREEN)==> bin/preview-emails (renders through render() with the fixtures)$(RESET)"
 	@$(BACKEND_FOLDER)/bin/preview-emails --no-compile --no-serve

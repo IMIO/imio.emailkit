@@ -2,10 +2,9 @@ import os
 import sys
 
 
-# ``support``, ``layers`` and the ``sitelayer`` test package are imported by bare
-# name from modules in ``tests/`` and ``tests/setup/``. pytest's ``prepend``
-# import mode inserts a collected module's basedir on ``sys.path``, but only for
-# that directory -- doing it here once is explicit and order independent.
+# pytest's `prepend` import mode puts a collected module's own directory on
+# `sys.path`, not this one, so bare imports of `support`/`layers`/`sitelayer`
+# need this insert.
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from pytest_plone import fixtures_factory
@@ -14,29 +13,11 @@ import inspect
 import pytest
 
 
-# ``pytest_plone`` 1.1.0 added ``keep_session``, defaulting to **True**: it
-# registers an autouse *session* fixture per layer, so every layer handed to
-# ``fixtures_factory`` is set up at session start and stays up until the end. It
-# is a large speed-up (25s against 4 minutes here) and it is wrong for this
-# suite.
-#
-# Two of these layers are mutually exclusive by construction. ``FIXTURE`` applies
-# ``imio.emailkit:default`` and ``BASE_FIXTURE`` applies ``imio.emailkit:base`` --
-# the opt-out profile, whose entire point is that the browser layer is *absent*.
-# They are siblings over the same ``PLONE_FIXTURE``, so with both pinned up at
-# once the second one's ``DemoStorage`` stacks on a database where the first
-# one's profile has already run, and the ``:base`` site comes up with
-# ``:default`` applied:
-#
-#     AssertionError: imio.emailkit:default leaked into a :base site: ('1000',)
-#     AssertionError: the request leaked IEmailkitLayer from another test
-#
-# Which is the opt-out's own guard firing, correctly, against its own test setup.
-# It reached CI as "6.2-latest fails, 6.2.1 passes" -- nothing to do with Plone:
-# 6.2's constraints simply pull pytest_plone 1.1.0 while 6.2.1's pull 1.0.0.
-#
-# So: opt out, and pay the four minutes. Guarded on the signature because 1.0.0
-# does not take the argument at all and 6.1 still resolves to it.
+# `keep_session=True` (the `pytest_plone` 1.1.0 default) keeps every layer up
+# for the whole session, which leaks `imio.emailkit:default` into a `:base`
+# site: both stack on the same `PLONE_FIXTURE`, and the opt-out's own guard
+# then fails. So this suite opts out. Guarded on the signature: 1.0.0 does
+# not take the argument.
 _FACTORY_OPTIONS = (
     {"keep_session": False}
     if "keep_session" in inspect.signature(fixtures_factory).parameters
@@ -47,12 +28,8 @@ _FACTORY_OPTIONS = (
 pytest_plugins = ["pytest_plone"]
 
 
-# The Phase 1 runtime (workstream W2: ``discovery.py``, ``render()``,
-# ``interfaces.py``, ``profiles/``) is written in parallel with this suite. While
-# it is missing, the layers cannot even be constructed -- so tolerate that here
-# and let each test module skip itself through ``support.require_runtime()``,
-# which prints why. Once the runtime lands this branch is dead code and every
-# test runs unchanged.
+# While the runtime is not importable, the layers cannot be constructed.
+# Each test module then skips itself through `support.require_runtime()`.
 RUNTIME_IMPORT_ERROR = None
 
 try:
@@ -63,7 +40,7 @@ try:
     from imio.emailkit.testing import INTEGRATION_TESTING
     from layers import SENDING_FUNCTIONAL_TESTING
     from layers import SITE_OVERRIDE_INTEGRATION_TESTING
-except ImportError as exc:  # pragma: no cover - only before W2 lands
+except ImportError as exc:  # pragma: no cover - only before the runtime lands
     RUNTIME_IMPORT_ERROR = exc
 else:
     globals().update(
@@ -72,19 +49,13 @@ else:
                 (ACCEPTANCE_TESTING, "acceptance"),
                 (FUNCTIONAL_TESTING, "functional"),
                 (INTEGRATION_TESTING, "integration"),
-                # The opt-out profile gets its own layer, because an opt-out
-                # nobody exercises is an opt-out nobody notices breaking.
                 (BASE_INTEGRATION_TESTING, "base"),
                 (BASE_FUNCTIONAL_TESTING, "base_functional"),
-                # A site package's layer extending IEmailkitLayer.
-                # Not named "site": that would collide with
-                # ``zope.component.hooks.site`` in this module's namespace, and
-                # ``globals().update`` would silently win -- the resulting error
-                # ("Fixture 'site' called directly") points nowhere near the cause.
+                # Not named "site": collides with
+                # `zope.component.hooks.site` in this module.
                 (SITE_OVERRIDE_INTEGRATION_TESTING, "site_override"),
-                # The one layer the Phase 2 tests run on. Functional
-                # because a queued send only reaches the MTA at commit time, and
-                # content-typed because one attachment source is a Plone File/Image.
+                # Functional: a queued send only reaches the MTA at commit
+                # time. Includes content types for File/Image attachments.
                 (SENDING_FUNCTIONAL_TESTING, "sending"),
             ),
             **_FACTORY_OPTIONS,
@@ -101,15 +72,8 @@ def package_name():
 def grant_roles():
     """``grant_roles(context, ["Manager"])`` for the default test user.
 
-    Defined here rather than taken from ``pytest_plone``, which grew this fixture
-    only in a later release: the version resolved for older Plone releases does not
-    have it, and every test that needs Manager rights then errors with
-    ``fixture 'grant_roles' not found`` on those rows of the matrix alone.
-
-    A conftest fixture shadows a plugin one, so this is what runs everywhere and
-    the suite no longer depends on which ``pytest_plone`` a given Plone pulls in.
-    Same name, same scope and same signature as upstream, so it can be deleted the
-    day the floor moves.
+    Defined here, not taken from ``pytest_plone``: an older Plone can
+    resolve a version with no ``grant_roles`` fixture.
     """
 
     def granter(context, roles):
@@ -122,9 +86,8 @@ def grant_roles():
 
 
 # ---------------------------------------------------------------------------
-# pytest_plone binds ``portal`` / ``http_request`` / ``browser_layers`` to the
-# fixture literally named ``integration``, so the two extra layers need their
-# own accessors.
+# pytest_plone binds ``portal``/``http_request``/``browser_layers`` to the
+# fixture named ``integration``, so the extra layers need their own accessors.
 # ---------------------------------------------------------------------------
 
 
@@ -152,11 +115,7 @@ def site_request(site_override):
 
 @pytest.fixture
 def make_member():
-    """``make_member(portal)`` -> the test user with a fullname and an address.
-
-    A factory rather than a fixture so the three layers (``:default``, ``:base``
-    and the site-override one) can all use it.
-    """
+    """``make_member(portal)`` -> the test user with a fullname and an address."""
 
     def make(portal, fullname=None, email=None):
         from plone.app.testing import TEST_USER_ID
@@ -175,12 +134,7 @@ def make_member():
 
 @pytest.fixture
 def layers_of():
-    """``layers_of(portal)`` -> the browser layers registered in that portal.
-
-    ``plone.browserlayer.utils.registered_layers`` reads the *current* site, so
-    the lookup is wrapped explicitly instead of relying on whichever portal the
-    layer happened to leave active.
-    """
+    """``layers_of(portal)`` -> the browser layers registered in that portal."""
 
     def registered(portal):
         from plone.browserlayer.utils import registered_layers
@@ -193,18 +147,14 @@ def layers_of():
 
 
 # ---------------------------------------------------------------------------
-# Phase 2 -- the ``Email`` builder and its preview view
+# The ``Email`` builder and its preview view, on the functional ``sending``
+# layer (``tests/layers.py``), so a queued send can be committed and read.
 # ---------------------------------------------------------------------------
-#
-# All of these hang off the ``sending`` layer (``tests/layers.py``), which is
-# functional so that a *queued* send can be committed and read. ``pytest_plone``
-# binds ``portal``/``http_request`` to the fixture literally named
-# ``integration``, so this layer needs its own accessors.
 
 
 @pytest.fixture
 def mail_portal(sending):
-    """The portal every Phase 2 test sends from."""
+    """The portal every builder/preview test sends from."""
     return sending["portal"]
 
 
@@ -217,11 +167,8 @@ def mail_request(sending):
 def mailhost(mail_portal):
     """The recording MailHost serving ``mail_portal``.
 
-    See ``imio.emailkit.testing.install_recording_mailhost`` for why this is not
-    ``Products.CMFPlone.tests.utils.MockMailHost``: the stock mock overrides the
-    one method that chooses between the queued and the immediate path, so it
-    cannot tell the two apart and the transaction guarantee becomes
-    untestable while looking tested.
+    Not ``Products.CMFPlone.tests.utils.MockMailHost``: that stock mock
+    cannot distinguish a queued send from an immediate one.
     """
     from imio.emailkit.testing import install_recording_mailhost
 
@@ -230,14 +177,7 @@ def mailhost(mail_portal):
 
 @pytest.fixture
 def deliver():
-    """Commit, so queued mail is actually handed to the mailer.
-
-    The default delivery joins a mail data manager to the transaction and
-    hands the message over in ``tpc_finish``. A test that inspects a message
-    therefore has to end the transaction -- and doing that through the real
-    ``transaction.commit()`` is the point: it is the same code path production
-    takes, and it is why these tests live in a functional layer.
-    """
+    """Commit, so queued mail is actually handed to the mailer."""
     import transaction
 
     return transaction.commit
@@ -251,14 +191,7 @@ def sent(mailhost):
 
 @pytest.fixture
 def site_sender(mail_portal):
-    """Give the site the configured sender ``From`` defaults to.
-
-    Set explicitly rather than trusting the test fixture's value: "``From``
-    defaults to the site's configured sender" is only testable against a sender
-    we know, and ``Products.MailHost`` raises outright on a message with no
-    ``From`` -- which would surface as a builder bug rather than as an
-    unconfigured site.
-    """
+    """Give the site the configured sender ``From`` defaults to."""
     from plone import api
 
     import support
@@ -272,8 +205,8 @@ def site_sender(mail_portal):
 
 @pytest.fixture
 def set_default_language(mail_portal):
-    """``set_default_language("nl")`` -- the site default grouping falls
-    back to for a recipient whose ``IEmailRecipient.language`` is ``None``."""
+    """``set_default_language("nl")`` -- the fallback for a recipient whose
+    ``IEmailRecipient.language`` is ``None``."""
     from plone import api
 
     import support
@@ -282,8 +215,6 @@ def set_default_language(mail_portal):
         api.portal.set_registry_record(support.DEFAULT_LANGUAGE_RECORD, language)
         tool = getattr(mail_portal, "portal_languages", None)
         if tool is not None:
-            # Belt and braces: which of the two a negotiator reads is not ours
-            # to assume, and the tool caches.
             tool.setDefaultLanguage(language)
         return language
 
@@ -292,14 +223,7 @@ def set_default_language(mail_portal):
 
 @pytest.fixture
 def make_recipient_member(mail_portal):
-    """``make_recipient_member(support.FR_MEMBER)`` -> a member with a language.
-
-    ``IEmailRecipient`` carries a "preferred language code"; for a Plone
-    member the stock source of that is the ``language`` member property, which
-    is what Plone's own "language of the user" negotiator reads. It is asserted
-    to round-trip here, so a Plone that stopped shipping the property fails with
-    that message instead of as a mysterious grouping bug.
-    """
+    """``make_recipient_member(support.FR_MEMBER)`` -> a member with a language."""
     from plone.app.testing import TEST_USER_PASSWORD
 
     def make(spec):
@@ -351,11 +275,8 @@ def notification_context():
 def mail(mail_portal, mailhost, site_sender, notification_context):
     """``mail()`` -> a fresh ``Email`` for the one registered template.
 
-    Pre-wired with the fixture context and nothing else, so each test states
-    only the recipients/attachments/subject it is about. The MailHost double and
-    the site sender are pulled in as dependencies rather than left to each test
-    to remember: forgetting the sender raises inside ``Products.MailHost``, and
-    forgetting the double would try to open an SMTP connection.
+    Pre-wired with the fixture context, so each test states only the
+    recipients/attachments/subject it is about.
     """
     import support
 

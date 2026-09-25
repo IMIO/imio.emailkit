@@ -1,12 +1,8 @@
 """Extraction shim: restate the ZCML msgids where i18ndude can see them.
 
-``python -m imio.emailkit.locales`` rebuilds the ``.pot`` with ``i18ndude
-rebuild-pot``, which extracts from Python and page templates but never from
-ZCML. The subject/preheader msgids live in ``configure.zcml`` since the
-``emailkit:templates`` directive replaced the registration dict, so without
-this module a locales rebuild would drop them from the catalog.
-
-``tests/test_msgids.py`` fails when this file and ``configure.zcml`` drift.
+``i18ndude rebuild-pot`` extracts from Python and templates, never ZCML.
+The subject/preheader msgids live in ``configure.zcml``, so without this
+module they would drop from the catalog.
 """
 
 from imio.emailkit import _

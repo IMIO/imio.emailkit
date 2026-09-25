@@ -1,20 +1,15 @@
-"""Recipient resolution -- one adapter, no ``isinstance`` in the builder.
+"""Recipient resolution: one adapter, no ``isinstance`` in the builder.
 
-``.to()``/``.cc()``/``.bcc()`` accept "an email string, a Plone member object, a
-userid, or an iterable of those". This module is where that polymorphism lives, so
-:class:`~imio.emailkit.email.Email` can stay the plain data holder it is meant to be:
-the builder flattens what it is handed and calls :func:`resolve` at ``.send()``.
+``.to()``/``.cc()``/``.bcc()`` accept an email string, a Plone member, a
+userid, or an iterable of those. The builder flattens what it is handed
+and calls :func:`resolve` at ``.send()``.
 
-Three things are deliberate and worth reading before changing anything here.
+Rules:
 
-* **Failures are collected, not raised one at a time.** Resolution happens at
-  ``.send()`` precisely so every bad value surfaces in one
-  :class:`~imio.emailkit.interfaces.RecipientError`.
-* **An adapter returns ``None`` rather than a placeholder.** "Fail loud, not
-  silent drop" means the *absence* of an answer has to travel; an adapter
-  that guessed an address would send a real mail to the wrong person.
-* **A ``str`` containing ``@`` is an address, full stop -- no member lookup.**
-  See :func:`recipient_from_string` for why.
+* Failures are collected, not raised one at a time.
+* An adapter returns ``None``, never a guessed address.
+* A ``str`` containing ``@`` is always an address, never a member lookup.
+  See :func:`recipient_from_string`.
 """
 
 from contextlib import suppress
@@ -36,9 +31,8 @@ from zope.interface import implementer
 class Recipient:
     """A resolved recipient: exactly three attributes and nothing else.
 
-    Frozen and hashable so :func:`resolve` can de-duplicate without inventing a
-    key, and immutable so a resolved list cannot be edited into disagreeing with
-    what was sent.
+    Frozen and hashable, so :func:`resolve` can de-duplicate without a
+    separate key.
     """
 
     email: str
@@ -51,26 +45,12 @@ class Recipient:
 def recipient_from_string(value):
     """The default ``str`` adapter: an address, or a userid.
 
-    ``"@" in value`` decides, and it decides *for* the address reading. That is a
-    real choice, because a userid can look like an email address when a site runs
-    ``use_email_as_login``. Taking the string at face value can only ever send to
-    the address the caller wrote; the other order -- look the userid up first --
-    would take ``"greffe@commune.be"`` and, if some member happened to carry that
-    userid with a different ``email`` property, deliver somewhere else entirely.
-    A wrong address is much worse than a missing display name.
+    ``"@" in value`` decides: this trusts the address as written, since a
+    wrong address is worse than a missing display name.
 
-    Consequence, and it is the documented trade-off: a bare address resolves with
-    no ``fullname`` and no ``language``, so it lands in the default-language
-    group. Pass the member object (or its userid) when the language matters.
-
-    ``"Greffe <greffe@commune.be>"`` is accepted too, and the display name is
-    kept. This is not decoration: without the parse, the whole string became the
-    address and the header came out as ``"Greffe <greffe"@commune.be`` -- valid
-    syntax, wrong mailbox, no error anywhere. Measured, then fixed.
-
-    A string carrying *several* addresses is refused rather than silently reduced
-    to its first: ``getaddresses`` would hand back only one and the rest would
-    vanish, which is the silent drop this module forbids. Pass a list.
+    A bare address gets no ``fullname``/``language``.
+    ``"Greffe <greffe@commune.be>"`` is parsed, keeping the display name
+    out of the address. A string with several addresses is refused.
     """
     value = value.strip()
     if not value:
@@ -94,29 +74,11 @@ def recipient_from_string(value):
 def recipient_from_member(member):
     """The default Plone-member adapter.
 
-    ``getProperty`` rather than attribute access because ``MemberData`` is not
-    path- or attribute-traversable for its properties (the same finding
-    that shapes the default-mail templates), and because a site is free to drop
-    the ``language`` property from ``portal_memberdata`` -- hence the default.
+    Uses ``getProperty``, not attribute access: ``MemberData`` properties
+    are not attribute-traversable. An empty ``language`` becomes ``None``.
 
-    An empty ``language`` property, which is what Plone stores for "no
-    preference", becomes ``None``: the attribute is documented as "may be
-    ``None``", and ``""`` would otherwise become its own language group.
-
-    A member whose ``email`` property holds *several* addresses is refused, for
-    the same reason the string adapter refuses one: nothing downstream can send
-    to two mailboxes in one field, and the failure was silent. ``parseaddr`` on
-    ``"a@b.be, c@d.be"`` returns ``('', '')``, so the header came out as
-    ``Full Name <>`` and the recipient simply vanished from the envelope while
-    every other recipient in the same call was delivered -- exactly the silent
-    drop this module forbids. Returning ``None`` here turns it into a
-    ``RecipientError`` naming the member.
-
-    A ``"Zoe <z@b.be>"`` shaped property is parsed rather than passed through, so
-    the address never ends up nested inside another display name. That is the same
-    defect that made ``.sender("Greffe <greffe@commune.be>")`` produce
-    ``From: "Greffe <greffe"@commune.be`` -- valid syntax, wrong mailbox, no error
-    -- and this adapter was on the path that had not been fixed.
+    A member whose ``email`` holds several addresses is refused, since
+    ``parseaddr`` would silently drop it.
     """
     raw = (member.getProperty("email", "") or "").strip()
     fullname = (member.getProperty("fullname", "") or "").strip()
@@ -138,8 +100,8 @@ def recipient_from_member(member):
 def lookup_member(userid):
     """The member registered under ``userid``, or ``None``.
 
-    ``queryUtility`` rather than ``getToolByName``: resolution happens inside
-    ``.send()``, which has a site but is handed no context to acquire from.
+    Uses ``queryUtility``, not ``getToolByName``: ``.send()`` has a site but
+    no context to acquire from.
     """
     tool = queryUtility(IMembershipTool)
     if tool is None:
@@ -152,17 +114,9 @@ def resolve(values):
 
     :param values: already-flattened recipient values, in the order given
     :returns: resolved recipients, de-duplicated by address, order preserved
-    :raises RecipientError: listing *every* value that could not be resolved
+    :raises RecipientError: lists every value that could not be resolved
 
-    De-duplication keeps the **first** occurrence, which is the one most likely to
-    carry a ``fullname`` and a ``language`` -- callers naturally write
-    ``.to(member).to(some_shared_list)`` and not the reverse. Comparison is
-    case-insensitive on the address, since a mail server is.
-
-    Scope note: duplicates are removed *within* one field, never across To/Cc/Bcc.
-    Dropping an address from Cc because it is also in To would change what every
-    recipient sees in the header, and that is the caller's editorial decision, not
-    ours.
+    Keeps the first duplicate, case-insensitive, only within one field.
     """
     resolved = []
     seen = set()
@@ -176,8 +130,8 @@ def resolve(values):
         if not address:
             problems.append(f"{describe(value)} resolved to an empty email address")
             continue
-        # Checked here rather than trusted from the adapter, because this is what
-        # lets `email.py` split every address on '@' without a guard of its own.
+        # Checked here so email.py can split every address on '@' with no
+        # guard of its own.
         if "@" not in address:
             problems.append(
                 f"{describe(value)} resolved to {address!r}, which is not an "
@@ -200,21 +154,15 @@ def describe(value):
         return repr(value)
     userid = getattr(value, "getId", None)
     if callable(userid):
-        # Suppressed rather than trusted: this function only ever runs while
-        # building an error message, and a traceback from *here* would replace the
-        # RecipientError the caller actually needs to read.
+        # Suppressed: a traceback here would replace the RecipientError the
+        # caller needs to see.
         with suppress(Exception):
             return f"{type(value).__name__} {userid()!r}"
     return f"{type(value).__name__} {value!r}"
 
 
 def describe_failure(value):
-    """Say *why* a value did not resolve, not merely that it did not.
-
-    The two realistic causes need different fixes -- a typo in a userid versus a
-    missing adapter registration -- and the message is the only place a caller
-    finds out which one they have.
-    """
+    """Say why a value did not resolve: a typo versus a missing adapter."""
     if isinstance(value, str):
         if "@" not in value:
             return (
@@ -240,17 +188,9 @@ def group_by_language(fields, default_language):
     :returns: list of ``(language, {field: [recipient, ...]})``, in first-seen
         order of the languages
 
-    A group holds only *its own* recipients in every field, so a French To and a
-    Dutch Cc produce two messages, the second with no ``To`` header. That is the
-    honest consequence of rendering once per language group and emitting one
-    message per group: the alternative -- repeating the full header lists in
-    every message -- would put the French body in front of the Dutch reader,
-    which is the exact failure per-language sending exists to prevent.
-
-    Languages are grouped on the string as resolved, with no normalisation. ``fr``
-    and ``fr-BE`` are therefore two groups: they are two different renders as far
-    as the locale helpers are concerned (Belgian French groups thousands
-    differently from French French), so merging them would be wrong, not thrifty.
+    Each group holds only its own recipients, so a French To and Dutch Cc
+    produce two separate messages. Languages are not normalised: ``fr``
+    and ``fr-be`` form two groups.
     """
     groups = {}
     for field, recipients in fields.items():
@@ -264,10 +204,8 @@ def group_by_language(fields, default_language):
 def default_language():
     """The language recipients without a preference are grouped under.
 
-    Deliberately the *site's* default rather than the current request's: a mail is
-    sent for the recipient's benefit, and the request language belongs to whoever
-    happened to trigger it -- often a manager, sometimes a cron job with no
-    request at all.
+    The site's default, not the request's, since the request may belong
+    to a manager or a cron job.
     """
     registry = queryUtility(IRegistry)
     if registry is not None:

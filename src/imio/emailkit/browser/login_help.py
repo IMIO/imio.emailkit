@@ -1,31 +1,17 @@
 """The username-reminder mail sent by Plone's login-help form.
 
-Why this module exists at all, in one paragraph: the other two restyled default
-mails are ``z3c.jbot`` overrides of real page templates on disk, but stock Plone
-has **no template** for the username reminder. It is
-``SEND_USERNAME_TEMPLATE`` -- a module-level i18n string at
-``Products/CMFPlone/browser/login/login_help.py:33``, declared ``text/plain``,
-interpolated with ``str.format()`` and handed straight to ``MailHost`` by
-``RequestUsername.send_username()``. jbot keys on a resolved filename, and there
-is no file, so the *view* is the only seam.
+Stock Plone has no template for the username reminder: it is a plain string
+handed straight to ``MailHost`` by ``RequestUsername.send_username()``. There
+is no file for ``z3c.jbot`` to key on, so the view is the only seam.
 
-That is a strictly better position than the jbot mails are in, not a worse one:
-because we own the view, the template speaks the flat dialect, renders through
-``render()`` and goes out through the ``Email`` builder. It is therefore genuinely
-discovered, golden-tested and previewable -- see the amended comment in
-``imio/emailkit/__init__.py``.
-
-Both classes below are bound to ``IEmailkitLayer`` in ``configure.zcml``, so
-the opt-out profile still works: a site on the ``:base`` profile gets stock Plone's
-view and stock Plone's plaintext mail.
+Both classes below are bound to ``IEmailkitLayer`` in ``configure.zcml``: a
+``:base`` site gets stock Plone's view and plaintext mail.
 """
 
 from imio.emailkit import Email
 
-# Plone's factory, not ours, for the one message below: it is stock Plone's own
-# string and Plone already ships it translated. Re-declaring it in the
-# `imio.emailkit` domain would make us re-translate FR/NL/DE for no gain and would
-# drift from whatever Plone says in the languages we do not ship.
+# Stock Plone's own factory: the message below is stock's string, already
+# translated FR/NL/DE.
 from plone.base import PloneMessageFactory as _plone
 from Products.CMFPlone.browser.login import login_help as stock
 from Products.Five.browser.pagetemplatefile import ViewPageTemplateFile
@@ -35,22 +21,12 @@ from zope.component import getMultiAdapter
 import os
 
 
-#: The registered template this view renders. Namespaced, like every discovered
-#: template name.
+#: The registered template this view renders.
 TEMPLATE_NAME = "imio.emailkit:get_username"
 
-#: Stock Plone's login-help *form* template, reused verbatim by absolute path.
-#:
-#: The form markup is not ours and there is no reason to fork it -- this module
-#: changes which mail goes out, not what the page looks like. Registering our
-#: class without a ``template=`` in ZCML means the class has to supply ``index``
-#: itself (``LoginHelpForm.render`` returns ``self.index()``), which is what the
-#: assignment below does.
-#:
-#: Keeping it a real ``ViewPageTemplateFile`` over Plone's own path also keeps the
-#: page jbot-overridable: jbot patches ``ViewPageTemplateFile.__get__`` and keys on
-#: the resolved filename, so a site that already overrides
-#: ``Products.CMFPlone.browser.login.templates.login_help.pt`` keeps winning.
+#: Stock Plone's login-help form template, reused verbatim by absolute path:
+#: this module changes which mail goes out, not what the page looks like. A
+#: real ``ViewPageTemplateFile`` keeps the page jbot-overridable.
 STOCK_LOGIN_HELP_TEMPLATE = os.path.join(
     os.path.dirname(stock.__file__), "templates", "login_help.pt"
 )
@@ -59,35 +35,24 @@ STOCK_LOGIN_HELP_TEMPLATE = os.path.join(
 class RequestUsername(stock.RequestUsername):
     """Stock's username subform, sending the styled mail instead of the flat one.
 
-    Everything about *when* the mail is sent, and the anti-enumeration behaviour
-    around it, is inherited untouched from ``handleGetUsername``: an address with
-    no match and an address with several matches both log and send nothing, and
-    all three outcomes emit the same status message. That is deliberate -- it
-    stops the form being used to probe for registered addresses -- and it is
-    asserted in ``tests/test_get_username.py``. Do not "improve" it into helpful
-    error reporting.
+    ``handleGetUsername``'s anti-enumeration behaviour is inherited
+    untouched: no match, several matches, and success all emit the same
+    status message, so the form cannot be used to probe for addresses. Do
+    not change it into helpful error reporting.
     """
 
     def send_username(self, portal, userinfo):
-        """Send the styled reminder. Same signature and same contract as stock.
+        """Send the styled reminder. Same signature and contract as stock.
 
-        ``immediate=True`` matches stock, and not only for parity: the
-        ``SMTPRecipientsRefused`` clause below exists to avoid disclosing an
-        address, and with the default transaction-bound delivery the SMTP
-        conversation happens in ``tpc_finish`` -- long after any ``except`` here
-        could run. So the paranoia handling and immediate delivery are one
-        decision, not two.
+        ``immediate=True`` is required: with the default transaction-bound
+        delivery, the SMTP conversation happens in ``tpc_finish``, long after
+        the ``SMTPRecipientsRefused`` clause below could run.
         """
         portal_state = getMultiAdapter(
             (portal, self.request), name="plone_portal_state"
         )
-        # The *member*, not ``userinfo["userid"]``. The ``str`` recipient adapter reads
-        # any string containing "@" as an address and never looks a member up
-        # (recipients.py, "A ``str`` containing ``@`` is an address, full stop"),
-        # so a site whose userids happen to look like addresses -- a migration
-        # artefact, not just ``use_email_as_login`` -- would have the userid
-        # delivered *as* the address. The member object has no such ambiguity and
-        # carries the language preference that the builder groups by.
+        # The member, not `userinfo["userid"]`: a userid that looks like an
+        # address would otherwise be delivered to as one.
         member = portal.portal_membership.getMemberById(userinfo["userid"])
         recipient = member if member is not None else userinfo["email"]
 
@@ -96,68 +61,43 @@ class RequestUsername(stock.RequestUsername):
                 Email(TEMPLATE_NAME)
                 .to(recipient)
                 .with_context(
-                    # ``title`` is PAS's full-name key. Falling back to the login
-                    # keeps the greeting from reading "Dear ," for a member who
-                    # never filled in a fullname.
+                    # The login fallback avoids "Dear ," for a member with
+                    # no fullname.
                     fullname=userinfo["title"] or userinfo["login"],
                     login=userinfo["login"],
                     site_name=portal_state.navigation_root_title(),
                     login_url=f"{portal_state.navigation_root_url()}/login",
-                    # Bugfix carried over from stock Plone, pinned by
-                    # ``TestClientAddressSemantics`` in the test suite: stock
-                    # Plone's ``request/HTTP_X_FORWARDED_FOR|request/REMOTE_ADDR``
-                    # renders EMPTY without an ``X-Forwarded-For`` header, because
-                    # ``HTTPRequest.get`` returns '' for a missing ``HTTP_`` key
-                    # rather than raising and TAL's ``|`` only falls through on an
-                    # error. ``getClientAddr`` is Zope's supported API; it needs
-                    # ``trusted-proxy`` in zope.conf behind a reverse proxy, which
-                    # the README documents.
+                    # `getClientAddr` needs `trusted-proxy` in zope.conf
+                    # behind a reverse proxy; see the README.
                     client_addr=self.request.getClientAddr(),
                 )
                 .send(immediate=True)
             )
         except SMTPRecipientsRefused:
-            # Don't disclose the email address on failure -- stock's behaviour,
-            # deliberately preserved. `from None` suppresses the original, which
-            # would otherwise put the rejected address in the traceback and undo
-            # the very thing this clause is for.
+            # Do not disclose the email address on failure. `from None` keeps
+            # the rejected address out of the traceback.
             raise SMTPRecipientsRefused(
                 _plone("Recipient address rejected by server.")
             ) from None
-        # Stock also has `except SMTPException as e: raise (e)`. That is a no-op
-        # re-raise, so it is dropped rather than copied: every other SMTP error
-        # propagates unchanged either way.
 
 
 class LoginHelpForm(stock.LoginHelpForm):
     """Stock's login-help form, wired to the :class:`RequestUsername` above.
 
-    ``update()`` is **reimplemented rather than extended**, and that is forced
-    rather than chosen. Stock instantiates ``RequestUsername`` by direct class
-    reference (``login_help.py:243``) -- no ZCA lookup to override -- and the mail
-    is sent inside the subform's own ``update()``, so by the time
-    ``super().update()`` returned the stock plaintext mail would already be on the
-    wire. There is no seam.
+    ``update()`` is reimplemented, not extended: stock instantiates
+    ``RequestUsername`` by direct class reference and sends the mail inside
+    the subform's own ``update()``, before ``super().update()`` could return.
 
-    The alternative, temporarily rebinding ``stock.RequestUsername`` around a
-    ``super().update()`` call, is a monkeypatch with a race: Zope's publisher is
-    threaded and two concurrent login-help requests would see each other's
-    rebind. Twelve forked lines with a drift test is the cheaper failure mode.
-
-    The drift test is ``test_stock_update_is_what_we_forked_from`` in
-    ``tests/test_get_username.py``, which pins the source of stock ``update()``.
-    When a Plone upgrade trips it, re-read the upstream method and re-fork it
-    here; do not weaken the test.
+    ``test_stock_update_is_what_we_forked_from`` pins the source of stock
+    ``update()``. When a Plone upgrade trips it, re-fork it here.
     """
 
     index = ViewPageTemplateFile(STOCK_LOGIN_HELP_TEMPLATE)
 
     def update(self):
-        # Forked from Products.CMFPlone.browser.login.login_help.LoginHelpForm
-        # (Plone 6). The ONLY intended difference is that the username subform is
-        # this module's RequestUsername. Keep it a recognisable copy -- the drift
-        # test compares against upstream, and a cleverer rewrite makes the next
-        # comparison harder for no gain.
+        # Forked from stock.LoginHelpForm. The only intended difference is
+        # the RequestUsername subform below; the drift test compares this
+        # against upstream, so keep it a recognisable copy.
         subforms = []
         if self.can_reset_password():
             form = stock.RequestResetPassword(None, self.request)
@@ -169,11 +109,9 @@ class LoginHelpForm(stock.LoginHelpForm):
             subforms.append(form)
 
         self.subforms = subforms
-        # `form.EditForm.update`, i.e. two classes up: `stock.LoginHelpForm` is
-        # exactly the method being replaced, so `super()` would recurse into it.
+        # `stock.LoginHelpForm` is the method being replaced, so `super()`
+        # must skip it and call two classes up.
         super(stock.LoginHelpForm, self).update()
 
-        # `use_email_as_login()` is inherited untouched. Its consequence is worth
-        # knowing and is NOT a defect in this module: when it is True stock hides
-        # the username subform entirely, so this mail is never sent -- inert, not
-        # broken. Both registry states are covered in tests/test_get_username.py.
+        # When `use_email_as_login()` is True, stock hides the username
+        # subform, so this mail is never sent.

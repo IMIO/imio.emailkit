@@ -1,17 +1,9 @@
 """The FR and NL catalogs must actually resolve at runtime.
 
-Phase 0's caveat A3 is why this file is not boilerplate. The compiled output
-carried **zero** ``i18n:domain`` declarations, so every ``i18n:translate``
-rendered its msgid's *default* text -- **indistinguishable from success**, because
-the English default appears in the output either way. Only a differential
-assertion (FR output != NL output) can tell "translated" from "silently fell back
-to the source language".
-
-So nothing here asserts on a specific msgid: msgids belong to the template
-author, and a test that hardcodes them breaks on every rename while still not
-proving substitution. What is asserted is that the domain exists, its catalogs are
-compiled and shipped, and the same template in two languages produces two
-different mails.
+A missing ``i18n:domain`` declaration makes ``i18n:translate`` render the
+English default everywhere, which looks like success. Only a differential
+check (FR output != NL output) can tell the two apart, so nothing here
+asserts on a specific msgid.
 """
 
 import pytest
@@ -23,19 +15,16 @@ support.require_runtime()
 from imio.emailkit import render  # noqa: E402
 
 
-#: "First-class i18n (FR/NL/DE)"; "(FR/NL/DE shipped)".
+#: Languages the package ships as first-class i18n.
 SHIPPED_LANGUAGES = ("fr", "nl", "de")
 
-#: The two the Phase 1 exit criteria and the iMio client base actually require.
+#: The two the iMio client base actually requires.
 REQUIRED_LANGUAGES = ("fr", "nl")
 
 
 class TestTheTranslationDomainExists:
     def test_the_domain_is_registered(self, integration):
-        """Without a registered ``imio.emailkit`` domain, every
-        ``i18n:translate`` in every template silently returns its default text.
-        This is caveat A3's root cause, and it is one utility lookup to rule out.
-        """
+        """Every ``i18n:translate`` would silently return its default text."""
         from zope.component import queryUtility
         from zope.i18n.interfaces import ITranslationDomain
 
@@ -59,14 +48,8 @@ class TestTheTranslationDomainExists:
 
 
 class TestCatalogsAreShipped:
-    """``.po`` without ``.mo`` is the failure that only bites once.
-
-    ``zope.i18n`` compiles a stale ``.po`` on start-up, but the freshly written
-    ``.mo`` is not picked up by the run that produced it -- so a checkout with
-    out-of-date ``.mo`` files serves untranslated text exactly once, which in CI
-    reads as a missing translation and on a developer's machine reads as nothing
-    at all.
-    """
+    """A ``.po`` without a compiled ``.mo`` serves untranslated text for
+    the run that compiles it."""
 
     @pytest.fixture
     def locales(self):
@@ -95,8 +78,7 @@ class TestCatalogsAreShipped:
         )
 
     def test_german_is_shipped(self, locales):
-        """German ships too. Its own test so a missing German catalog is one
-        clear failure rather than a parametrised surprise in the middle of the
+        """Separate, so a missing catalog is not a surprise inside the
         FR/NL run."""
         path = locales / "de" / "LC_MESSAGES" / f"{support.PACKAGE_NAME}.po"
 
@@ -110,12 +92,8 @@ class TestTemplatesAreReallyTranslated:
     def test_fr_and_nl_renders_differ_beyond_the_lang_attribute(
         self, integration, template
     ):
-        """The differential assertion caveat A3 demands.
-
-        The ``lang`` attribute is stripped from both sides first, because it
-        differs by construction and would make this pass on a template whose
-        i18n is entirely broken.
-        """
+        """The ``lang`` attribute is stripped first: it always differs, and
+        would make this pass even on broken i18n."""
         context = support.load_fixture(template)
         name = support.qualified(template)
 
@@ -127,8 +105,8 @@ class TestTemplatesAreReallyTranslated:
 
         assert stripped_fr != stripped_nl, (
             "the French and Dutch renders are identical once lang= is removed: "
-            "either the template has no i18n:translate, or i18n:domain is missing "
-            "from the compiled output (Phase 0 caveat A3)"
+            "either the template has no i18n:translate, or i18n:domain is "
+            "missing from the compiled output"
         )
         assert text_fr != text_nl, (
             "the plaintext twins are identical across languages -- the twin is not "
@@ -136,14 +114,9 @@ class TestTemplatesAreReallyTranslated:
         )
 
     def test_the_registered_subject_is_translated(self, integration, template):
-        """The "**subject lives in the registration** as an i18n msgid,
-        translated per recipient language at send time".
-
-        Taken from the registration rather than from a rendered header, because
-        that is where it is put -- for a discovered template the subject never
-        appears in the body at all. The assertion is differential for caveat A3's
-        reason: a msgid with no catalog entry returns its English default, which
-        reads exactly like a successful translation.
+        """Read from the registration, not a rendered header: the subject
+        never appears in the body. Differential, since an untranslated
+        msgid still returns its English default.
         """
         from imio.emailkit import discovery
         from zope.i18n import translate
@@ -161,10 +134,8 @@ class TestTemplatesAreReallyTranslated:
         assert fr != str(msgid), f"{msgid!r} is untranslated in French"
 
     def test_the_registered_preheader_is_translated(self, integration, template):
-        """``preheader`` is an optional msgid per template, rendered into
-        the layout's hidden div -- "the highest-visibility email feature that
-        everyone forgets; every inbox shows it". An untranslated one is shown to
-        every recipient, in the wrong language, next to the subject."""
+        """Shown by every inbox next to the subject; an untranslated one
+        reaches every recipient in the wrong language."""
         from imio.emailkit import discovery
         from zope.i18n import translate
 

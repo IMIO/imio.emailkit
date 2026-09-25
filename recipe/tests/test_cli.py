@@ -46,12 +46,12 @@ class TestTheThreeParsers:
         assert arguments.list is True
         assert arguments.verbose is True
 
-    def test_compile_emails_spells_spec_5s_own_flags(self):
+    def test_compile_emails_accepts_watch_and_new(self):
         arguments = compile_emails.parser().parse_args(["--watch", "--new", "x"])
         assert arguments.watch is True
         assert arguments.new == "x"
 
-    def test_check_emails_can_run_either_gate_alone(self):
+    def test_check_emails_can_run_either_check_alone(self):
         assert check_emails.parser().parse_args(["--no-lint"]).no_lint is True
         assert check_emails.parser().parse_args(["--lint-only"]).lint_only is True
 

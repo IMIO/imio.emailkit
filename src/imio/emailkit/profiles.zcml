@@ -4,13 +4,10 @@
     i18n_domain="imio.emailkit"
     >
 
-  <!-- `:base` is the documented opt-out, level 3. It ships the
-       runtime (render(), discovery, the theme records) and NOT the browser
-       layer, so Plone's stock mails are left exactly as they were. It stays
-       visible in the add-ons control panel on purpose: opting out means
-       installing this instead of `:default`.
-       (No double hyphen anywhere in these comments: XML forbids it inside a
-       comment, which is the same hazard Phase 0 hit in compiled templates.) -->
+  <!-- `:base` ships the runtime (render(), discovery, the theme records) but
+       not the browser layer, so Plone's stock mails stay untouched. It stays
+       visible in the add-ons control panel: installing it instead of
+       `:default` is how a site opts out. -->
   <genericsetup:registerProfile
       name="base"
       title="iMio Emailkit: runtime only"

@@ -1,39 +1,23 @@
 /*
- * Quicksand, self-hosted, for the clients that support web fonts in mail.
+ * Quicksand, self-hosted, for mail clients that support web fonts.
  *
- * Reached from the kit shell as
- * `<link rel="stylesheet" href="${asset_base}/fonts.css">`, never as an
- * `@font-face` block inside the document's own `<style>`. Two reasons, both
- * measured rather than assumed:
+ * Loaded as `<link rel="stylesheet" href="${asset_base}/fonts.css">`, never
+ * as an `@font-face` block inside the document's `<style>`: a Chameleon
+ * `${...}` placeholder inside `<style>` goes through Juice's CSS parser at
+ * build time, and the `{` and `}` break CSS inlining for the whole document.
+ * An `href` attribute is never parsed by Juice.
  *
- *   1. A Chameleon `${...}` placeholder inside a `<style>` element goes through
- *      Juice's CSS parser at build time: the `{` opens a block, the `}` closes
- *      it early, and CSS inlining dies for the WHOLE document while the build
- *      still exits 0. An `href` is an attribute; Juice never parses it. Same
- *      rule the shell already follows for `bgcolor` versus `style`.
- *   2. The `src` urls below are relative, so they resolve against this
- *      stylesheet's own URL inside the resource directory. Nothing here needs
- *      to know the portal's hostname, which is the only thing the build cannot
- *      know.
+ * Not Google Fonts: loading from fonts.gstatic.com tells Google the IP
+ * address, time and mail client of every citizen who opens the message.
  *
- * NOT Google Fonts, which is what the v2 mockups used. Loading a font from
- * fonts.gstatic.com tells Google the IP address, the time and the mail client
- * of every citizen who opens a message from a Walloon local authority. Serving
- * the same file from the portal costs 30 KB in the egg and leaks nothing.
+ * Gmail, Outlook and most webmail strip `<link>` outright, so the display
+ * stack in `kit/tailwind.css` falls back to Trebuchet MS and then Arial:
+ * this file is an enhancement, never a dependency.
  *
- * REACH. Apple Mail, iOS Mail, Thunderbird and Samsung Mail honour a remote
- * stylesheet in mail; Gmail, Outlook and most webmail strip `<link>` outright.
- * That is the same reach the mockups' Google Fonts link had, and it is why the
- * display stack in `kit/tailwind.css` still falls back to Trebuchet MS and then
- * Arial: this file is an enhancement for the clients that take it, never a
- * dependency.
+ * Two weights: 700 for headings and overlines, 500 for `font-medium`.
  *
- * Two weights, matching the mockups' own request (`wght@500;700`): 700 for the
- * banner heading, the card titles and the overlines, 500 for anything an author
- * sets in `font-medium`. Latin subset only.
- *
- * Quicksand is licensed under the SIL Open Font License 1.1, which permits
- * redistribution; see CONTRIBUTORS.md.
+ * Quicksand is licensed under the SIL Open Font License 1.1; see
+ * CONTRIBUTORS.md.
  */
 @font-face {
   font-family: "Quicksand";

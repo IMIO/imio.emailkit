@@ -1,26 +1,15 @@
-"""ZCML registration of **external** add-ons ("any consumer addon").
+"""ZCML registration of external consumer add-ons.
 
-``tests/test_zcml_directive.py`` covers the directive itself and
-``tests/test_discovery.py`` the registry behind it. This module covers what neither
-can: two *other* packages, each with its own ``configure.zcml``, its own
-``emails/`` sources and its own committed ``templates/*.pt``, registering
-alongside ``imio.emailkit``'s own templates.
+Two add-ons register templates alongside ``imio.emailkit``'s own:
+``tests/dummies/dummy/minimal`` and ``tests/dummies/dummy/complete``. See
+``tests/dummies/README.md`` for what each is for, and ``tests/dummyaddons.py``
+for how their ZCML runs without a pip install.
 
-The add-ons are ``tests/dummies/dummy/minimal`` and
-``tests/dummies/dummy/complete``; ``tests/dummies/README.md`` says what each of
-them is for, and ``tests/dummyaddons.py`` says how their ZCML gets executed
-without them being pip-installed.
+Assertions read each add-on's own ``configure.zcml`` through :func:`declared`,
+so they cannot drift from what the file actually says.
 
-**The assertions read the add-on's own ``configure.zcml``.** That file *is* the
-registration, so a test that restated its contents here could agree with itself
-while disagreeing with the add-on. :func:`declared` parses it, and every "what it
-registers" assertion is driven off that.
-
-**The collision case is the one that matters.** Three packages register a template
-whose basename is ``notification``: both dummies and ``imio.emailkit`` itself.
-The answer is that lookups are namespaced, so there is nothing to collide -- and
-the assertions below are written to fail if execution order ever started deciding
-which one you get.
+All three packages register a template named ``notification``. Lookups are
+namespaced by package, so there is no collision.
 """
 
 from xml.etree import ElementTree
@@ -40,20 +29,15 @@ from imio.emailkit import render  # noqa: E402
 )
 
 
-#: The XML namespace the directives live in. Spelled out rather than imported, so
-#: this fails if the published namespace URI ever moves: consumers have it in their
-#: own ZCML, which makes it part of the contract rather than an implementation
-#: detail.
+#: The XML namespace the directives use. Written out, not imported, so the
+#: test fails if the namespace URI ever changes.
 EMAILKIT_NS = "http://namespaces.imio.be/emailkit"
 
-#: The basename all three packages share, which is the whole point of
-#: namespacing lookups.
+#: The basename all three packages share.
 SHARED_BASENAME = support.NOTIFICATION
 
-#: Every template name that must be registered while the dummies are installed:
-#: the two add-ons' plus ``imio.emailkit``'s own. The host package is included on
-#: purpose -- a registration mechanism that shadowed the host's own templates would
-#: otherwise look like a success.
+#: Every template name that must be registered while the dummies are
+#: installed: the two add-ons' plus ``imio.emailkit``'s own.
 EXPECTED = (
     *dummyaddons.all_qualified_names(),
     support.qualified(SHARED_BASENAME),
@@ -63,12 +47,10 @@ EXPECTED = (
 def declared(addon):
     """``{basename: {attribute: value}}`` from the add-on's ``configure.zcml``.
 
-    Also the assertion that there is exactly **one** ``<emailkit:templates>``
-    block: the directive gives a package one templates directory, so a second block
-    in the same package is a configuration conflict at startup.
+    Asserts there is exactly one ``<emailkit:templates>`` block: a second
+    block in the same package is a configuration conflict at startup.
     """
-    # The parsed file is a dummy add-on's own committed configure.zcml, not
-    # input from anywhere.
+    # This file is the add-on's own committed configure.zcml, not external input.
     root = ElementTree.parse(addon.zcml).getroot()  # noqa: S314
     blocks = root.findall(f"{{{EMAILKIT_NS}}}templates")
 
@@ -133,11 +115,8 @@ class TestBothAddonsAreRegistered:
 
     @pytest.mark.parametrize("addon", dummyaddons.ADDONS, ids=lambda a: a.package)
     def test_names_are_namespaced_by_the_registering_package(self, templates, addon):
-        """Template names are namespaced at lookup.
-
-        The namespace is the package the ZCML file belongs to, never an attribute
-        the consumer writes -- so it cannot disagree with where the files are.
-        """
+        """The namespace is the package owning the ZCML file, not an
+        attribute the consumer writes."""
         for basename in addon.templates:
             template = templates[addon.qualified(basename)]
 
@@ -149,10 +128,9 @@ class TestBothAddonsAreRegistered:
     def test_the_files_come_from_the_addons_own_directory(self, templates, addon):
         """Resolves ``<package>/<directory>/<name>.pt``.
 
-        ``dummy.minimal`` omits ``directory`` and relies on the documented
-        ``templates`` default; ``dummy.complete`` states it. Both must land in
-        their own package, and a template resolved out of the *host's* directory
-        would be the failure this catches.
+        ``dummy.minimal`` omits ``directory`` and uses the default;
+        ``dummy.complete`` states it. Both must resolve inside their own
+        package, not the host's.
         """
         for basename in addon.templates:
             html_path = templates[addon.qualified(basename)].html_path
@@ -165,12 +143,8 @@ class TestBothAddonsAreRegistered:
 
     @pytest.mark.parametrize("addon", dummyaddons.ADDONS, ids=lambda a: a.package)
     def test_the_templates_directory_is_recorded_for_the_build_tooling(self, addon):
-        """The build tooling asks where a package's compiled output lands.
-
-        It cannot derive that from the registered templates: a package whose first
-        build has not run yet registers nothing at all, and "where should the build
-        write" still has to have an answer.
-        """
+        """The build tooling needs a package's output directory even before
+        its first build has registered any template."""
         from imio.emailkit.discovery import registered_directories
 
         directories = registered_directories()
@@ -178,12 +152,8 @@ class TestBothAddonsAreRegistered:
         assert directories[addon.package] == addon.templates_dir.resolve()
 
     def test_the_dummies_are_not_registered_when_not_installed(self, integration):
-        """The negative control for the whole module.
-
-        Without it, every assertion above could be passing because the templates
-        were somehow always there. ``tests/dummyaddons.installed()`` is what puts
-        them in the registry, so outside it they must be gone again.
-        """
+        """Negative control: outside ``installed()``, the dummy templates
+        must be gone."""
         from imio.emailkit.discovery import available_templates
 
         with dummyaddons.uninstalled():
@@ -225,12 +195,9 @@ class TestNoCollisionOnASharedBasename:
         )
 
     def test_each_one_renders_its_own_content(self, templates):
-        """Distinct paths are not enough; the *render* has to pick the right one.
-
-        Each of the three fixtures has a different ``title``, so a lookup that
-        silently returned another package's template shows up here as the wrong
-        heading rather than as a passing test.
-        """
+        """The render must pick the right file, not just resolve a distinct
+        path. Each fixture has a different title, so a wrong lookup shows up
+        as the wrong heading."""
         rendered = {}
         for addon in dummyaddons.ADDONS:
             html, _text = render(
@@ -258,12 +225,9 @@ class TestNoCollisionOnASharedBasename:
             )
 
     def test_the_bare_basename_still_resolves_to_nothing(self, integration):
-        """The same namespacing, now with three candidates instead of one.
-
-        Accepting the bare name would make the answer depend on the order the three
-        packages' ZCML happens to execute in, which is exactly the bug the
-        namespace exists to prevent.
-        """
+        """The bare name must not resolve, even with three candidates
+        registered. Accepting it would make the result depend on ZCML load
+        order."""
         with pytest.raises(TemplateNotFound):
             render(SHARED_BASENAME, context={})
 
@@ -290,7 +254,7 @@ class TestAvailableListsEveryAddon:
         )
 
     def test_the_message_names_the_other_addons_templates(self, failure):
-        """The list has to reach whoever reads the traceback."""
+        """The list must appear in the exception message, not just the object."""
         message = str(failure)
         for name in EXPECTED:
             assert name in message
@@ -318,13 +282,9 @@ class TestRegistrationMetadata:
 
     @pytest.mark.parametrize("addon", dummyaddons.ADDONS, ids=lambda a: a.package)
     def test_the_subject_msgid_carries_the_addons_own_domain(self, templates, addon):
-        """The domain comes from the add-on's own ``i18n_domain``.
-
-        Which is half the reason the registration is ZCML: the msgid picks up the
-        domain of the file it is written in, so a consumer needs no
-        ``MessageFactory`` and cannot accidentally register a subject in
-        ``imio.emailkit``'s domain, where its own catalog would never be looked for.
-        """
+        """The msgid domain comes from the add-on's own ``i18n_domain``. This
+        lets a consumer skip a ``MessageFactory`` and keeps its subject out
+        of ``imio.emailkit``'s own domain."""
         for basename in addon.templates:
             domain = templates[addon.qualified(basename)].subject.domain
 
@@ -335,7 +295,8 @@ class TestRegistrationMetadata:
             assert domain != support.PACKAGE_NAME
 
     def test_the_preheader_is_optional(self, templates):
-        """The preheader: "Omitted -> the div collapses to nothing"."""
+        """The preheader is optional; when omitted, the div collapses to
+        nothing."""
         minimal = templates[dummyaddons.MINIMAL.qualified("notification")]
 
         assert "preheader" not in declared(dummyaddons.MINIMAL)["notification"], (
@@ -357,11 +318,8 @@ class TestRegistrationMetadata:
 
 
 class TestPlaintextTwins:
-    """The ``.txt.pt`` twin is primary; its absence is a warned fallback.
-
-    The two dummies are on opposite sides of this on purpose, so both paths are
-    exercised by a *registered* add-on rather than by moving a file aside.
-    """
+    """The ``.txt.pt`` twin is used when present; its absence falls back
+    with a warning. The two dummies exercise both paths."""
 
     def test_a_declared_twin_is_resolved(self, templates):
         for basename in dummyaddons.COMPLETE.twins:
@@ -397,13 +355,9 @@ class TestPlaintextTwins:
                 )
 
     def test_the_twin_carries_what_the_fallback_loses(self, integration):
-        """Why the twin is made primary, asserted rather than asserted-about.
-
-        ``dummy.complete:convocation`` has a hand-authored twin and its plaintext
-        part contains the CTA **URL**; ``dummy.minimal`` has none and the naive
-        extraction drops every ``<a href>`` it walks over. If the fallback ever
-        started keeping links this test is where the documentation gets updated.
-        """
+        """``dummy.complete:convocation`` has a hand-authored twin whose text
+        includes the CTA URL. ``dummy.minimal`` has none, and the automatic
+        fallback drops every ``<a href>``."""
         _html, text = render(
             dummyaddons.COMPLETE.qualified("convocation"),
             context=support.load_fixture_from(
@@ -419,15 +373,10 @@ class TestPlaintextTwins:
 
 
 class TestOneBrokenRegistrationDoesNotHideTheOthers:
-    """A typo in one add-on must not cost the others their mails.
-
-    Exercised by executing one extra ``<emailkit:templates>`` block for
-    ``dummy.minimal`` that names a template nobody built, rather than by shipping a
-    third, broken dummy add-on: a dummy that exists to be wrong would be read as
-    documentation of how to be wrong. The block runs through the real directive on
-    a fresh configuration machine, which is what a consumer's own instance start
-    does with the same mistake.
-    """
+    """A broken template in one add-on must not cost the others their
+    mails. Registers an extra template that names a ``.pt`` file that was
+    never built, through the real directive on a fresh configuration
+    machine, as a consumer's instance start does with the same mistake."""
 
     ZCML = """\
 <configure
@@ -453,8 +402,8 @@ class TestOneBrokenRegistrationDoesNotHideTheOthers:
         machine = ConfigurationMachine()
         xmlconfig.registerCommonDirectives(machine)
         xmlconfig.include(machine, file="meta.zcml", package=imio.emailkit)
-        # What an `<include package=...>` sets for the file it processes; the
-        # directive reads it to derive the namespace and the directory base.
+        # `<include package=...>` sets this. The directive reads it to derive
+        # the namespace and the directory base.
         machine.package = importlib.import_module(dummyaddons.MINIMAL.package)
 
         with caplog.at_level(logging.WARNING, logger="imio.emailkit.discovery"):
