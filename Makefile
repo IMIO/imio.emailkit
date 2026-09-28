@@ -343,3 +343,55 @@ release: $(VENV_FOLDER) ## Create a release
 	@echo "$(GREEN)==> Create a release$(RESET)"
 	@uv pip install -e ".[release]"
 	@uv run fullrelease
+
+RECIPE_VERSION_FILE=$(RECIPE_FOLDER)/src/imio/recipe/emailkit/__init__.py
+# Default: the current version without `.dev0`, then the next beta or patch.
+RECIPE_VERSION?=
+RECIPE_NEXT?=
+
+.PHONY: recipe-release
+recipe-release: ## Release imio.recipe.emailkit to PyPI (RECIPE_VERSION=, RECIPE_NEXT= to override)
+	# Not zest.releaser: its `git commit -a` is repo-wide, and it uploads
+	# artifacts that nobody inspected. This target commits one file only and
+	# asks before the upload.
+	@cd $(BACKEND_FOLDER)
+	if [[ -n "$$(git status --porcelain)" ]]; then
+		echo "$(RED)==> The working tree is not clean$(RESET)"
+		exit 1
+	fi
+	git fetch -q origin
+	if [[ "$$(git rev-parse HEAD)" != "$$(git rev-parse '@{u}')" ]]; then
+		echo "$(RED)==> HEAD is not in sync with its upstream$(RESET)"
+		exit 1
+	fi
+	current="$$(sed -nE 's/^__version__ = "(.*)"$$/\1/p' $(RECIPE_VERSION_FILE))"
+	version="$(RECIPE_VERSION)"
+	version="$${version:-$${current%.dev0}}"
+	next="$(RECIPE_NEXT)"
+	next="$${next:-$$(python3 -c 'import re, sys; print(re.sub(r"(\d+)$$", lambda m: str(int(m.group(1)) + 1), sys.argv[1]) + ".dev0")' "$$version")}"
+	tag="imio.recipe.emailkit-$$version"
+	if git rev-parse -q --verify "refs/tags/$$tag" >/dev/null; then
+		echo "$(RED)==> The tag $$tag exists already$(RESET)"
+		exit 1
+	fi
+	echo "$(GREEN)==> Release imio.recipe.emailkit $$version, then $$next$(RESET)"
+	# Restore the version file if a step fails before the release commit.
+	trap 'git checkout -q -- $(RECIPE_VERSION_FILE); echo "$(RED)==> Aborted, nothing committed$(RESET)"' EXIT
+	sed -i -E "s/^__version__ = \".*\"$$/__version__ = \"$$version\"/" $(RECIPE_VERSION_FILE)
+	rm -rf $(RECIPE_FOLDER)/dist
+	uv build -q --out-dir $(RECIPE_FOLDER)/dist $(RECIPE_FOLDER)
+	for sdist in $(RECIPE_FOLDER)/dist/*.tar.gz; do tar -tzf "$$sdist"; done
+	for wheel in $(RECIPE_FOLDER)/dist/*.whl; do unzip -l "$$wheel"; done
+	uvx twine check --strict $(RECIPE_FOLDER)/dist/*
+	read -r -p "Upload imio.recipe.emailkit $$version to PyPI? [y/N] " answer
+	if [[ "$$answer" != "y" ]]; then
+		exit 1
+	fi
+	git commit -q -m "Preparing release imio.recipe.emailkit $$version" -- $(RECIPE_VERSION_FILE)
+	trap - EXIT
+	git tag -a "$$tag" -m "Release imio.recipe.emailkit $$version"
+	uvx twine upload $(RECIPE_FOLDER)/dist/*
+	sed -i -E "s/^__version__ = \".*\"$$/__version__ = \"$$next\"/" $(RECIPE_VERSION_FILE)
+	git commit -q -m "Back to development: imio.recipe.emailkit $$next" -- $(RECIPE_VERSION_FILE)
+	git push -q origin HEAD "$$tag"
+	echo "$(GREEN)==> Released imio.recipe.emailkit $$version$(RESET)"
