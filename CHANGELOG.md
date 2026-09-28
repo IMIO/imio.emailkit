@@ -9,6 +9,13 @@
 
 <!-- towncrier release notes start -->
 
+## 1.0.0b3 (2026-09-28)
+
+
+### Internal:
+
+- Release again with no code change. The PyPI simple index did not list 1.0.0b2. 
+
 ## 1.0.0b2 (2026-09-28)
 
 
