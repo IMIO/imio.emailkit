@@ -84,11 +84,15 @@ msgstr "Uw wachtwoord"
 msgid "email_card_your_account"
 msgstr "Uw account"
 
-#. Default: "Log in with Wallonie Connect"
+#. Default: "Read the Wallonie Connect documentation"
 #: imio/emailkit/templates/user_migrated_to_sso.pt:204
 #: imio/emailkit/templates/user_migrated_to_sso.txt.pt:10
 msgid "email_cta_sso_migrated"
-msgstr "Aanmelden met Wallonie Connect"
+msgstr "Documentatie over Wallonie Connect raadplegen"
+
+#. Default: "Need help?"
+msgid "email_sso_migrated_help"
+msgstr "Hulp nodig?"
 
 #. Default: "View this item"
 #: imio/emailkit/contentrules/mail.py:81
@@ -106,6 +110,10 @@ msgstr "E-mailadres"
 #: imio/emailkit/templates/user_migrated_to_sso.txt.pt:8
 msgid "email_field_former_username"
 msgstr "Vorige gebruikersnaam"
+
+#. Default: "(no longer in use)"
+msgid "email_field_former_username_hint"
+msgstr "(niet meer gebruiken)"
 
 #. Default: "Full name"
 #: imio/emailkit/templates/registered_notify_template.pt:181
@@ -299,11 +307,6 @@ msgstr "Welkom"
 #: imio/emailkit/templates/user_migrated_to_sso.txt.pt:14
 msgid "email_sso_migrated_account_link"
 msgstr "Mijn Wallonie Connect-account beheren"
-
-#. Default: "If the button does not work, copy this address into your browser:"
-#: imio/emailkit/templates/user_migrated_to_sso.pt:231
-msgid "email_sso_migrated_fallback"
-msgstr "Als de knop niet werkt, kopieer dan dit adres in uw browser:"
 
 #. Default: "Your access to ${institution} on ${site_name} is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing else changed, only the way you log in."
 #: imio/emailkit/templates/user_migrated_to_sso.pt:166

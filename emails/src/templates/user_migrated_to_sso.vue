@@ -10,13 +10,12 @@
  *   email        the address the account is now reached by, and its new
  *                userid
  *   username     the local username that has just stopped working
- *   login_url    starts the OIDC flow and comes back to the institution
  *   account_url  the Wallonie Connect account console; may be empty, and
  *                the password callout then drops its link
  *
  * The reader is being told about a change they did not ask for and cannot
  * undo, so the mail answers the three questions they will have, in order:
- * what do I type now (the card), how do I get in (the button), and what
+ * what do I type now (the card), where do I learn more (the link), and what
  * happened to my password (the callout). Nothing else.
  *
  * The subject names no product, because the registration subject is one
@@ -37,6 +36,29 @@
       <span i18n:translate="email_title_sso_migrated" tal:omit-tag="">Your account now uses Wallonie Connect</span>
     </template>
     <template #subtitle>${institution}</template>
+
+    <!--
+      The mark, then the link to its documentation. `asset_base` is
+      empty whenever the render had no request to build an absolute URL
+      from (a preview, a unit test), so the whole row is dropped rather
+      than shipping a relative url that would show as a broken-image icon.
+
+      A raster logo, not SVG: mail clients do not render SVG. If images
+      are blocked, the `alt` text and the link below say the same thing.
+    -->
+    <table role="presentation" tal:condition="asset_base" class="w-full">
+      <tr>
+        <td align="center" class="pt-2 pb-8 text-[0px] leading-[0]">
+          <img
+            src="${asset_base}/logo-wallonie-connect.png"
+            alt="Wallonie Connect"
+            width="200"
+            height="48"
+            class="block"
+          >
+        </td>
+      </tr>
+    </table>
 
     <p
       i18n:translate="email_sso_migrated_lead"
@@ -65,38 +87,19 @@
         <KitDataRow>
           <template #label>
             <span i18n:translate="email_field_former_username" tal:omit-tag="">Former username</span>
+            <br>
+            <span i18n:translate="email_field_former_username_hint" tal:omit-tag="">(no longer in use)</span>
           </template>
           ${username}
         </KitDataRow>
       </KitDataList>
     </KitCard>
 
-    <!--
-      The mark, then the button that repeats it in words. `asset_base` is
-      empty whenever the render had no request to build an absolute URL
-      from (a preview, a unit test), so the whole row is dropped rather
-      than shipping a relative url that would show as a broken-image icon.
-
-      A raster logo, not SVG: mail clients do not render SVG. If images
-      are blocked, the `alt` text and the button below say the same thing.
-    -->
-    <table role="presentation" tal:condition="asset_base" class="w-full">
-      <tr>
-        <td align="center" class="pt-2 text-[0px] leading-[0]">
-          <img
-            src="${asset_base}/logo-wallonie-connect.png"
-            alt="Wallonie Connect"
-            width="200"
-            height="48"
-            class="block"
-          >
-        </td>
-      </tr>
-    </table>
-
-    <KitButton href="${login_url}" align="center">
-      <span i18n:translate="email_cta_sso_migrated" tal:omit-tag="">Log in with Wallonie Connect</span>
-    </KitButton>
+    <p class="m-0 pt-4 text-center text-sm leading-[22px] text-imio-grey-dark">
+      <span i18n:translate="email_sso_migrated_help" tal:omit-tag="">Need help?</span>
+      <a href="https://docs.imio.be/wallonie-connect/" class="text-imio-magenta-dark underline" data-dark="accent"
+        ><span i18n:translate="email_cta_sso_migrated" tal:omit-tag="">Read the Wallonie Connect documentation</span></a>
+    </p>
 
     <KitPanel>
       <template #overline>
@@ -116,19 +119,5 @@
           ><span i18n:translate="email_sso_migrated_account_link" tal:omit-tag="">Manage my Wallonie Connect account</span></a>
       </p>
     </KitPanel>
-
-    <template #mentions>
-      <!--
-        The address as a real link, not plain grey text: a client that
-        autolinks it styles it on its own; one that does not leaves the
-        reader retyping it by hand. `data-dark="accent"` moves it off
-        #b3004b, which is about 2:1 on a dark ground.
-      -->
-      <p class="m-0 text-[13px] leading-[21px] text-imio-grey-dark">
-        <span i18n:translate="email_sso_migrated_fallback" tal:omit-tag="">If the button does not work, copy this address into your browser:</span>
-        <br>
-        <a href="${login_url}" class="break-all text-imio-magenta-dark underline" data-dark="accent">${login_url}</a>
-      </p>
-    </template>
   </KitMain>
 </template>

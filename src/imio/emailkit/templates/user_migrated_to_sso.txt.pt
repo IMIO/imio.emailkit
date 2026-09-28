@@ -5,9 +5,9 @@
 
 <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_card_your_account">Your account</span> : <span tal:omit-tag="" tal:content="email" />
 <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_field_institution">Institution</span> : <span tal:omit-tag="" tal:content="institution" />
-<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_field_former_username">Former username</span> : <span tal:omit-tag="" tal:content="username" />
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_field_former_username">Former username</span> <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_field_former_username_hint">(no longer in use)</span> : <span tal:omit-tag="" tal:content="username" />
 
-<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_cta_sso_migrated">Log in with Wallonie Connect</span> : <span tal:omit-tag="" tal:content="login_url" />
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_sso_migrated_help">Need help?</span> <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_cta_sso_migrated">Read the Wallonie Connect documentation</span> : https://docs.imio.be/wallonie-connect/
 
 <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_callout_password">Your password</span>
 <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_sso_migrated_password">Your former username <span i18n:name="username" tal:omit-tag="" tal:content="username">username</span> and its password no longer work. Your password is now the one on your Wallonie Connect account, and that is where you change it.</span>
