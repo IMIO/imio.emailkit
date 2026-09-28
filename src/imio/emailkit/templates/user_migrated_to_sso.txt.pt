@@ -1,7 +1,7 @@
 <tal:body
   ><span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_title_sso_migrated">Your account now uses Wallonie Connect</span>
 
-<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_sso_migrated_lead">Your access to <span i18n:name="institution" tal:omit-tag="" tal:content="institution">the institution</span> on <span i18n:name="site_name" tal:omit-tag="" tal:content="site_name">the site</span> is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing you published changes; only the way you log in does.</span>
+<span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_sso_migrated_lead">Your access to <span i18n:name="institution" tal:omit-tag="" tal:content="institution">the institution</span> on <span i18n:name="site_name" tal:omit-tag="" tal:content="site_name">the site</span> is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing else changed, only the way you log in.</span>
 
 <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_card_your_account">Your account</span> : <span tal:omit-tag="" tal:content="email" />
 <span tal:omit-tag="" i18n:domain="imio.emailkit" i18n:translate="email_field_institution">Institution</span> : <span tal:omit-tag="" tal:content="institution" />

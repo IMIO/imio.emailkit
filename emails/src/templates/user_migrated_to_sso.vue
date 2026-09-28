@@ -47,8 +47,7 @@
       on
       <span i18n:name="site_name" tal:omit-tag="" tal:content="site_name">the site</span>
       is now managed by Wallonie Connect, the single sign-on service of the
-      Walloon local authorities. Nothing you published changes; only the way you
-      log in does.
+      Walloon local authorities. Nothing else changed, only the way you log in.
     </p>
 
     <KitCard>

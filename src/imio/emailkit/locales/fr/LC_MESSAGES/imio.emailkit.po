@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: imio.emailkit\n"
-"POT-Creation-Date: 2026-09-25 09:09+0000\n"
+"POT-Creation-Date: 2026-09-28 08:01+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI +ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -15,47 +15,47 @@ msgstr ""
 "Domain: imio.emailkit\n"
 "Language: fr\n"
 
-#: imio/emailkit/interfaces.py:48
+#: imio/emailkit/interfaces.py:34
 msgid "Absolute URL of the logo shown in the mail header. Remote URL, not an inline image."
 msgstr "URL absolue du logo affiché dans l’en-tête du courriel. URL distante, pas une image intégrée."
 
-#: imio/emailkit/profiles.zcml:28
+#: imio/emailkit/profiles.zcml:25
 msgid "Email templating runtime plus the restyled Plone default mails."
 msgstr "Moteur de gabarits d’e-mails et courriels Plone par défaut restylés."
 
-#: imio/emailkit/profiles.zcml:20
+#: imio/emailkit/profiles.zcml:17
 msgid "Email templating runtime without the restyled Plone default mails. Install this instead of the default profile to keep Plone's stock mails untouched."
 msgstr "Moteur de gabarits d’e-mails sans les courriels Plone par défaut restylés. Installez ce profil plutôt que le profil par défaut pour laisser les courriels Plone d’origine inchangés."
 
-#: imio/emailkit/interfaces.py:73
+#: imio/emailkit/interfaces.py:57
 msgid "Footer HTML"
 msgstr "HTML du pied de page"
 
-#: imio/emailkit/interfaces.py:74
+#: imio/emailkit/interfaces.py:58
 msgid "HTML inserted in the mail footer. Rendered unescaped -- it is one of the two slots allowed to carry markup."
 msgstr "HTML inséré dans le pied de page du courriel. Rendu sans échappement : c’est l’un des deux emplacements autorisés à contenir du balisage."
 
-#: imio/emailkit/interfaces.py:59
+#: imio/emailkit/interfaces.py:45
 msgid "Hexadecimal color used by buttons and the header rule, for example ``#e6007e``."
 msgstr "Couleur hexadécimale utilisée par les boutons et le filet de l’en-tête, par exemple ``#e6007e``."
 
-#: imio/emailkit/interfaces.py:47
+#: imio/emailkit/interfaces.py:33
 msgid "Logo URL"
 msgstr "URL du logo"
 
-#: imio/emailkit/interfaces.py:58
+#: imio/emailkit/interfaces.py:44
 msgid "Primary color"
 msgstr "Couleur principale"
 
-#: imio/emailkit/contentrules/configure.zcml:86
+#: imio/emailkit/contentrules/configure.zcml:61
 msgid "Send a styled email built from a registered template, through the imio.emailkit builder: one message per recipient language, with the subject translated accordingly."
 msgstr "Envoyer un courriel mis en forme à partir d’un gabarit enregistré, via le constructeur imio.emailkit : un message par langue de destinataire, avec l’objet traduit en conséquence."
 
-#: imio/emailkit/contentrules/configure.zcml:86
+#: imio/emailkit/contentrules/configure.zcml:61
 msgid "Send styled email"
 msgstr "Envoyer un courriel mis en forme"
 
-#: imio/emailkit/profiles.zcml:36
+#: imio/emailkit/profiles.zcml:33
 msgid "Uninstall iMio Emailkit setup."
 msgstr "Désinstaller la configuration d’iMio Emailkit."
 
@@ -91,7 +91,7 @@ msgid "email_cta_sso_migrated"
 msgstr "Se connecter avec Wallonie Connect"
 
 #. Default: "View this item"
-#: imio/emailkit/contentrules/mail.py:123
+#: imio/emailkit/contentrules/mail.py:81
 msgid "email_cta_view_item"
 msgstr "Consulter ce contenu"
 
@@ -236,27 +236,27 @@ msgid "email_pill_your_account"
 msgstr "Votre compte"
 
 #. Default: "Here is the username you asked for."
-#: imio/emailkit/msgids.py:18
+#: imio/emailkit/msgids.py:14
 msgid "email_preheader_get_username"
 msgstr "Voici le nom d’utilisateur que vous avez demandé."
 
 #. Default: "Follow the link to choose a new password."
-#: imio/emailkit/msgids.py:20
+#: imio/emailkit/msgids.py:16
 msgid "email_preheader_mail_password_template"
 msgstr "Suivez le lien pour choisir un nouveau mot de passe."
 
 #. Default: "You have a new notification."
-#: imio/emailkit/msgids.py:16
+#: imio/emailkit/msgids.py:12
 msgid "email_preheader_notification"
 msgstr "Vous avez une nouvelle notification."
 
 #. Default: "Follow the link to choose your password."
-#: imio/emailkit/msgids.py:28
+#: imio/emailkit/msgids.py:24
 msgid "email_preheader_registered_notify_template"
 msgstr "Suivez le lien pour choisir votre mot de passe."
 
 #. Default: "Log in from now on with Wallonie Connect, using your email address."
-#: imio/emailkit/msgids.py:33
+#: imio/emailkit/msgids.py:29
 msgid "email_preheader_sso_migrated"
 msgstr "Connectez-vous dorénavant avec Wallonie Connect, avec votre adresse e-mail."
 
@@ -305,11 +305,11 @@ msgstr "Gérer mon compte Wallonie Connect"
 msgid "email_sso_migrated_fallback"
 msgstr "Si le bouton ne fonctionne pas, copiez cette adresse dans votre navigateur :"
 
-#. Default: "Your access to ${institution} on ${site_name} is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing you published changes; only the way you log in does."
+#. Default: "Your access to ${institution} on ${site_name} is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing else changed, only the way you log in."
 #: imio/emailkit/templates/user_migrated_to_sso.pt:166
 #: imio/emailkit/templates/user_migrated_to_sso.txt.pt:4
 msgid "email_sso_migrated_lead"
-msgstr "Votre accès à ${institution} sur ${site_name} est désormais géré par Wallonie Connect, le service d’authentification unique des pouvoirs locaux wallons. Rien de ce que vous avez publié ne change ; seule votre manière de vous connecter change."
+msgstr "Votre accès à ${institution} sur ${site_name} est désormais géré par Wallonie Connect, le service d’authentification unique des pouvoirs locaux wallons. Rien d’autre n’a changé, seulement votre manière de vous connecter."
 
 #. Default: "Your former username ${username} and its password no longer work. Your password is now the one on your Wallonie Connect account, and that is where you change it."
 #: imio/emailkit/templates/user_migrated_to_sso.pt:216
@@ -318,27 +318,27 @@ msgid "email_sso_migrated_password"
 msgstr "Votre ancien identifiant ${username} et son mot de passe ne fonctionnent plus. Votre mot de passe est désormais celui de votre compte Wallonie Connect, et c’est là que vous le modifiez."
 
 #. Default: "Your username"
-#: imio/emailkit/msgids.py:17
+#: imio/emailkit/msgids.py:13
 msgid "email_subject_get_username"
 msgstr "Votre nom d’utilisateur"
 
 #. Default: "Password reset request"
-#: imio/emailkit/msgids.py:19
+#: imio/emailkit/msgids.py:15
 msgid "email_subject_mail_password_template"
 msgstr "Demande de réinitialisation de mot de passe"
 
 #. Default: "Notification"
-#: imio/emailkit/msgids.py:15
+#: imio/emailkit/msgids.py:11
 msgid "email_subject_notification"
 msgstr "Notification"
 
 #. Default: "An account has been created for you"
-#: imio/emailkit/msgids.py:24
+#: imio/emailkit/msgids.py:20
 msgid "email_subject_registered_notify_template"
 msgstr "Un compte a été créé pour vous"
 
 #. Default: "Your account now uses Wallonie Connect"
-#: imio/emailkit/msgids.py:32
+#: imio/emailkit/msgids.py:28
 msgid "email_subject_sso_migrated"
 msgstr "Votre compte utilise désormais Wallonie Connect"
 
@@ -349,78 +349,78 @@ msgid "email_title_sso_migrated"
 msgstr "Votre compte utilise désormais Wallonie Connect"
 
 #. Default: "Send one of the styled email templates shipped by the installed add-ons. The template owns the markup and the subject; this form chooses which one and who receives it."
-#: imio/emailkit/contentrules/mail.py:414
+#: imio/emailkit/contentrules/mail.py:326
 msgid "help_add_styledmail_action"
 msgstr "Envoyer l’un des gabarits de courriels mis en forme fournis par les add-ons installés. Le gabarit détient le balisage et l’objet ; ce formulaire choisit lequel et qui le reçoit."
 
 #. Default: "One entry per recipient: an email address, or the id of a Plone user. Prefer the user id where you can, because the mail is then rendered and its subject translated in that user's own preferred language."
-#: imio/emailkit/contentrules/mail.py:154
+#: imio/emailkit/contentrules/mail.py:110
 msgid "help_styledmail_recipients"
 msgstr "Une entrée par destinataire : une adresse e-mail, ou l’identifiant d’un utilisateur Plone. Préférez l’identifiant utilisateur quand c’est possible : le courriel est alors rendu et son objet traduit dans la langue préférée de cet utilisateur."
 
 #. Default: "Send to the owner of the content that triggered the rule, in addition to the recipients above. The rule fails loudly rather than sending to fewer people if the owner cannot be resolved."
-#: imio/emailkit/contentrules/mail.py:173
+#: imio/emailkit/contentrules/mail.py:129
 msgid "help_styledmail_send_to_owner"
 msgstr "Envoyer au propriétaire du contenu qui a déclenché la règle, en plus des destinataires ci-dessus. Si le propriétaire ne peut pas être résolu, la règle échoue bruyamment au lieu d’envoyer à moins de personnes."
 
 #. Default: "The styled template this rule sends. The list holds every template registered by every installed add-on; a template's name is <package>:<template>, because three add-ons may each ship one called 'notification'."
-#: imio/emailkit/contentrules/mail.py:139
+#: imio/emailkit/contentrules/mail.py:95
 msgid "help_styledmail_template"
 msgstr "Le gabarit mis en forme que cette règle envoie. La liste contient tous les gabarits enregistrés par tous les add-ons installés ; le nom d’un gabarit s’écrit <paquet>:<gabarit>, car trois add-ons peuvent chacun en fournir un appelé « notification »."
 
-#: imio/emailkit/profiles.zcml:28
+#: imio/emailkit/profiles.zcml:25
 msgid "iMio Emailkit: Install"
 msgstr "iMio Emailkit : installation"
 
-#: imio/emailkit/profiles.zcml:36
+#: imio/emailkit/profiles.zcml:33
 msgid "iMio Emailkit: Uninstall"
 msgstr "iMio Emailkit : désinstallation"
 
-#: imio/emailkit/profiles.zcml:20
+#: imio/emailkit/profiles.zcml:17
 msgid "iMio Emailkit: runtime only"
 msgstr "iMio Emailkit : moteur uniquement"
 
 #. Default: "Add Send styled email action"
-#: imio/emailkit/contentrules/mail.py:413
+#: imio/emailkit/contentrules/mail.py:325
 msgid "label_add_styledmail_action"
 msgstr "Ajouter une action Envoyer un courriel mis en forme"
 
 #. Default: "Edit Send styled email action"
-#: imio/emailkit/contentrules/mail.py:434
+#: imio/emailkit/contentrules/mail.py:346
 msgid "label_edit_styledmail_action"
 msgstr "Modifier l’action Envoyer un courriel mis en forme"
 
 #. Default: "Email recipients"
-#: imio/emailkit/contentrules/mail.py:153
+#: imio/emailkit/contentrules/mail.py:109
 msgid "label_styledmail_recipients"
 msgstr "Destinataires du courriel"
 
 #. Default: "Also send to the owner of the content"
-#: imio/emailkit/contentrules/mail.py:169
+#: imio/emailkit/contentrules/mail.py:125
 msgid "label_styledmail_send_to_owner"
 msgstr "Envoyer aussi au propriétaire du contenu"
 
 #. Default: "Email template"
-#: imio/emailkit/contentrules/mail.py:138
+#: imio/emailkit/contentrules/mail.py:94
 msgid "label_styledmail_template"
 msgstr "Gabarit de courriel"
 
 #. Default: "Configure element"
-#: imio/emailkit/contentrules/mail.py:422
+#: imio/emailkit/contentrules/mail.py:334
 msgid "legend_styledmail_configure"
 msgstr "Configurer l’élément"
 
 #. Default: "Send the styled email \"${template}\" to ${recipients}"
-#: imio/emailkit/contentrules/mail.py:217
+#: imio/emailkit/contentrules/mail.py:169
 msgid "summary_styledmail"
 msgstr "Envoyer le courriel mis en forme « ${template} » à ${recipients}"
 
 #. Default: "Send the styled email \"${template}\" to ${recipients} and to the owner of the content"
-#: imio/emailkit/contentrules/mail.py:230
+#: imio/emailkit/contentrules/mail.py:182
 msgid "summary_styledmail_and_owner"
 msgstr "Envoyer le courriel mis en forme « ${template} » à ${recipients} et au propriétaire du contenu"
 
 #. Default: "Send the styled email \"${template}\" to the owner of the content"
-#: imio/emailkit/contentrules/mail.py:223
+#: imio/emailkit/contentrules/mail.py:175
 msgid "summary_styledmail_owner_only"
 msgstr "Envoyer le courriel mis en forme « ${template} » au propriétaire du contenu"

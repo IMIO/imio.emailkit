@@ -164,7 +164,7 @@
                     <span i18n:name="institution" tal:omit-tag tal:content="institution">the institution</span>
                     on
                     <span i18n:name="site_name" tal:omit-tag tal:content="site_name">the site</span>
-                    is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing you published changes; only the way you log in does.
+                    is now managed by Wallonie Connect, the single sign-on service of the Walloon local authorities. Nothing else changed, only the way you log in.
                   </p>
                   <table role="presentation" style="margin-top: 20px; width: 100%; border-top-right-radius: 12px; border-bottom-right-radius: 12px; border: 2px solid #ededed;" cellpadding="0" cellspacing="0">
                     <tr>
