@@ -4,7 +4,7 @@ dynamic = ["version"]
 description = "Buildout recipe generating bin/compile-emails, bin/check-emails and bin/preview-emails for imio.emailkit consumers"
 readme = "README.md"
 license = "GPL-2.0-only"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 authors = [{ name = "Antoine Duchêne", email = "antoine.duchene@imio.be" }]
 keywords = ["buildout", "recipe", "Plone", "email", "Maizzle"]
 classifiers = [
@@ -19,6 +19,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 # `imio.emailkit`, Node and npm are not dependencies: a buildout with no
 # emailkit consumer must not drag Plone into the buildout interpreter.
