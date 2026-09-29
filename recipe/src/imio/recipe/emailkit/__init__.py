@@ -21,7 +21,7 @@ from imio.recipe.emailkit import projects as projects_module
 import logging
 
 
-__version__ = "1.0.0b5.dev0"
+__version__ = "1.0.0b5"
 
 logger = logging.getLogger("imio.recipe.emailkit")
 
